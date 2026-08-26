@@ -1,245 +1,208 @@
+<div align="center">
+
 # 🐧⚡ Waddle
+### AI-Integrated Next-Gen Linux Terminal Emulator
 
-**完全ローカル AI（Ollama）統合型 Linux ターミナルエミュレータ**
+[![Built with Tauri](https://img.shields.io/badge/Tauri-2.0-24C8D8?style=for-the-badge&logo=tauri&logoColor=white)](https://tauri.app/)
+[![Rust](https://img.shields.io/badge/Rust-1.98+-orange?style=for-the-badge&logo=rust&logoColor=white)](https://www.rust-lang.org/)
+[![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
+[![Ollama](https://img.shields.io/badge/Ollama-Local_AI-white?style=for-the-badge&logo=ollama&logoColor=black)](https://ollama.com/)
+[![Platform](https://img.shields.io/badge/Platform-Linux_(Wayland_/_X11)-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://www.kernel.org/)
+[![Vibe Coding](https://img.shields.io/badge/Built_with-AI_Vibe_Coding-8A2BE2?style=for-the-badge&logo=sparkles&logoColor=white)](#-about-this-project--ai-vibe-coding)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
 
-Waddle のアイコンイメージ
+<p align="center">
+  <strong>超高速 PTY ターミナル × 完全ローカル AI（Ollama） × 簡易内蔵エディタ</strong><br>
+  外部クラウドにデータを一切送信しない、プライベートかつインテリジェントな Linux 向けターミナルエミュレータ
+</p>
 
-Waddle は、Linux（Wayland / X11）環境向けに設計された次世代ターミナルエミュレータです。**ローカル LLM（Ollama）**および**簡易内蔵エディタ**をターミナルへと完全に統合し、外部クラウド API（Gemini / OpenAI 等）を一切使わず、すべての AI 処理を**ご自身の PC （ローカル）**で完結させるプライバシー保護＆オフライン対応のターミナルです。 🐧⚡
-
-> Waddle の "🦙" は、迷い虫（Goofy-Goober）を元気に導く、ふかふかのぬくもりのある友です。
+</div>
 
 ---
 
-## ✨ 主な特徴（Key Features）
+## 🤖 About This Project (AI Vibe Coding)
 
-### 🤖 自然言語からコマンドを自動生成（`Ctrl + K`）
+> [!IMPORTANT]
+> ### 💡 AI Vibe Coding Project
+> 本プロジェクト **Waddle** は、**AI（Google DeepMind Antigravity / Gemini）との対話を通じて構築された「AI Vibe Coding（バイブコーディング）」プロジェクト**です。
+> 人間のアイデアとAIのエージェントコーディングを掛け合わせ、アーキテクチャ設計から Rust による PTY 制御、WebKitGTK 最適化、React 19 フロントエンド、Ollama 統合、内蔵エディタ実装までを一気通貫で開発しました。
 
-日本語でも英語でも好きな言葉でやりたいことを入力するだけで、ローカルの Ollama モデルが最適な Linux コマンドとその解説を瞬時に生成します。
+---
 
-- 例：`直近のコミットを取り消したい`、`8080 番ポートを使っているプロセスを終了`
-- 生成されたコマンドを `Enter` でターミナルに挿入し、`Ctrl + Enter` で即座に実行可能
-- 危険なコマンド（`rm -rf`、パーティション操作等）は**警告バッジ付き**でハイライト表示
+## 🌟 主な特徴 (Features)
 
-### 📝 簡易内蔵エディタ & AI コード支援（`Ctrl + E`）
+### 1. 🤖 自然言語コマンド生成 (`Ctrl + K`)
+- やりたいことを日本語や英語で入力するだけで、ローカルの Ollama モデルが最適な Linux コマンドとその解説を瞬時に生成。
+- 危険なコマンド（`rm -rf`, パーティション操作等）は警告バッジで検知。
+- `Enter` でターミナルに挿入、`Ctrl + Enter` で即時実行。
 
-ターミナル画面とシームレスに連携するスライドイン / スプリット型エディタです。
+### 2. 📝 簡易内蔵エディタ & AI コード支援 (`Ctrl + E`)
+- ターミナル横にシームレスに開くスライドインエディタ。
+- **クイックオープン & 保存**: カレントディレクトリ内のファイル選択・パス入力・保存 (`Ctrl + S`)。
+- **Run in Terminal**: 編集中のスクリプト（Python, Bash, JS/TS, Rust 等）をワンクリックでターミナルに送信して即時実行。
+- **AI Edit (`Ctrl + Shift + K`)**: Ollama に指示（「エラー処理を追加して」「TypeScriptに変換して」等）を与えてコードを自動置換・リファクタリング。
 
-- **クイックオープン & 保存**：カレントディレクトリ内のファイル選択・パス入力・保存をサポート（`Ctrl + S`）
-- **Run in Terminal**：編集中のスクリプト（Python、Bash、JS/TS、Rust 等）をワンクリックでターミナルに送信して即時実行
-- **AI Edit（`Ctrl + Shift + K`）**：Ollama を活用し「エラー処理を追加して」「TypeScript にリファクタリングして」のようないndiceを与えてコードを自動更新
+### 3. 🚨 インテリジェント・エラー自動診断 & ワンクリック修正
+- コマンドがエラー（Exit code != 0 またはエラーログ検出）で終了した場合、スマートバナーが自動出現。
+- ワンクリックで「なぜ失敗したか」「修正するための推奨コマンド」をローカル AI が分析・提示し、そのままワンクリックで修正コマンドを実行可能。
 
-### 🚨 インテリジェント・エラー自動診断 & ワンクリック修正
+### 4. 💬 コンテキスト連動型 Copilot サイドバー
+- カレントディレクトリ (`pwd`)、Git ブランチ・変更状態、直近のコマンドと実行出力を自動で把握した対話型アシスタント。
+- 回答内のコードブロックから直接「ターミナルへ挿入」「即座に実行」「クリップボードにコピー」が可能。
 
-コマンド実行がエラー（終了コードが `!= 0` またはエラーログが検出された）ことで終了した場合、直感的なスマートバナーを表示します。
+### 5. 🦙 Ollama ローカルモデルの自動検出 & 完全プライベート
+- ローカルにインストールされている Ollama モデル（`llama3.2`, `deepseek-r1`, `qwen2.5-coder`, `codellama`, `mistral` 等）を自動検出。
+- 設定画面（`Ctrl + ,`）でモデル一覧をワンクリック再取得・ドロップダウン切り替え。
+- クラウド API や API キーへの依存はゼロ。すべてのデータはお手元の PC 内で安全に処理されます。
 
-- ワンクリックで「なぜ失敗したか」「修正するための推奨コマンド」をローカル AI が分析・提示
-- 推奨修正コマンドもワンクリックで実行可能
+### 6. ⚡ 超高速 PTY & xterm.js レンダリング
+- Rust 製 PTY マネージャー (`portable-pty`) による低レイテンシ・高信頼な疑似端末。
+- Linux `/proc/<pid>/cwd` によるリアルタイムなカレントディレクトリ追跡。
+- WebGL / Canvas 加速、TrueColor (24bit)、Nerd Fonts 対応。
 
-### 💬 コンテキスト連動型 AI Copilot サイドバー
-
-`pwd`（カレントディレクトリ）、Git ブランチ・変更状態、直近のコマンドと実行ログを自動で把握した対話型アシスタントです。
-
-- 回答内のコードブロックから直接「ターミナルへ挿入」「即座に実行」「クリップボードにコピー」が可能
-
-### 🦙 Ollama ローカルモデルの自動検出 & 簡単切替
-
-ローカルの Ollama にインストールされているモデル（`llama3.2`、`deepseek-r1`、`qwen2.5-coder`、`codellama`、`mistral` 等）を自動検出します。
-
-- 設定画面（`Ctrl + ,`）でワンクリックでモデル一覧を再取得し、ドロップダウンから選択可
-- Ollama の接続状態・バージョンをリアルタイムで表示
-
-### ⚡ 超高速 PTY & xterm.js レンダリング
-
-Rust 製 PTY マネージャー（`portable-pty`）による低レイテンシ・高信頼な疑似端末と、高性能な xterm.js レンダリングによって滑らかな入出力体験を実現します。
-
-- WebGL / Canvas アクセラレーション描画
-- TrueColor（24bit）対応
-- Nerd Fonts 対応
-
-### 🎨 美しいモダンテーマ
-
-4 つの美しいテーマから選べます。
-
-- **Waddle Cyber Dark**（デフォルト）
+### 7. 🎨 4種類の洗練されたモダンテーマ
+- **Waddle Cyber Dark** (Default)
 - **Tokyo Night**
 - **Catppuccin Mocha**
 - **Dracula**
 
 ---
 
-## ⌨️ キーボードショートカット
+## ⌨️ キーボードショートカット (Keybindings)
 
 | ショートカット | 機能 |
 | :--- | :--- |
 | `Ctrl + K` | **AI Command Generator** を開く |
 | `Ctrl + E` | **簡易内蔵エディタ** の開閉トグル |
-| `Ctrl + S`（エディタ内） | ファイルの保存 |
-| `Ctrl + Shift + K`（エディタ内） | **AI コード編集・自動生成** を開く |
+| `Ctrl + S` (エディタ内) | ファイルの保存 |
+| `Ctrl + Shift + K` (エディタ内) | **AI コード編集・自動生成** を開く |
 | `Ctrl + T` | 新しいターミナルタブを開く |
 | `Ctrl + W` | 現在のタブを閉じる |
-| `Ctrl + ,` | 設定画面（Ollama モデル選択、テーマ設定）を開く |
-| `Enter`（AI Modal 内） | 生成されたコマンドをターミナルに挿入 |
-| `Ctrl + Enter`（AI Modal 内） | 生成されたコマンドを即時実行 |
+| `Ctrl + ,` | 設定画面（Ollama モデル選択・テーマ・フォント設定）を開く |
+| `Enter` (AI Modal内) | 生成されたコマンドをターミナルに挿入 |
+| `Ctrl + Enter` (AI Modal内) | 生成されたコマンドを即時実行 |
 | `Esc` | モーダルを閉じる |
 
 ---
 
-## 🏗️ テクノロジー（Tech Stack）
+## 🏗️ アーキテクチャ (Architecture)
 
-- **Tauri 2** — リッチなデスクトップアプリを軽量な Rust バックエンドで構築
-- **React 19 + TypeScript** — 型安全性を考慮したフロントエンド開発
-- **Vite** — 高速なビルドツール
-- **xterm.js + xterm-webgl / xterm-canvas** — 高性能なターミナル描画
-- **xterm-fit / xterm-web-links** — 自動スクリーンフィット・リンク表示
-- **portable-pty（Rust）** — 低レイテンシな疑似 PTY
-- **Ollama** — 完全ローカルの AI 処理エンジン
-- **lucide-react + react-markdown（GFM）** — アイコンと副作用のあるマークダウンレンダリング
+```mermaid
+graph TD
+    subgraph UI_Layer [Frontend: Tauri 2.0 Webview / React 19 + TypeScript]
+        TermView[Terminal View: xterm.js + WebLinks + Fit]
+        Editor[Embedded Editor: Quick Open + Run in Terminal]
+        AIOverlay[AI Command Modal Ctrl+K / Smart Error Banner]
+        Copilot[AI Copilot Sidebar: Context-Aware Chat]
+        Settings[Settings Modal: Ollama Model Auto-Discovery]
+    end
+
+    subgraph Rust_Backend [Backend: Rust + Tauri Core]
+        PtyMgr[PTY Manager: portable-pty + /proc/PID/cwd]
+        AiCore[Ollama Client: Streaming / Tags / Generate]
+        FileIO[File System: Read / Write / List]
+        ConfigMgr[Config Manager: ~/.config/waddle/config.json]
+    end
+
+    subgraph System_Layer [Local Linux Environment]
+        Shell[Linux Shell: /bin/bash, zsh, fish]
+        Ollama[Local Ollama: http://localhost:11434]
+    end
+
+    TermView <-->|Tauri IPC Events| PtyMgr
+    PtyMgr <--> Shell
+    Editor <-->|File Commands| FileIO
+    AIOverlay & Copilot & Editor <-->|AI Commands| AiCore
+    AiCore <-->|REST / SSE Stream| Ollama
+```
 
 ---
 
-## 🚀 クイック開始
+## 🚀 クイックスタート (Quick Start)
 
-### 1. 依存項の確認
+### 1. 前提条件のインストール
 
-Waddle を構築する前に、以下のツールをインストール済みか確認してください。
+- [Rust (Cargo)](https://rustup.rs/) (1.70 以上)
+- [Node.js & npm](https://nodejs.org/) (Node 18 以上)
+- [Ollama](https://ollama.com/) (ローカル AI 実行エンジン)
 
-| ツール | 必須バージョン |
-| :--- | :--- |
-| [Rust](https://rustup.rs/) | 安定版（Stable） |
-| [Node.js](https://nodejs.org/) | v18 以上 |
-| [Clang/LLVM](https://clang.llvm.org/) | x86_64-linux-gnu 版 |
-| Ollama | 1.0 以上（[公式サイト](https://ollama.com/download)） |
-
-### 2. Ollama の起動とモデルのダウンロード
-
-Waddle は Ollama を中心にローカルで活用しますので、事前に Ollama とモデルを準備します。
+### 2. Ollama の準備
 
 ```bash
-# Ollama サーバーを起動（バックグラウンドで稼働させます）
+# Ollama サーバーを起動
 ollama serve
 
-# お好みのモデルをダウンロード
-# 例: llama3.2 や deepseek-r1、qwen2.5-coder
+# お好みのローカルモデルをダウンロード
 ollama pull llama3.2
+# またはコード特化モデル
+ollama pull qwen2.5-coder
+# または推論モデル
+ollama pull deepseek-r1
 ```
 
-### 3. Waddle の開発ビルド
+### 3. 開発モードでの起動
 
 ```bash
+# リポジトリのクローン
+git clone https://github.com/your-username/Waddle.git
+cd Waddle
+
 # 依存パッケージのインストール
 npm install
 
-# 開発用で起動（http://localhost:1420 を開いてください）
+# 開発サーバー起動
 npm run tauri dev
 ```
 
-> 💡 依存パッケージのインストール（`npm install`）は初めてを使う度に一度だけ実行してください。
+---
 
-### 4. Waddle のパッケージ化 & 配布ビルド
+## 📦 プロダクションビルド (Production Build)
 
-正式リリース版をビルドしたい場合は、以下のいずれかを実行します。
+単一バイナリおよび Linux 配布用パッケージ（`.AppImage` / `.deb`）を生成する場合：
 
 ```bash
-# OS に依存しないフロントエンドのアセットをビルド
-npm run build
-
-# OS 別パッケージ（deb / rpm / AppImage / dmg / msi / nsis 等）を生成
 npm run tauri build
 ```
 
-> 💡 バイナリ生成の最初のビルドでは、バックエンドのコンパイルを含むため数分かかります。ご耐心ください。
+### 成果物の出力先
+- **単一バイナリ (約 12〜19 MB)**: `src-tauri/target/release/waddle`
+- **AppImage パッケージ**: `src-tauri/target/release/bundle/appimage/`
+- **deb パッケージ**: `src-tauri/target/release/bundle/deb/`
 
----
-
-## 📊 開発ワークフロー
-
-```
-       ┌─────────────────────────────────────────────┐
-       │           npm run tauri dev                    │
-       └───────────────┬───────────────────┬──────────┘
-                       │                   │
-              ┌────────▼─────────┐   ┌─────▼──────────┐
-              │   Vite + React    │   │  Rust (Tauri)  │
-              │   Frontend        │   │   Backend       │
-              │   (xterm, Ollama) │   │  (portable-pty) │
-              └────────┬──────────┘   └────────┬────────┘
-                       └───────────┬───────────┘
-                                   │
-                        ┌──────────▼──────────┐
-                        │   Waddle ウィンドウ   │
-                        │  (ターミナル + エディタ  │
-                        │   + AI Copilot サイドバー)│
-                        └───────────────────────┘
+### システムへのインストール例
+```bash
+sudo cp src-tauri/target/release/waddle /usr/local/bin/
 ```
 
 ---
 
-## 🖥️ プロジェクト構成
+## 💻 技術スタック (Tech Stack)
 
-```text
-.
-├── index.html          # Vite の HTML エントリポイント
-├── package.json        # フロントエンド依存とスクリプト
-├── tsconfig.json       # TypeScript 設定
-├── vite.config.ts      # Vite 設定
-├── public/             # ビルド時にそのまま含めるリソース
-├── src/                # React / TypeScript フロントエンド
-│   ├── main.tsx        # アプリエントリー
-│   ├── index.css       # グローバル CSS
-│   ├── App.css         # コンポーネント固有の CSS
-│   ├── App.tsx         # ルートコンポーネント
-│   ├── theme.ts        # テーマ定義
-│   ├── types.ts        # 型定義
-│   ├── components/     # React コンポーネント
-│   ├── services/       # Ollama / Tauri などのロジック
-│   └── assets/         # 画像・フォント等
-└── src-tauri/          # Rust バックエンド (Tauri)
-    ├── tauri.conf.json # Tauri アプリ設定
-    ├── Cargo.toml      # Rust 依存
-    ├── build.rs        # Tauri ビルドフック
-    ├── icons/          # アプリアイコン
-    └── src/            # Rust 実装
-```
+| レイヤー | 使用技術 |
+| :--- | :--- |
+| **Framework** | [Tauri 2.0](https://tauri.app/) |
+| **Backend** | Rust, `portable-pty`, `tokio`, `reqwest`, `serde` |
+| **Frontend** | React 19, TypeScript, Vite, Vanilla CSS |
+| **Terminal Core** | `@xterm/xterm`, `@xterm/addon-fit`, `@xterm/addon-web-links` |
+| **Local AI Engine** | [Ollama](https://ollama.com/) (`/api/generate`, `/api/chat`, `/api/tags`) |
+| **Icons & Markdown** | `lucide-react`, `react-markdown`, `remark-gfm` |
 
 ---
 
-## 🔒 プライバシー & セキュリティ
+## 🔒 プライバシー & セキュリティ (Privacy & Security)
 
-Waddle は以下の原則に基づいて設計されています。
-
-- **一切クラウドに依存しない**：AI 処理（コマンド生成、エラー診断、チャット支援、コード自動編集）はすべてローカルで完結します
-- **外部 API 不使用**：Gemini / OpenAI 等の第三者 API を一切利用しません
-- **データは手元を守る**：すべての処理をご自身の環境内で実行しますので、プロンプトやコードは一切外部に出ません
+- **100% オフライン & ローカル完結**: 入力したコマンド、ファイル内容、プロンプト、実行ログは一切外部インターネットやサードパーティAPIへ送信されません。
+- **データ主権**: 自宅・社内ネットワーク等のプライベート環境でも安全に活用できます。
 
 ---
 
-## 🤝 貢献（Contributing）
+## 📄 ライセンス (License)
 
-Waddle はオープンで透明性のある開発を方針としています。コードの改善、バグフィクス、新機能の提案など、誰でも参加できます。新しい機能を開発する際は、必ず PR を作成し、関連するテストを記述してください。
-
----
-
-## 📄 ライセンス
-
-Waddle は MIT ライセンスで公開されています。`LICENSE`（別途整備予定）を参照してください。
-
----
-
-## 🙋 質問への答え（FAQ）
-
-### Q: インストールには Ollama は必須ですか？
-A: Waddle の AI 機能を利用するには Ollama のインストール＆動作が必須です。ターミナル機能そのものは利用できますが、AI 機能が正常に機能しない場合は Ollama の稼働をご確認の上、再度お試しください。
-
-### Q: Windows / macOS は動くでしょうか？
-A: Waddle は現在 Linux（Wayland / X11）環境を対象として設計されています。将来的に他 OS への対応を検討しておりますので、ご意見は Welcome です（[#29](#)）。
-
-### Q: どの Ollama モデルが推奨されますか？
-A: ターミナル・コード関連のタスクにはコードに特化したモデル（例：`qwt2.5-coder`、`codellama`）を推奨しつつ、汎用的な会話には `llama3.2` や `deepseek-r1` でも十分に活用可能です。
+本プロジェクトは [MIT License](LICENSE) のもとで公開されています。
 
 ---
 
 <p align="center">
-  Made with 💛🐧 by <strong>Susie</strong>.
-  <br>
-  迷い虫も、あなたと一緒にどこかへ向かいます。
+  Crafted via <strong>AI Vibe Coding</strong> 🐧⚡<br>
+  Built with ❤️ for Linux Developers
 </p>
