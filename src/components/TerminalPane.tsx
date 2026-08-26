@@ -30,7 +30,7 @@ export const TerminalPane: React.FC<TerminalPaneProps> = ({
   useEffect(() => {
     if (!containerRef.current) return;
 
-    // Clear previous DOM elements if re-mounting (React 19 StrictMode safety)
+    // Clear previous DOM elements if re-mounting
     containerRef.current.innerHTML = '';
 
     const currentTheme = THEMES[config.terminal.theme] || THEMES.waddle_dark;
@@ -43,6 +43,7 @@ export const TerminalPane: React.FC<TerminalPaneProps> = ({
       scrollback: config.terminal.scrollback,
       theme: currentTheme.terminal,
       allowTransparency: true,
+      convertEol: true,
       smoothScrollDuration: 100,
     });
 
@@ -55,7 +56,7 @@ export const TerminalPane: React.FC<TerminalPaneProps> = ({
     termRef.current = term;
     fitAddonRef.current = fitAddon;
 
-    // Safely fit initial layout
+    // Initial fit & focus
     const timer = setTimeout(() => {
       if (containerRef.current && containerRef.current.clientWidth > 0) {
         try {
@@ -64,13 +65,14 @@ export const TerminalPane: React.FC<TerminalPaneProps> = ({
           if (rows > 2 && cols > 2) {
             TauriApi.resizePty(tab.sessionId, rows, cols);
           }
+          term.focus();
         } catch (e) {
           // ignore fit error
         }
       }
     }, 60);
 
-    // Send user input to PTY
+    // Send user input directly to PTY
     let inputLine = '';
     const onDataDisposable = term.onData((data) => {
       TauriApi.writePty(tab.sessionId, data);
@@ -188,7 +190,7 @@ export const TerminalPane: React.FC<TerminalPaneProps> = ({
     }
   }, [config]);
 
-  // Re-fit when becoming active
+  // Re-fit and focus when becoming active
   useEffect(() => {
     if (isActive && fitAddonRef.current && termRef.current) {
       setTimeout(() => {
@@ -229,6 +231,7 @@ export const TerminalPane: React.FC<TerminalPaneProps> = ({
     <div
       className="terminal-wrapper"
       style={{ display: isActive ? 'block' : 'none' }}
+      onClick={() => termRef.current?.focus()}
     >
       <div
         ref={containerRef}
