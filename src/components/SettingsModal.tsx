@@ -9,6 +9,7 @@ import {
   AlertCircle,
   CheckCircle2,
   HardDrive,
+  Type,
 } from 'lucide-react';
 import { AppConfig, OllamaStatus } from '../types';
 import { THEMES } from '../theme';
@@ -21,6 +22,30 @@ interface SettingsModalProps {
   onSaveConfig: (newConfig: AppConfig) => void;
 }
 
+const inputStyle: React.CSSProperties = {
+  backgroundColor: '#181e2e',
+  color: '#f8fafc',
+  border: '1px solid rgba(56, 189, 248, 0.25)',
+  borderRadius: '6px',
+  padding: '8px 12px',
+  fontSize: '13px',
+  outline: 'none',
+  width: '100%',
+  colorScheme: 'dark',
+};
+
+const FONT_OPTIONS = [
+  { label: 'JetBrainsMono Nerd Font (推奨)', value: "'JetBrainsMono Nerd Font', 'JetBrains Mono', 'Symbols Nerd Font Mono', monospace" },
+  { label: 'MesloLGS NF (Powerlevel10k / Oh My Posh)', value: "'MesloLGS NF', 'MesloLGS Nerd Font', 'Symbols Nerd Font Mono', monospace" },
+  { label: 'FiraCode Nerd Font (リガチャ対応)', value: "'FiraCode Nerd Font', 'Fira Code', 'Symbols Nerd Font Mono', monospace" },
+  { label: 'Hack Nerd Font', value: "'Hack Nerd Font', 'Hack', 'Symbols Nerd Font Mono', monospace" },
+  { label: 'CaskaydiaCove Nerd Font (Cascadia Code)', value: "'CaskaydiaCove Nerd Font', 'Cascadia Code', 'Symbols Nerd Font Mono', monospace" },
+  { label: 'SauceCodePro Nerd Font (Source Code Pro)', value: "'SauceCodePro Nerd Font', 'Source Code Pro', 'Symbols Nerd Font Mono', monospace" },
+  { label: 'Symbols Nerd Font Only (記号フォールバック)', value: "'Symbols Nerd Font Mono', 'JetBrains Mono', monospace" },
+  { label: 'システム等幅 (monospace)', value: 'monospace' },
+  { label: 'カスタムフォント...', value: 'custom' },
+];
+
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
   onClose,
@@ -31,6 +56,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [ollamaStatus, setOllamaStatus] = useState<OllamaStatus | null>(null);
   const [isCheckingOllama, setIsCheckingOllama] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [isCustomFont, setIsCustomFont] = useState(false);
 
   const fetchOllamaStatus = async (endpoint?: string) => {
     setIsCheckingOllama(true);
@@ -55,6 +81,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     if (isOpen) {
       setFormData({ ...config });
       fetchOllamaStatus(config.ai.ollama_endpoint);
+      const isKnownPreset = FONT_OPTIONS.some((f) => f.value === config.terminal.font_family);
+      setIsCustomFont(!isKnownPreset && config.terminal.font_family !== 'custom');
     }
   }, [isOpen]);
 
@@ -74,10 +102,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     <div className="modal-backdrop" onClick={onClose}>
       <div
         className="ai-modal"
-        style={{ width: '620px' }}
+        style={{ width: '640px', backgroundColor: '#131722', color: '#f8fafc' }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="ai-modal-header">
+        <div className="ai-modal-header" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
           <div className="ai-modal-title" style={{ color: 'var(--fg-main)' }}>
             <Settings size={16} />
             <span>Waddle 設定 (Ollama Local AI & Appearance)</span>
@@ -106,8 +134,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 padding: '10px 14px',
-                background: ollamaStatus?.available ? 'var(--success-bg)' : 'var(--danger-bg)',
-                border: `1px solid ${ollamaStatus?.available ? 'var(--success)' : 'var(--danger-border)'}`,
+                background: ollamaStatus?.available ? 'rgba(16, 185, 129, 0.15)' : 'rgba(244, 63, 94, 0.15)',
+                border: `1px solid ${ollamaStatus?.available ? 'rgba(16, 185, 129, 0.4)' : 'rgba(244, 63, 94, 0.4)'}`,
                 borderRadius: '8px',
                 fontSize: '13px',
               }}
@@ -133,7 +161,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
               <button
                 className="btn-secondary"
-                style={{ padding: '4px 10px', fontSize: '11px' }}
+                style={{ padding: '4px 10px', fontSize: '11px', background: '#1b2234', color: '#f8fafc' }}
                 onClick={() => fetchOllamaStatus(formData.ai.ollama_endpoint)}
                 disabled={isCheckingOllama}
               >
@@ -146,7 +174,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <div
                 style={{
                   fontSize: '12px',
-                  color: 'var(--fg-muted)',
+                  color: '#94a3b8',
                   padding: '8px 12px',
                   background: 'rgba(0, 0, 0, 0.4)',
                   borderRadius: '6px',
@@ -158,10 +186,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             )}
 
             <div className="form-group">
-              <label className="form-label">Ollama エンドポイント URL</label>
+              <label className="form-label" style={{ color: '#94a3b8' }}>Ollama エンドポイント URL</label>
               <input
                 type="text"
                 className="form-input"
+                style={inputStyle}
                 placeholder="http://localhost:11434"
                 value={formData.ai.ollama_endpoint}
                 onChange={(e) =>
@@ -174,10 +203,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
 
             <div className="form-group">
-              <label className="form-label">使用するローカルモデル</label>
+              <label className="form-label" style={{ color: '#94a3b8' }}>使用するローカルモデル</label>
               {ollamaStatus?.available && ollamaStatus.models.length > 0 ? (
                 <select
                   className="form-select"
+                  style={inputStyle}
                   value={formData.ai.ollama_model}
                   onChange={(e) =>
                     setFormData({
@@ -187,7 +217,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   }
                 >
                   {ollamaStatus.models.map((model) => (
-                    <option key={model} value={model}>
+                    <option key={model} value={model} style={{ background: '#181e2e', color: '#f8fafc' }}>
                       {model}
                     </option>
                   ))}
@@ -196,6 +226,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <input
                   type="text"
                   className="form-input"
+                  style={inputStyle}
                   placeholder="llama3.2 / deepseek-r1 / qwen2.5-coder"
                   value={formData.ai.ollama_model}
                   onChange={(e) =>
@@ -209,7 +240,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
 
             <div className="form-group">
-              <label className="form-label">生成 Temperature ({formData.ai.temperature})</label>
+              <label className="form-label" style={{ color: '#94a3b8' }}>生成 Temperature ({formData.ai.temperature})</label>
               <input
                 type="range"
                 min="0.0"
@@ -234,9 +265,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
 
             <div className="form-group">
-              <label className="form-label">カラーテーマ</label>
+              <label className="form-label" style={{ color: '#94a3b8' }}>カラーテーマ</label>
               <select
                 className="form-select"
+                style={inputStyle}
                 value={formData.terminal.theme}
                 onChange={(e) =>
                   setFormData({
@@ -246,19 +278,89 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 }
               >
                 {Object.values(THEMES).map((th) => (
-                  <option key={th.id} value={th.id}>
+                  <option key={th.id} value={th.id} style={{ background: '#181e2e', color: '#f8fafc' }}>
                     {th.name}
                   </option>
                 ))}
               </select>
             </div>
 
+            {/* Font Selection */}
+            <div className="form-group">
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <label className="form-label" style={{ color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <Type size={13} />
+                  <span>フォント (Font Family)</span>
+                </label>
+              </div>
+
+              <select
+                className="form-select"
+                style={inputStyle}
+                value={isCustomFont ? 'custom' : formData.terminal.font_family}
+                onChange={(e) => {
+                  if (e.target.value === 'custom') {
+                    setIsCustomFont(true);
+                  } else {
+                    setIsCustomFont(false);
+                    setFormData({
+                      ...formData,
+                      terminal: { ...formData.terminal, font_family: e.target.value },
+                    });
+                  }
+                }}
+              >
+                {FONT_OPTIONS.map((f) => (
+                  <option key={f.value} value={f.value} style={{ background: '#181e2e', color: '#f8fafc' }}>
+                    {f.label}
+                  </option>
+                ))}
+              </select>
+
+              {isCustomFont && (
+                <input
+                  type="text"
+                  className="form-input"
+                  style={{ ...inputStyle, marginTop: '6px' }}
+                  placeholder="例: 'Hack', 'MesloLGS NF', monospace"
+                  value={formData.terminal.font_family}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      terminal: { ...formData.terminal, font_family: e.target.value },
+                    })
+                  }
+                />
+              )}
+
+              {/* Font Preview */}
+              <div
+                style={{
+                  background: 'rgba(0, 0, 0, 0.4)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '6px',
+                  padding: '8px 12px',
+                  fontFamily: formData.terminal.font_family,
+                  fontSize: `${formData.terminal.font_size}px`,
+                  color: 'var(--accent)',
+                  marginTop: '4px',
+                  overflowX: 'auto',
+                }}
+              >
+                <div> /home/user/project  main*    ⚡</div>
+                <div style={{ color: 'var(--fg-muted)', fontSize: '11px', marginTop: '2px' }}>
+                  const code = (x: number) =&gt; x &gt;= 42 != null;
+                </div>
+              </div>
+            </div>
+
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
               <div className="form-group">
-                <label className="form-label">フォントサイズ (px)</label>
+                <label className="form-label" style={{ color: '#94a3b8' }}>フォントサイズ (px)</label>
                 <input
                   type="number"
                   className="form-input"
+                  style={inputStyle}
                   min={10}
                   max={32}
                   value={formData.terminal.font_size}
@@ -275,9 +377,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
 
               <div className="form-group">
-                <label className="form-label">カーソルスタイル</label>
+                <label className="form-label" style={{ color: '#94a3b8' }}>カーソルスタイル</label>
                 <select
                   className="form-select"
+                  style={inputStyle}
                   value={formData.terminal.cursor_style}
                   onChange={(e) =>
                     setFormData({
@@ -289,17 +392,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     })
                   }
                 >
-                  <option value="block">Block</option>
-                  <option value="underline">Underline</option>
-                  <option value="bar">Bar</option>
+                  <option value="block" style={{ background: '#181e2e', color: '#f8fafc' }}>Block</option>
+                  <option value="underline" style={{ background: '#181e2e', color: '#f8fafc' }}>Underline</option>
+                  <option value="bar" style={{ background: '#181e2e', color: '#f8fafc' }}>Bar</option>
                 </select>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="modal-footer">
-          <button className="btn-secondary" onClick={onClose}>
+        <div className="modal-footer" style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+          <button className="btn-secondary" style={{ background: '#1b2234', color: '#f8fafc' }} onClick={onClose}>
             キャンセル
           </button>
           <button id="btn-save-settings" className="btn-primary" onClick={handleSave}>

@@ -275,11 +275,11 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
           }}
           style={{
             flex: 1,
-            background: 'rgba(0, 0, 0, 0.3)',
-            border: '1px solid var(--border)',
+            backgroundColor: '#181e2e',
+            border: '1px solid rgba(56, 189, 248, 0.25)',
             borderRadius: '4px',
-            padding: '3px 8px',
-            color: 'var(--fg-main)',
+            padding: '4px 8px',
+            color: '#f8fafc',
             fontSize: '12px',
             fontFamily: 'var(--font-mono)',
             outline: 'none',
@@ -298,11 +298,11 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
         {dirFiles.length > 0 && (
           <select
             style={{
-              background: 'rgba(0, 0, 0, 0.4)',
-              border: '1px solid var(--border)',
+              backgroundColor: '#181e2e',
+              border: '1px solid rgba(56, 189, 248, 0.25)',
               borderRadius: '4px',
               padding: '3px 6px',
-              color: 'var(--fg-muted)',
+              color: '#f8fafc',
               fontSize: '11px',
               maxWidth: '120px',
               outline: 'none',
@@ -314,11 +314,11 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
             }}
             defaultValue=""
           >
-            <option value="" disabled>
+            <option value="" disabled style={{ background: '#181e2e', color: '#94a3b8' }}>
               ファイル選択...
             </option>
             {dirFiles.map((f) => (
-              <option key={f} value={f}>
+              <option key={f} value={f} style={{ background: '#181e2e', color: '#f8fafc' }}>
                 {f}
               </option>
             ))}

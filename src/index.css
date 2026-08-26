@@ -1,6 +1,15 @@
 /* Import xterm css */
 @import '@xterm/xterm/css/xterm.css';
 
+/* Nerd Fonts Symbols Font-Face (for glyphs, icons, Powerline, and devicons) */
+@font-face {
+  font-family: 'Symbols Nerd Font Mono';
+  src: url('https://cdn.jsdelivr.net/gh/ryanoasis/nerd-fonts@3.2.1/patched-fonts/NerdFontsSymbolsOnly/SymbolsNerdFontMono-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   --bg-main: #0c0e14;
   --bg-secondary: #131722;
@@ -22,7 +31,7 @@
   --warning-bg: rgba(245, 158, 11, 0.12);
   --border: rgba(255, 255, 255, 0.08);
   --border-active: rgba(56, 189, 248, 0.4);
-  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  --font-mono: 'JetBrainsMono Nerd Font', 'JetBrains Mono', 'FiraCode Nerd Font', 'Fira Code', 'MesloLGS NF', 'Symbols Nerd Font Mono', monospace;
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
   --font-display: 'Outfit', sans-serif;
   --radius-sm: 6px;
@@ -715,18 +724,33 @@ body, html {
   color: var(--fg-muted);
 }
 
-.form-input, .form-select {
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid var(--border);
+.form-input, .form-select, input[type="text"], input[type="number"], input[type="password"] {
+  background-color: #181e2e !important;
+  border: 1px solid rgba(56, 189, 248, 0.2) !important;
   border-radius: var(--radius-sm);
-  padding: 8px 12px;
-  color: var(--fg-main);
+  padding: 9px 12px;
+  color: #f8fafc !important;
   font-size: 13px;
+  font-family: var(--font-sans);
   outline: none;
+  color-scheme: dark;
+  transition: all 0.15s ease;
 }
 
-.form-input:focus, .form-select:focus {
-  border-color: var(--accent);
+.form-input:focus, .form-select:focus, input:focus, select:focus {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 10px var(--accent-glow) !important;
+  background-color: #1e2638 !important;
+}
+
+.form-select option {
+  background-color: #181e2e;
+  color: #f8fafc;
+  padding: 6px;
+}
+
+input::placeholder {
+  color: #64748b !important;
 }
 
 /* Animations */
