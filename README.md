@@ -1,10 +1,7 @@
 <div align="center">
 
 # 🐧⚡ Waddle
-### AI-Integrated Next-Gen Linux Terminal Emulator
-
-
-![banner](./images/waddle-banner.svg)
+### AI-Integrated Next-Generation Linux Terminal Emulator
 
 [![Built with Tauri](https://img.shields.io/badge/Tauri-2.0-24C8D8?style=for-the-badge&logo=tauri&logoColor=white)](https://tauri.app/)
 [![Rust](https://img.shields.io/badge/Rust-1.98+-orange?style=for-the-badge&logo=rust&logoColor=white)](https://www.rust-lang.org/)
@@ -15,8 +12,12 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
 
 <p align="center">
-  <strong>超高速 PTY ターミナル × 完全ローカル AI（Ollama） × 簡易内蔵エディタ</strong><br>
-  外部クラウドにデータを一切送信しない、プライベートかつインテリジェントな Linux 向けターミナルエミュレータ
+  <strong>Ultra-Fast PTY Terminal × 100% Local AI (Ollama) × Embedded Lightweight Editor</strong><br>
+  A private, intelligent, and lightweight terminal emulator for Linux that never sends your data to the cloud.
+</p>
+
+<p align="center">
+  <a href="README.md">English</a> | <a href="README.ja.md">日本語</a>
 </p>
 
 </div>
@@ -27,68 +28,66 @@
 
 > [!IMPORTANT]
 > ### 💡 AI Vibe Coding Project
-> 本プロジェクト **Waddle** は、**AI（Google DeepMind Antigravity / Gemini）との対話を通じて構築された「AI Vibe Coding（バイブコーディング）」プロジェクト**です。
-> 人間のアイデアとAIのエージェントコーディングを掛け合わせ、アーキテクチャ設計から Rust による PTY 制御、WebKitGTK 最適化、React 19 フロントエンド、Ollama 統合、内蔵エディタ実装までを一気通貫で開発しました。
+> **Waddle** is an **AI Vibe Coding** project built through interactive pair programming with **Google DeepMind's Antigravity (Gemini)**.
+> Combining human architectural direction with agentic AI coding, the entire project—from low-level Rust PTY process handling, Linux `/proc/<pid>/cwd` tracking, WebKitGTK optimization, React 19 frontend, local Ollama streaming client, to the embedded code editor—was designed and implemented in flow.
 
 ---
 
-## 🌟 主な特徴 (Features)
+## 🌟 Key Features
 
-### 1. 🤖 自然言語コマンド生成 (`Ctrl + K`)
-- やりたいことを日本語や英語で入力するだけで、ローカルの Ollama モデルが最適な Linux コマンドとその解説を瞬時に生成。
-- 危険なコマンド（`rm -rf`, パーティション操作等）は警告バッジで検知。
-- `Enter` でターミナルに挿入、`Ctrl + Enter` で即時実行。
+### 1. 🤖 Natural Language Command Generation (`Ctrl + K`)
+- Type what you want to achieve in natural language (English, Japanese, etc.), and local Ollama models instantly generate the exact Linux command with clear explanations.
+- Destructive commands (e.g., `rm -rf`, partition modifications) are automatically flagged with warning tags.
+- Press `Enter` to insert into the terminal, or `Ctrl + Enter` to execute immediately.
 
-### 2. 📝 簡易内蔵エディタ & AI コード支援 (`Ctrl + E`)
-- ターミナル横にシームレスに開くスライドインエディタ。
-- **クイックオープン & 保存**: カレントディレクトリ内のファイル選択・パス入力・保存 (`Ctrl + S`)。
-- **Run in Terminal**: 編集中のスクリプト（Python, Bash, JS/TS, Rust 等）をワンクリックでターミナルに送信して即時実行。
-- **AI Edit (`Ctrl + Shift + K`)**: Ollama に指示（「エラー処理を追加して」「TypeScriptに変換して」等）を与えてコードを自動置換・リファクタリング。
+### 2. 📝 Embedded Lightweight Editor & AI Code Assistant (`Ctrl + E`)
+- Seamlessly toggle a side-by-side / slide-in code editor next to your terminal.
+- **Quick Open & Save**: Browse files in the current working directory, open by path, and save changes (`Ctrl + S`).
+- **Run in Terminal**: Send scripts (Python, Bash, JS/TS, Rust, etc.) directly into the active shell with one click.
+- **AI Edit (`Ctrl + Shift + K`)**: Instruct Ollama to refactor, add error handling, or generate code directly inside the editor.
 
-### 3. 🚨 インテリジェント・エラー自動診断 & ワンクリック修正
-- コマンドがエラー（Exit code != 0 またはエラーログ検出）で終了した場合、スマートバナーが自動出現。
-- ワンクリックで「なぜ失敗したか」「修正するための推奨コマンド」をローカル AI が分析・提示し、そのままワンクリックで修正コマンドを実行可能。
+### 3. 🚨 Intelligent Error Diagnosis & One-Click Fixes
+- Automatically detects failed commands (non-zero exit code or stderr keywords) and displays an actionable smart banner.
+- With one click, local AI analyzes why the command failed and suggests a verified remedy command you can run instantly.
 
-### 4. 💬 コンテキスト連動型 Copilot サイドバー
-- カレントディレクトリ (`pwd`)、Git ブランチ・変更状態、直近のコマンドと実行出力を自動で把握した対話型アシスタント。
-- 回答内のコードブロックから直接「ターミナルへ挿入」「即座に実行」「クリップボードにコピー」が可能。
+### 4. 💬 Context-Aware AI Copilot Sidebar
+- Interactive chat assistant with real-time awareness of your terminal context: CWD (`pwd`), Git branch & dirty status, and recent command history.
+- Run, insert, or copy code snippets directly from Markdown response blocks.
 
-### 5. 🦙 Ollama ローカルモデルの自動検出 & 完全プライベート
-- ローカルにインストールされている Ollama モデル（`llama3.2`, `deepseek-r1`, `qwen2.5-coder`, `codellama`, `mistral` 等）を自動検出。
-- 設定画面（`Ctrl + ,`）でモデル一覧をワンクリック再取得・ドロップダウン切り替え。
-- クラウド API や API キーへの依存はゼロ。すべてのデータはお手元の PC 内で安全に処理されます。
+### 5. 🦙 Auto-Discovery of Local Ollama Models (100% Private & Offline)
+- Automatically detects installed Ollama models (`llama3.2`, `deepseek-r1`, `qwen2.5-coder`, `codellama`, `mistral`, etc.).
+- Switch models on the fly from the Settings modal (`Ctrl + ,`).
+- **Zero API keys, zero cloud dependencies, zero data leakage.**
 
-### 6. ⚡ 超高速 PTY & xterm.js レンダリング
-- Rust 製 PTY マネージャー (`portable-pty`) による低レイテンシ・高信頼な疑似端末。
-- Linux `/proc/<pid>/cwd` によるリアルタイムなカレントディレクトリ追跡。
-- WebGL / Canvas 加速、TrueColor (24bit)、Nerd Fonts 対応。
+### 6. ⚡ High-Performance PTY & xterm.js Rendering
+- Native Rust pseudo-terminal manager (`portable-pty`) with sub-millisecond latency.
+- Accurate real-time directory tracking via Linux `/proc/<pid>/cwd`.
+- TrueColor (24-bit), WebGL/Canvas acceleration, and full Nerd Fonts & Powerline glyph support.
 
-### 7. 🎨 4種類の洗練されたモダンテーマ
-- **Waddle Cyber Dark** (Default)
-- **Tokyo Night**
-- **Catppuccin Mocha**
-- **Dracula**
+### 7. 🎨 Themes & Nerd Fonts Customization
+- Built-in themes: **Waddle Cyber Dark** (Default), **Tokyo Night**, **Catppuccin Mocha**, **Dracula**.
+- Curated presets for **JetBrainsMono Nerd Font**, **MesloLGS NF**, **FiraCode Nerd Font**, **Hack Nerd Font**, or custom local fonts.
 
 ---
 
-## ⌨️ キーボードショートカット (Keybindings)
+## ⌨️ Keybindings
 
-| ショートカット | 機能 |
+| Shortcut | Action |
 | :--- | :--- |
-| `Ctrl + K` | **AI Command Generator** を開く |
-| `Ctrl + E` | **簡易内蔵エディタ** の開閉トグル |
-| `Ctrl + S` (エディタ内) | ファイルの保存 |
-| `Ctrl + Shift + K` (エディタ内) | **AI コード編集・自動生成** を開く |
-| `Ctrl + T` | 新しいターミナルタブを開く |
-| `Ctrl + W` | 現在のタブを閉じる |
-| `Ctrl + ,` | 設定画面（Ollama モデル選択・テーマ・フォント設定）を開く |
-| `Enter` (AI Modal内) | 生成されたコマンドをターミナルに挿入 |
-| `Ctrl + Enter` (AI Modal内) | 生成されたコマンドを即時実行 |
-| `Esc` | モーダルを閉じる |
+| `Ctrl + K` | Open **AI Command Generator** |
+| `Ctrl + E` | Toggle **Embedded Code Editor** |
+| `Ctrl + S` *(in editor)* | Save file |
+| `Ctrl + Shift + K` *(in editor)* | Open **AI Code Edit / Refactor** |
+| `Ctrl + T` | Open new terminal tab |
+| `Ctrl + W` | Close current terminal tab |
+| `Ctrl + ,` | Open **Settings** (Ollama model, themes, fonts) |
+| `Enter` *(in AI modal)* | Insert generated command into terminal |
+| `Ctrl + Enter` *(in AI modal)* | Execute generated command immediately |
+| `Esc` | Close active modal / popup |
 
 ---
 
-## 🏗️ アーキテクチャ (Architecture)
+## 🏗️ Architecture
 
 ```mermaid
 graph TD
@@ -121,67 +120,67 @@ graph TD
 
 ---
 
-## 🚀 クイックスタート (Quick Start)
+## 🚀 Quick Start
 
-### 1. 前提条件のインストール
+### 1. Prerequisites
 
-- [Rust (Cargo)](https://rustup.rs/) (1.70 以上)
-- [Node.js & npm](https://nodejs.org/) (Node 18 以上)
-- [Ollama](https://ollama.com/) (ローカル AI 実行エンジン)
+- [Rust (Cargo)](https://rustup.rs/) (1.70+)
+- [Node.js & npm](https://nodejs.org/) (Node 18+)
+- [Ollama](https://ollama.com/) (Local AI engine)
 
-### 2. Ollama の準備
+### 2. Set Up Ollama
 
 ```bash
-# Ollama サーバーを起動
+# Start Ollama server
 ollama serve
 
-# お好みのローカルモデルをダウンロード
+# Pull your preferred local model(s)
 ollama pull llama3.2
-# またはコード特化モデル
+# Or coding-specialized model
 ollama pull qwen2.5-coder
-# または推論モデル
+# Or reasoning model
 ollama pull deepseek-r1
 ```
 
-### 3. 開発モードでの起動
+### 3. Run in Development Mode
 
 ```bash
-# リポジトリのクローン
+# Clone the repository
 git clone https://github.com/your-username/Waddle.git
 cd Waddle
 
-# 依存パッケージのインストール
+# Install dependencies
 npm install
 
-# 開発サーバー起動
+# Start development server
 npm run tauri dev
 ```
 
 ---
 
-## 📦 プロダクションビルド (Production Build)
+## 📦 Production Build
 
-単一バイナリおよび Linux 配布用パッケージ（`.AppImage` / `.deb`）を生成する場合：
+To package Waddle into an optimized standalone binary or Linux bundle:
 
 ```bash
 npm run tauri build
 ```
 
-### 成果物の出力先
-- **単一バイナリ (約 12〜19 MB)**: `src-tauri/target/release/waddle`
-- **AppImage パッケージ**: `src-tauri/target/release/bundle/appimage/`
-- **deb パッケージ**: `src-tauri/target/release/bundle/deb/`
+### Output Artifacts:
+- **Standalone Binary (~12–19 MB)**: `src-tauri/target/release/waddle`
+- **AppImage Package**: `src-tauri/target/release/bundle/appimage/`
+- **Debian/Ubuntu Package**: `src-tauri/target/release/bundle/deb/`
 
-### システムへのインストール例
+### System Installation Example:
 ```bash
 sudo cp src-tauri/target/release/waddle /usr/local/bin/
 ```
 
 ---
 
-## 💻 技術スタック (Tech Stack)
+## 💻 Tech Stack
 
-| レイヤー | 使用技術 |
+| Layer | Technologies |
 | :--- | :--- |
 | **Framework** | [Tauri 2.0](https://tauri.app/) |
 | **Backend** | Rust, `portable-pty`, `tokio`, `reqwest`, `serde` |
@@ -192,16 +191,16 @@ sudo cp src-tauri/target/release/waddle /usr/local/bin/
 
 ---
 
-## 🔒 プライバシー & セキュリティ (Privacy & Security)
+## 🔒 Privacy & Security
 
-- **100% オフライン & ローカル完結**: 入力したコマンド、ファイル内容、プロンプト、実行ログは一切外部インターネットやサードパーティAPIへ送信されません。
-- **データ主権**: 自宅・社内ネットワーク等のプライベート環境でも安全に活用できます。
+- **100% Offline & Local**: No telemetry, no third-party cloud API keys, and no command/log transmissions over the internet.
+- **Complete Data Sovereignty**: Safe to use in enterprise, air-gapped, or sensitive internal networks.
 
 ---
 
-## 📄 ライセンス (License)
+## 📄 License
 
-本プロジェクトは [MIT License](LICENSE) のもとで公開されています。
+This project is licensed under the [MIT License](LICENSE).
 
 ---
 
