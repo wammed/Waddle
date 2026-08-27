@@ -3,6 +3,9 @@
 # 🐧⚡ Waddle
 ### AI-Integrated Next-Generation Linux Terminal Emulator
 
+
+![Banner](./images/waddle-banner.svg)
+
 [![Built with Tauri](https://img.shields.io/badge/Tauri-2.0-24C8D8?style=for-the-badge&logo=tauri&logoColor=white)](https://tauri.app/)
 [![Rust](https://img.shields.io/badge/Rust-1.98+-orange?style=for-the-badge&logo=rust&logoColor=white)](https://www.rust-lang.org/)
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
