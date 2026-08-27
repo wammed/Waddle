@@ -1,6 +1,5 @@
 import React from 'react';
 import {
-  Terminal,
   Plus,
   X,
   Sparkles,
@@ -9,6 +8,7 @@ import {
   FileCode,
 } from 'lucide-react';
 import { TerminalTab } from '../types';
+import waddleIcon from '../assets/waddle-icon.svg';
 
 interface TitleBarProps {
   tabs: TerminalTab[];
@@ -41,7 +41,17 @@ export const TitleBar: React.FC<TitleBarProps> = ({
     <header className="titlebar-container" data-tauri-drag-region>
       <div className="titlebar-left">
         <div className="app-brand">
-          <Terminal className="brand-icon" />
+          <img
+            src={waddleIcon}
+            alt="Waddle"
+            style={{
+              width: '24px',
+              height: '24px',
+              borderRadius: '6px',
+              objectFit: 'contain',
+              filter: 'drop-shadow(0 0 6px var(--accent-glow))',
+            }}
+          />
           <span>Waddle</span>
         </div>
 
