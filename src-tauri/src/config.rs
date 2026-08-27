@@ -33,12 +33,22 @@ pub struct TerminalConfig {
     pub opacity: f32,
     pub shell: Option<String>,
     pub scrollback: u32,
+    #[serde(default)]
+    pub background_image: Option<String>,
+    #[serde(default = "default_bg_opacity")]
+    pub background_opacity: f32,
+    #[serde(default)]
+    pub background_blur: u32,
+}
+
+fn default_bg_opacity() -> f32 {
+    0.85
 }
 
 impl Default for TerminalConfig {
     fn default() -> Self {
         Self {
-            font_family: "JetBrains Mono, Fira Code, Cascadia Code, monospace".to_string(),
+            font_family: "JetBrainsMono Nerd Font, JetBrains Mono, monospace".to_string(),
             font_size: 14,
             theme: "waddle_dark".to_string(),
             cursor_style: "block".to_string(),
@@ -46,6 +56,9 @@ impl Default for TerminalConfig {
             opacity: 0.95,
             shell: None,
             scrollback: 10000,
+            background_image: None,
+            background_opacity: 0.85,
+            background_blur: 0,
         }
     }
 }

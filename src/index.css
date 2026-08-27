@@ -261,7 +261,7 @@ body, html {
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-/* Terminal Viewport */
+/* Terminal Viewport & Wallpaper */
 .terminal-wrapper {
   flex: 1;
   width: 100%;
@@ -269,16 +269,37 @@ body, html {
   padding: 8px 12px;
   position: relative;
   overflow: hidden;
+  background: transparent !important;
+  z-index: 1;
 }
 
 .xterm {
   height: 100%;
   padding: 2px;
+  background: transparent !important;
 }
 
 .xterm .xterm-viewport {
+  background-color: transparent !important;
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+
+.xterm-screen {
+  background-color: transparent !important;
+}
+
+.terminal-wallpaper-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  pointer-events: none;
+  z-index: 0;
+  transition: opacity 0.2s ease;
 }
 
 .xterm .xterm-viewport::-webkit-scrollbar {

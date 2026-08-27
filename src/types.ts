@@ -15,6 +15,9 @@ export interface TerminalConfig {
   opacity: number;
   shell?: string;
   scrollback: number;
+  background_image?: string;
+  background_opacity?: number;
+  background_blur?: number;
 }
 
 export interface AppConfig {

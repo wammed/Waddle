@@ -11,6 +11,8 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { AppConfig, GitStatus, SystemInfo, TerminalContext, TerminalTab } from './types';
 import { TauriApi } from './services/tauriApi';
 import { THEMES } from './theme';
+import { convertFileSrc } from '@tauri-apps/api/core';
+import waddleWallpaper from './assets/waddle-wallpaper.png';
 
 const generateTabId = () => {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -201,6 +203,21 @@ export function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [activeTabId, tabs]);
 
+  const getWallpaperUrl = (bgImage?: string): string | null => {
+    if (!bgImage || bgImage === 'none') return null;
+    if (bgImage === 'preset_cyberpunk') return waddleWallpaper;
+    if (bgImage.startsWith('http://') || bgImage.startsWith('https://') || bgImage.startsWith('data:')) {
+      return bgImage;
+    }
+    try {
+      return convertFileSrc(bgImage);
+    } catch {
+      return bgImage;
+    }
+  };
+
+  const wallpaperUrl = getWallpaperUrl(config.terminal.background_image);
+
   return (
     <div className="app-container">
       {/* Title Bar & Tabs */}
@@ -220,7 +237,35 @@ export function App() {
 
       {/* Main Content Area */}
       <main className="main-content">
-        <section className="terminal-area">
+        <section className="terminal-area" style={{ position: 'relative', overflow: 'hidden' }}>
+          {/* Wallpaper Layer */}
+          {wallpaperUrl && (
+            <div
+              className="terminal-wallpaper-layer"
+              style={{
+                backgroundImage: `url('${wallpaperUrl}')`,
+                opacity: config.terminal.background_opacity ?? 0.85,
+                filter: config.terminal.background_blur && config.terminal.background_blur > 0
+                  ? `blur(${config.terminal.background_blur}px)`
+                  : undefined,
+                transform: config.terminal.background_blur && config.terminal.background_blur > 0 ? 'scale(1.05)' : undefined,
+              }}
+            />
+          )}
+
+          {/* Dark Contrast Overlay for Terminal Text Readability */}
+          {wallpaperUrl && (
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                backgroundColor: `rgba(10, 14, 22, ${Math.max(0.2, 1 - (config.terminal.background_opacity ?? 0.85))})`,
+                pointerEvents: 'none',
+                zIndex: 0,
+              }}
+            />
+          )}
+
           {/* Smart Error Banner */}
           {errorAlert && (
             <AiErrorBanner

@@ -1,13 +1,10 @@
 <div align="center">
 
-<img src="./images/waddle-icon.svg" alt="Waddle Icon" width="150" style="border-radius: 24px;" />
-
 # 🐧⚡ Waddle
 ### 完全ローカルAI統合型 次世代 Linux ターミナルエミュレータ
 
-<p align="center">
-  <img src="./images/waddle-banner.svg" alt="Waddle Banner" width="620" />
-</p>
+
+![Banner](./images/waddle-banner.svg)
 
 [![Built with Tauri](https://img.shields.io/badge/Tauri-2.0-24C8D8?style=for-the-badge&logo=tauri&logoColor=white)](https://tauri.app/)
 [![Rust](https://img.shields.io/badge/Rust-1.98+-orange?style=for-the-badge&logo=rust&logoColor=white)](https://www.rust-lang.org/)

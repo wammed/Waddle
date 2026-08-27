@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Settings,
   X,
@@ -10,6 +10,8 @@ import {
   CheckCircle2,
   HardDrive,
   Type,
+  Image as ImageIcon,
+  FolderOpen,
 } from 'lucide-react';
 import { AppConfig, OllamaStatus } from '../types';
 import { THEMES } from '../theme';
@@ -58,12 +60,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [isCustomFont, setIsCustomFont] = useState(false);
 
+  // Wallpaper modes: 'none' | 'preset_cyberpunk' | 'custom'
+  const [bgMode, setBgMode] = useState<'none' | 'preset_cyberpunk' | 'custom'>('none');
+  const [customBgPath, setCustomBgPath] = useState<string>('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const fetchOllamaStatus = async (endpoint?: string) => {
     setIsCheckingOllama(true);
     try {
       const status = await TauriApi.checkOllamaStatus(endpoint || formData.ai.ollama_endpoint);
       setOllamaStatus(status);
-      // Auto-select first model if current is empty or not in list
       if (status.models.length > 0 && (!formData.ai.ollama_model || !status.models.includes(formData.ai.ollama_model))) {
         setFormData((prev) => ({
           ...prev,
@@ -83,10 +89,70 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       fetchOllamaStatus(config.ai.ollama_endpoint);
       const isKnownPreset = FONT_OPTIONS.some((f) => f.value === config.terminal.font_family);
       setIsCustomFont(!isKnownPreset && config.terminal.font_family !== 'custom');
+
+      // Initialize background image state
+      const bg = config.terminal.background_image;
+      if (!bg || bg === 'none') {
+        setBgMode('none');
+        setCustomBgPath('');
+      } else if (bg === 'preset_cyberpunk') {
+        setBgMode('preset_cyberpunk');
+        setCustomBgPath('');
+      } else {
+        setBgMode('custom');
+        setCustomBgPath(bg);
+      }
     }
   }, [isOpen]);
 
   if (!isOpen) return null;
+
+  const handleBgModeChange = (mode: 'none' | 'preset_cyberpunk' | 'custom') => {
+    setBgMode(mode);
+    if (mode === 'none') {
+      setFormData((prev) => ({
+        ...prev,
+        terminal: { ...prev.terminal, background_image: undefined },
+      }));
+    } else if (mode === 'preset_cyberpunk') {
+      setFormData((prev) => ({
+        ...prev,
+        terminal: { ...prev.terminal, background_image: 'preset_cyberpunk' },
+      }));
+    } else {
+      const path = customBgPath || '/home/susie/Pictures/wallpaper.jpg';
+      setCustomBgPath(path);
+      setFormData((prev) => ({
+        ...prev,
+        terminal: { ...prev.terminal, background_image: path },
+      }));
+    }
+  };
+
+  const handleCustomPathChange = (val: string) => {
+    setCustomBgPath(val);
+    setFormData((prev) => ({
+      ...prev,
+      terminal: { ...prev.terminal, background_image: val.trim() ? val : undefined },
+    }));
+  };
+
+  // Local File Selector using browser FileReader
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      setCustomBgPath(file.name);
+      setFormData((prev) => ({
+        ...prev,
+        terminal: { ...prev.terminal, background_image: dataUrl },
+      }));
+    };
+    reader.readAsDataURL(file);
+  };
 
   const handleSave = async () => {
     await TauriApi.saveConfig(formData);
@@ -102,7 +168,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     <div className="modal-backdrop" onClick={onClose}>
       <div
         className="ai-modal"
-        style={{ width: '640px', backgroundColor: '#131722', color: '#f8fafc' }}
+        style={{ width: '660px', backgroundColor: '#131722', color: '#f8fafc' }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="ai-modal-header" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
@@ -287,12 +353,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
             {/* Font Selection */}
             <div className="form-group">
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <label className="form-label" style={{ color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <Type size={13} />
-                  <span>フォント (Font Family)</span>
-                </label>
-              </div>
+              <label className="form-label" style={{ color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Type size={13} />
+                <span>フォント (Font Family)</span>
+              </label>
 
               <select
                 className="form-select"
@@ -397,6 +461,103 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <option value="bar" style={{ background: '#181e2e', color: '#f8fafc' }}>Bar</option>
                 </select>
               </div>
+            </div>
+
+            {/* Wallpaper & Background Image Section */}
+            <div className="form-group" style={{ marginTop: '10px' }}>
+              <label className="form-label" style={{ color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <ImageIcon size={13} />
+                <span>背景画像・壁紙 (Background Wallpaper)</span>
+              </label>
+
+              <select
+                className="form-select"
+                style={inputStyle}
+                value={bgMode}
+                onChange={(e) => handleBgModeChange(e.target.value as any)}
+              >
+                <option value="none" style={{ background: '#181e2e', color: '#f8fafc' }}>なし (デフォルトダーク背景)</option>
+                <option value="preset_cyberpunk" style={{ background: '#181e2e', color: '#f8fafc' }}>Waddle Official Cyberpunk (公式壁紙)</option>
+                <option value="custom" style={{ background: '#181e2e', color: '#f8fafc' }}>カスタム画像 (ファイル選択 / パス指定)...</option>
+              </select>
+
+              {bgMode === 'custom' && (
+                <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+                  <input
+                    type="text"
+                    className="form-input"
+                    style={{ ...inputStyle, flex: 1 }}
+                    placeholder="例: /home/user/Pictures/wallpaper.jpg または https://..."
+                    value={customBgPath}
+                    onChange={(e) => handleCustomPathChange(e.target.value)}
+                  />
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    accept="image/*"
+                    style={{ display: 'none' }}
+                    onChange={handleFileSelect}
+                  />
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    style={{ background: '#1b2234', color: '#f8fafc', whiteSpace: 'nowrap' }}
+                    onClick={() => fileInputRef.current?.click()}
+                    title="ローカル画像ファイルを参照"
+                  >
+                    <FolderOpen size={14} />
+                    <span>参照...</span>
+                  </button>
+                </div>
+              )}
+
+              {bgMode !== 'none' && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '8px' }}>
+                  <div className="form-group">
+                    <label className="form-label" style={{ color: '#94a3b8' }}>
+                      画像不透明度 ({Math.round((formData.terminal.background_opacity ?? 0.85) * 100)}%)
+                    </label>
+                    <input
+                      type="range"
+                      min="0.1"
+                      max="1.0"
+                      step="0.05"
+                      value={formData.terminal.background_opacity ?? 0.85}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          terminal: {
+                            ...formData.terminal,
+                            background_opacity: parseFloat(e.target.value),
+                          },
+                        })
+                      }
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label" style={{ color: '#94a3b8' }}>
+                      背景ぼかし ({formData.terminal.background_blur ?? 0}px)
+                    </label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="20"
+                      step="1"
+                      value={formData.terminal.background_blur ?? 0}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          terminal: {
+                            ...formData.terminal,
+                            background_blur: parseInt(e.target.value) || 0,
+                          },
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

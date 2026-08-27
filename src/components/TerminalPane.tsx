@@ -34,6 +34,12 @@ export const TerminalPane: React.FC<TerminalPaneProps> = ({
     containerRef.current.innerHTML = '';
 
     const currentTheme = THEMES[config.terminal.theme] || THEMES.waddle_dark;
+    const isBgImage = Boolean(config.terminal.background_image && config.terminal.background_image !== 'none');
+    
+    // Transparent terminal background when wallpaper image is enabled
+    const terminalTheme = isBgImage
+      ? { ...currentTheme.terminal, background: '#00000000' }
+      : currentTheme.terminal;
 
     const term = new Terminal({
       fontFamily: config.terminal.font_family,
@@ -41,7 +47,7 @@ export const TerminalPane: React.FC<TerminalPaneProps> = ({
       cursorStyle: config.terminal.cursor_style,
       cursorBlink: config.terminal.cursor_blink,
       scrollback: config.terminal.scrollback,
-      theme: currentTheme.terminal,
+      theme: terminalTheme,
       allowTransparency: true,
       convertEol: true,
       smoothScrollDuration: 100,
@@ -174,11 +180,16 @@ export const TerminalPane: React.FC<TerminalPaneProps> = ({
     };
   }, [tab.sessionId]);
 
-  // Update theme & font when config changes
+  // Update theme & font & background when config changes
   useEffect(() => {
     if (!termRef.current) return;
     const currentTheme = THEMES[config.terminal.theme] || THEMES.waddle_dark;
-    termRef.current.options.theme = currentTheme.terminal;
+    const isBgImage = Boolean(config.terminal.background_image && config.terminal.background_image !== 'none');
+    
+    termRef.current.options.theme = isBgImage
+      ? { ...currentTheme.terminal, background: '#00000000' }
+      : currentTheme.terminal;
+
     termRef.current.options.fontSize = config.terminal.font_size;
     termRef.current.options.fontFamily = config.terminal.font_family;
     termRef.current.options.cursorStyle = config.terminal.cursor_style;
