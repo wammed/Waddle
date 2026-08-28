@@ -3,7 +3,6 @@
 # 🐧⚡ Waddle
 ### AI-Integrated Next-Generation Linux Terminal Emulator
 
-
 ![Banner](./images/waddle-banner.svg)
 
 [![Built with Tauri](https://img.shields.io/badge/Tauri-2.0-24C8D8?style=for-the-badge&logo=tauri&logoColor=white)](https://tauri.app/)
@@ -15,8 +14,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
 
 <p align="center">
-  <strong>Ultra-Fast PTY Terminal × 100% Local AI (Ollama) × Embedded Lightweight Editor</strong><br>
-  A private, intelligent, and lightweight terminal emulator for Linux that never sends your data to the cloud.
+  <strong>Ultra-Fast PTY Terminal × 100% Local AI (Ollama) × Embedded Lightweight Editor × Custom Wallpapers</strong><br>
+  A private, intelligent, and customizable terminal emulator for Linux that never sends your data to the cloud.
 </p>
 
 <p align="center">
@@ -31,45 +30,50 @@
 
 > [!IMPORTANT]
 > ### 💡 AI Vibe Coding Project
-> **Waddle** is an **AI Vibe Coding** project built through interactive pair programming with **Google DeepMind's Antigravity (Gemini)**.
-> Combining human architectural direction with agentic AI coding, the entire project—from low-level Rust PTY process handling, Linux `/proc/<pid>/cwd` tracking, WebKitGTK optimization, React 19 frontend, local Ollama streaming client, to the embedded code editor—was designed and implemented in flow.
+> **Waddle** is an **AI Vibe Coding** project created through real-time interactive pair programming with **Google DeepMind's Antigravity (Gemini)**.
+> Combining human architectural design with agentic AI pair-programming, the entire project—from low-level Rust PTY management, Linux `/proc/<pid>/cwd` tracking, WebKitGTK Wayland optimization, React 19 UI, transparent xterm.js rendering, local Ollama streaming client, to the embedded code editor—was designed and implemented in full flow.
 
 ---
 
 ## 🌟 Key Features
 
-### 1. 🤖 Natural Language Command Generation (`Ctrl + K`)
-- Type what you want to achieve in natural language (English, Japanese, etc.), and local Ollama models instantly generate the exact Linux command with clear explanations.
-- Destructive commands (e.g., `rm -rf`, partition modifications) are automatically flagged with warning tags.
+### 1. 🤖 Natural Language Command Generator (`Ctrl + K`)
+- Type your intent in natural language (English, Japanese, etc.), and local Ollama models instantly generate the exact Linux command with clear explanations.
+- Destructive commands (e.g., `rm -rf`, disk partitioning) are automatically flagged with danger warning badges.
 - Press `Enter` to insert into the terminal, or `Ctrl + Enter` to execute immediately.
 
-### 2. 📝 Embedded Lightweight Editor & AI Code Assistant (`Ctrl + E`)
-- Seamlessly toggle a side-by-side / slide-in code editor next to your terminal.
+### 2. 🖼️ Custom Background Images & Wallpapers (`Ctrl + ,`)
+- **Built-in Presets**: One-click apply **Waddle Official Cyberpunk** wallpaper.
+- **Custom Local Images & URLs**: Choose local images (PNG, JPG, SVG, WebP) with the built-in file picker or enter local file paths / web URLs.
+- **Opacity & Blur Controls**: Real-time slider adjustments for image opacity (10%–100%) and frosted glass blur (0–20px) with automatic contrast overlay for crystal-clear terminal text readability.
+
+### 3. 📝 Embedded Lightweight Editor & AI Code Assistant (`Ctrl + E`)
+- Seamlessly toggle a side-by-side code editor right inside your terminal.
 - **Quick Open & Save**: Browse files in the current working directory, open by path, and save changes (`Ctrl + S`).
 - **Run in Terminal**: Send scripts (Python, Bash, JS/TS, Rust, etc.) directly into the active shell with one click.
 - **AI Edit (`Ctrl + Shift + K`)**: Instruct Ollama to refactor, add error handling, or generate code directly inside the editor.
 
-### 3. 🚨 Intelligent Error Diagnosis & One-Click Fixes
-- Automatically detects failed commands (non-zero exit code or stderr keywords) and displays an actionable smart banner.
+### 4. 🚨 Intelligent Error Diagnosis & One-Click Fixes
+- Automatically detects failed commands (non-zero exit codes or stderr keywords) and displays an actionable smart banner.
 - With one click, local AI analyzes why the command failed and suggests a verified remedy command you can run instantly.
 
-### 4. 💬 Context-Aware AI Copilot Sidebar
+### 5. 💬 Context-Aware AI Copilot Sidebar
 - Interactive chat assistant with real-time awareness of your terminal context: CWD (`pwd`), Git branch & dirty status, and recent command history.
 - Run, insert, or copy code snippets directly from Markdown response blocks.
 
-### 5. 🦙 Auto-Discovery of Local Ollama Models (100% Private & Offline)
+### 6. 🦙 Auto-Discovery of Local Ollama Models (100% Private & Offline)
 - Automatically detects installed Ollama models (`llama3.2`, `deepseek-r1`, `qwen2.5-coder`, `codellama`, `mistral`, etc.).
 - Switch models on the fly from the Settings modal (`Ctrl + ,`).
 - **Zero API keys, zero cloud dependencies, zero data leakage.**
 
-### 6. ⚡ High-Performance PTY & xterm.js Rendering
+### 7. ⚡ High-Performance PTY & xterm.js Rendering
 - Native Rust pseudo-terminal manager (`portable-pty`) with sub-millisecond latency.
 - Accurate real-time directory tracking via Linux `/proc/<pid>/cwd`.
 - TrueColor (24-bit), WebGL/Canvas acceleration, and full Nerd Fonts & Powerline glyph support.
 
-### 7. 🎨 Themes & Nerd Fonts Customization
+### 8. 🎨 Themes & Nerd Fonts Customization
 - Built-in themes: **Waddle Cyber Dark** (Default), **Tokyo Night**, **Catppuccin Mocha**, **Dracula**.
-- Curated presets for **JetBrainsMono Nerd Font**, **MesloLGS NF**, **FiraCode Nerd Font**, **Hack Nerd Font**, or custom local fonts.
+- Curated presets for **JetBrainsMono Nerd Font**, **MesloLGS NF**, **FiraCode Nerd Font**, **Hack Nerd Font**, or custom local fonts with automatic glyph fallback.
 
 ---
 
@@ -83,7 +87,7 @@
 | `Ctrl + Shift + K` *(in editor)* | Open **AI Code Edit / Refactor** |
 | `Ctrl + T` | Open new terminal tab |
 | `Ctrl + W` | Close current terminal tab |
-| `Ctrl + ,` | Open **Settings** (Ollama model, themes, fonts) |
+| `Ctrl + ,` | Open **Settings** (Ollama model, wallpaper, themes, fonts) |
 | `Enter` *(in AI modal)* | Insert generated command into terminal |
 | `Ctrl + Enter` *(in AI modal)* | Execute generated command immediately |
 | `Esc` | Close active modal / popup |
@@ -95,11 +99,12 @@
 ```mermaid
 graph TD
     subgraph UI_Layer [Frontend: Tauri 2.0 Webview / React 19 + TypeScript]
-        TermView[Terminal View: xterm.js + WebLinks + Fit]
+        TermView[Terminal View: xterm.js + WebLinks + Fit + Transparency]
+        WallLayer[Wallpaper Layer: Custom Image + Blur + Opacity Overlay]
         Editor[Embedded Editor: Quick Open + Run in Terminal]
         AIOverlay[AI Command Modal Ctrl+K / Smart Error Banner]
         Copilot[AI Copilot Sidebar: Context-Aware Chat]
-        Settings[Settings Modal: Ollama Model Auto-Discovery]
+        Settings[Settings Modal: Ollama Model & Wallpaper & Fonts]
     end
 
     subgraph Rust_Backend [Backend: Rust + Tauri Core]
