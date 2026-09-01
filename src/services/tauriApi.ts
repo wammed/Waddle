@@ -264,6 +264,20 @@ export const TauriApi = {
     return await invoke('save_config', { config });
   },
 
+  async saveWallpaperFile(
+    fileName: string,
+    fileData: number[] | Uint8Array
+  ): Promise<string> {
+    if (!isTauri()) {
+      return `/home/user/Pictures/${fileName}`;
+    }
+    const dataArray = Array.isArray(fileData) ? fileData : Array.from(fileData);
+    return await invoke<string>('save_wallpaper_file', {
+      fileName,
+      fileData: dataArray,
+    });
+  },
+
   async getSystemInfo(): Promise<SystemInfo> {
     if (!isTauri()) {
       return {

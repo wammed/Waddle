@@ -299,7 +299,10 @@ body, html {
   background-repeat: no-repeat;
   pointer-events: none;
   z-index: 0;
-  transition: opacity 0.2s ease;
+  transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform, opacity;
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }
 
 .xterm .xterm-viewport::-webkit-scrollbar {

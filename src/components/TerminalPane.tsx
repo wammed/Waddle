@@ -62,8 +62,8 @@ export const TerminalPane: React.FC<TerminalPaneProps> = ({
     termRef.current = term;
     fitAddonRef.current = fitAddon;
 
-    // Initial fit & focus
-    const timer = setTimeout(() => {
+    // Initial fit & focus on first frame
+    const rafId = requestAnimationFrame(() => {
       if (containerRef.current && containerRef.current.clientWidth > 0) {
         try {
           fitAddon.fit();
@@ -76,7 +76,7 @@ export const TerminalPane: React.FC<TerminalPaneProps> = ({
           // ignore fit error
         }
       }
-    }, 60);
+    });
 
     // Send user input directly to PTY
     let inputLine = '';
@@ -163,7 +163,7 @@ export const TerminalPane: React.FC<TerminalPaneProps> = ({
     resizeObserver.observe(containerRef.current);
 
     return () => {
-      clearTimeout(timer);
+      cancelAnimationFrame(rafId);
       clearInterval(pollInterval);
       resizeObserver.disconnect();
       onDataDisposable.dispose();

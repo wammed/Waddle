@@ -1,6 +1,8 @@
+use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+use base64::Engine;
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AiConfig {
@@ -71,6 +73,7 @@ pub struct AppConfig {
 
 pub struct ConfigManager {
     config_path: PathBuf,
+    config_dir: PathBuf,
 }
 
 impl ConfigManager {
@@ -81,13 +84,67 @@ impl ConfigManager {
         let _ = fs::create_dir_all(&config_dir);
         Self {
             config_path: config_dir.join("config.json"),
+            config_dir,
         }
+    }
+
+    pub fn save_wallpaper_data(&self, file_name: &str, data: &[u8]) -> Result<String, String> {
+        let wallpapers_dir = self.config_dir.join("wallpapers");
+        let _ = fs::create_dir_all(&wallpapers_dir);
+
+        let clean_name = Path::new(file_name)
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("wallpaper.png");
+
+        let file_path = if clean_name.contains('.') {
+            wallpapers_dir.join(clean_name)
+        } else {
+            wallpapers_dir.join(format!("{}.png", clean_name))
+        };
+
+        fs::write(&file_path, data)
+            .map_err(|e| format!("Failed to save wallpaper image: {}", e))?;
+
+        Ok(file_path.to_string_lossy().to_string())
+    }
+
+    pub fn migrate_base64_wallpaper(&self, cfg: &mut AppConfig) -> bool {
+        if let Some(ref bg) = cfg.terminal.background_image {
+            if bg.starts_with("data:image/") {
+                if let Some(comma_pos) = bg.find(',') {
+                    let header = &bg[..comma_pos];
+                    let base64_str = &bg[comma_pos + 1..];
+                    let ext = if header.contains("image/jpeg") || header.contains("image/jpg") {
+                        "jpg"
+                    } else if header.contains("image/webp") {
+                        "webp"
+                    } else if header.contains("image/gif") {
+                        "gif"
+                    } else {
+                        "png"
+                    };
+
+                    if let Ok(decoded_bytes) = BASE64_STANDARD.decode(base64_str.trim()) {
+                        let file_name = format!("migrated_wallpaper.{}", ext);
+                        if let Ok(saved_path) = self.save_wallpaper_data(&file_name, &decoded_bytes) {
+                            cfg.terminal.background_image = Some(saved_path);
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        false
     }
 
     pub fn load(&self) -> AppConfig {
         if self.config_path.exists() {
             if let Ok(content) = fs::read_to_string(&self.config_path) {
-                if let Ok(cfg) = serde_json::from_str::<AppConfig>(&content) {
+                if let Ok(mut cfg) = serde_json::from_str::<AppConfig>(&content) {
+                    if self.migrate_base64_wallpaper(&mut cfg) {
+                        let _ = self.save_internal(&cfg);
+                    }
                     return cfg;
                 }
             }
@@ -97,11 +154,56 @@ impl ConfigManager {
         default_cfg
     }
 
-    pub fn save(&self, config: &AppConfig) -> Result<(), String> {
+    fn save_internal(&self, config: &AppConfig) -> Result<(), String> {
         let json = serde_json::to_string_pretty(config)
             .map_err(|e| format!("Failed to serialize config: {}", e))?;
         fs::write(&self.config_path, json)
             .map_err(|e| format!("Failed to write config file: {}", e))?;
         Ok(())
+    }
+
+    pub fn save(&self, config: &AppConfig) -> Result<(), String> {
+        let mut cfg = config.clone();
+        self.migrate_base64_wallpaper(&mut cfg);
+        self.save_internal(&cfg)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_base64_wallpaper_migration() {
+        let temp_dir = std::env::temp_dir().join(format!("waddle_test_{}", uuid::Uuid::new_v4()));
+        let _ = fs::create_dir_all(&temp_dir);
+
+        let manager = ConfigManager {
+            config_path: temp_dir.join("config.json"),
+            config_dir: temp_dir.clone(),
+        };
+
+        let dummy_png_bytes = b"fake-png-image-binary-data";
+        let encoded = BASE64_STANDARD.encode(dummy_png_bytes);
+        let mut cfg = AppConfig::default();
+        cfg.terminal.background_image = Some(format!("data:image/png;base64,{}", encoded));
+
+        let migrated = manager.migrate_base64_wallpaper(&mut cfg);
+        assert!(migrated);
+
+        let new_bg = cfg.terminal.background_image.clone().unwrap();
+        assert!(new_bg.ends_with("migrated_wallpaper.png"));
+        assert!(Path::new(&new_bg).exists());
+
+        let read_data = fs::read(&new_bg).unwrap();
+        assert_eq!(read_data, dummy_png_bytes);
+
+        // Save and verify config file does not contain base64
+        manager.save(&cfg).unwrap();
+        let saved_json = fs::read_to_string(&manager.config_path).unwrap();
+        assert!(!saved_json.contains("data:image/png;base64"));
+        assert!(saved_json.contains("migrated_wallpaper.png"));
+
+        let _ = fs::remove_dir_all(&temp_dir);
     }
 }

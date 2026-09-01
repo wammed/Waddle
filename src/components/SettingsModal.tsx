@@ -137,21 +137,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }));
   };
 
-  // Local File Selector using browser FileReader
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Local File Selector using Tauri backend to save directly to disk
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = reader.result as string;
-      setCustomBgPath(file.name);
+    try {
+      const buffer = await file.arrayBuffer();
+      const bytes = new Uint8Array(buffer);
+      const savedPath = await TauriApi.saveWallpaperFile(file.name, bytes);
+      setCustomBgPath(savedPath);
       setFormData((prev) => ({
         ...prev,
-        terminal: { ...prev.terminal, background_image: dataUrl },
+        terminal: { ...prev.terminal, background_image: savedPath },
       }));
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.error('Failed to save wallpaper file:', err);
+    }
   };
 
   const handleSave = async () => {

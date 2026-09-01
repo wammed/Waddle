@@ -8,7 +8,7 @@ import { AiSidebar } from './components/AiSidebar';
 import { EditorPane } from './components/EditorPane';
 import { SettingsModal } from './components/SettingsModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { AppConfig, GitStatus, SystemInfo, TerminalContext, TerminalTab } from './types';
+import { AppConfig, SystemInfo, TerminalContext, TerminalTab } from './types';
 import { TauriApi } from './services/tauriApi';
 import { THEMES } from './theme';
 import { convertFileSrc } from '@tauri-apps/api/core';
@@ -21,27 +21,48 @@ const generateTabId = () => {
   return `tab-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 };
 
+const DEFAULT_CONFIG: AppConfig = {
+  ai: {
+    provider: 'ollama',
+    ollama_endpoint: 'http://localhost:11434',
+    ollama_model: 'llama3.2',
+    temperature: 0.2,
+  },
+  terminal: {
+    font_family: "'JetBrainsMono Nerd Font', 'JetBrains Mono', 'Symbols Nerd Font Mono', monospace",
+    font_size: 14,
+    theme: 'waddle_dark',
+    cursor_style: 'block',
+    cursor_blink: true,
+    opacity: 0.95,
+    scrollback: 10000,
+  },
+};
+
+const getCachedConfig = (): AppConfig => {
+  if (typeof window !== 'undefined' && window.localStorage) {
+    try {
+      const cached = localStorage.getItem('waddle_config_cache');
+      if (cached) {
+        return JSON.parse(cached);
+      }
+    } catch {}
+  }
+  return DEFAULT_CONFIG;
+};
+
 export function App() {
   const [tabs, setTabs] = useState<TerminalTab[]>([]);
   const [activeTabId, setActiveTabId] = useState<string>('');
-  const [config, setConfig] = useState<AppConfig>({
-    ai: {
-      provider: 'ollama',
-      ollama_endpoint: 'http://localhost:11434',
-      ollama_model: 'llama3.2',
-      temperature: 0.2,
-    },
-    terminal: {
-      font_family: 'JetBrains Mono, monospace',
-      font_size: 14,
-      theme: 'waddle_dark',
-      cursor_style: 'block',
-      cursor_blink: true,
-      opacity: 0.95,
-      scrollback: 10000,
-    },
-  });
+  const [config, setConfig] = useState<AppConfig>(getCachedConfig);
   const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
+
+  const handleUpdateConfig = useCallback((newConfig: AppConfig) => {
+    setConfig(newConfig);
+    try {
+      localStorage.setItem('waddle_config_cache', JSON.stringify(newConfig));
+    } catch {}
+  }, []);
 
   // Modals and panels
   const [isAiCommandOpen, setIsAiCommandOpen] = useState(false);
@@ -76,35 +97,46 @@ export function App() {
     if (isInitializedRef.current) return;
     isInitializedRef.current = true;
 
+    // Immediately launch initial terminal tab
+    createNewTab();
+
+    // Fetch config & system info in background
     const init = async () => {
       try {
         const [loadedConfig, sysInfo] = await Promise.all([
           TauriApi.getConfig(),
           TauriApi.getSystemInfo(),
         ]);
-        setConfig(loadedConfig);
+        handleUpdateConfig(loadedConfig);
         setSystemInfo(sysInfo);
       } catch (err) {
         console.warn('Init fetch failed:', err);
       }
-
-      // Create initial terminal tab
-      createNewTab();
     };
 
     init();
+  }, [handleUpdateConfig]);
+
+  const updateTab = useCallback((tabId: string, updates: Partial<TerminalTab>) => {
+    setTabs((prev) =>
+      prev.map((t) => (t.id === tabId ? { ...t, ...updates } : t))
+    );
   }, []);
 
   const createNewTab = async () => {
     try {
       const pty = await TauriApi.createPty(24, 80);
-      const gitStatus: GitStatus = await TauriApi.getGitStatus(pty.cwd);
+      const newTabId = generateTabId();
       const newTab: TerminalTab = {
-        id: generateTabId(),
+        id: newTabId,
         title: 'bash',
         sessionId: pty.id,
         cwd: pty.cwd,
-        gitStatus,
+        gitStatus: {
+          is_repo: false,
+          modified_count: 0,
+          untracked_count: 0,
+        },
       };
 
       setTabs((prev) => {
@@ -115,6 +147,13 @@ export function App() {
         return [...prev, newTab];
       });
       setActiveTabId(newTab.id);
+
+      // Fetch git status in background asynchronously without blocking tab render
+      TauriApi.getGitStatus(pty.cwd)
+        .then((gitStatus) => {
+          updateTab(newTabId, { gitStatus });
+        })
+        .catch(() => {});
     } catch (err) {
       console.error('Failed to create tab PTY:', err);
     }
@@ -138,12 +177,6 @@ export function App() {
       }
     }
   };
-
-  const updateTab = useCallback((tabId: string, updates: Partial<TerminalTab>) => {
-    setTabs((prev) =>
-      prev.map((t) => (t.id === tabId ? { ...t, ...updates } : t))
-    );
-  }, []);
 
   const activeTab = tabs.find((t) => t.id === activeTabId) || tabs[0];
 
@@ -203,10 +236,15 @@ export function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [activeTabId, tabs]);
 
-  const getWallpaperUrl = (bgImage?: string): string | null => {
+  const wallpaperUrl = React.useMemo(() => {
+    const bgImage = config.terminal.background_image;
     if (!bgImage || bgImage === 'none') return null;
     if (bgImage === 'preset_cyberpunk') return waddleWallpaper;
-    if (bgImage.startsWith('http://') || bgImage.startsWith('https://') || bgImage.startsWith('data:')) {
+    if (
+      bgImage.startsWith('http://') ||
+      bgImage.startsWith('https://') ||
+      bgImage.startsWith('data:')
+    ) {
       return bgImage;
     }
     try {
@@ -214,9 +252,7 @@ export function App() {
     } catch {
       return bgImage;
     }
-  };
-
-  const wallpaperUrl = getWallpaperUrl(config.terminal.background_image);
+  }, [config.terminal.background_image]);
 
   return (
     <div className="app-container">
@@ -343,7 +379,7 @@ export function App() {
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
         config={config}
-        onSaveConfig={setConfig}
+        onSaveConfig={handleUpdateConfig}
       />
     </div>
   );

@@ -204,6 +204,15 @@ async fn ai_edit_code(
 // --- Config & System Commands ---
 
 #[tauri::command]
+fn save_wallpaper_file(
+    state: State<'_, AppState>,
+    file_name: String,
+    file_data: Vec<u8>,
+) -> Result<String, String> {
+    state.config_manager.save_wallpaper_data(&file_name, &file_data)
+}
+
+#[tauri::command]
 fn get_config(state: State<'_, AppState>) -> AppConfig {
     state.config_manager.load()
 }
@@ -283,6 +292,7 @@ pub fn run() {
             ai_edit_code,
             get_config,
             save_config,
+            save_wallpaper_file,
             get_system_info,
         ])
         .run(tauri::generate_context!())
