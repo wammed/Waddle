@@ -137,7 +137,25 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }));
   };
 
-  // Local File Selector using Tauri backend to save directly to disk
+  // Browse for wallpaper image using native file dialog with file-input fallback
+  const handleBrowseClick = async () => {
+    try {
+      const selectedPath = await TauriApi.pickWallpaperFile();
+      if (selectedPath) {
+        setCustomBgPath(selectedPath);
+        setFormData((prev) => ({
+          ...prev,
+          terminal: { ...prev.terminal, background_image: selectedPath },
+        }));
+        return;
+      }
+    } catch (err) {
+      console.warn('Native picker error, trying input fallback:', err);
+    }
+    fileInputRef.current?.click();
+  };
+
+  // Local File Selector fallback using Tauri backend to save directly to disk
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -504,7 +522,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     type="button"
                     className="btn-secondary"
                     style={{ background: '#1b2234', color: '#f8fafc', whiteSpace: 'nowrap' }}
-                    onClick={() => fileInputRef.current?.click()}
+                    onClick={handleBrowseClick}
                     title="ローカル画像ファイルを参照"
                   >
                     <FolderOpen size={14} />

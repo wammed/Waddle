@@ -234,6 +234,31 @@ pub fn check_git_status(path_str: &str) -> GitStatus {
         };
     }
 
+    // Fast check: only run git if .git exists in path or an immediate parent
+    let mut has_git = false;
+    let mut cur = Some(path);
+    let mut depth = 0;
+    while let Some(p) = cur {
+        if p.join(".git").exists() {
+            has_git = true;
+            break;
+        }
+        depth += 1;
+        if depth > 4 {
+            break;
+        }
+        cur = p.parent();
+    }
+
+    if !has_git {
+        return GitStatus {
+            is_repo: false,
+            branch: None,
+            modified_count: 0,
+            untracked_count: 0,
+        };
+    }
+
     let output = std::process::Command::new("git")
         .args(["status", "--porcelain", "-b"])
         .current_dir(path)

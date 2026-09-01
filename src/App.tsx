@@ -279,14 +279,33 @@ export function App() {
             <div
               className="terminal-wallpaper-layer"
               style={{
-                backgroundImage: `url('${wallpaperUrl}')`,
                 opacity: config.terminal.background_opacity ?? 0.85,
-                filter: config.terminal.background_blur && config.terminal.background_blur > 0
-                  ? `blur(${config.terminal.background_blur}px)`
-                  : undefined,
-                transform: config.terminal.background_blur && config.terminal.background_blur > 0 ? 'scale(1.05)' : undefined,
               }}
-            />
+            >
+              <img
+                src={wallpaperUrl}
+                alt=""
+                decoding="async"
+                loading="eager"
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  filter:
+                    config.terminal.background_blur && config.terminal.background_blur > 0
+                      ? `blur(${config.terminal.background_blur}px)`
+                      : undefined,
+                  transform:
+                    config.terminal.background_blur && config.terminal.background_blur > 0
+                      ? 'scale(1.05) translateZ(0)'
+                      : 'translateZ(0)',
+                  pointerEvents: 'none',
+                  userSelect: 'none',
+                }}
+              />
+            </div>
           )}
 
           {/* Dark Contrast Overlay for Terminal Text Readability */}

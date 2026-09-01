@@ -294,13 +294,12 @@ body, html {
   inset: 0;
   width: 100%;
   height: 100%;
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
+  overflow: hidden;
+  contain: strict;
   pointer-events: none;
   z-index: 0;
   transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-  will-change: transform, opacity;
+  will-change: opacity;
   transform: translateZ(0);
   backface-visibility: hidden;
 }

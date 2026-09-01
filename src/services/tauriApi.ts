@@ -278,6 +278,13 @@ export const TauriApi = {
     });
   },
 
+  async pickWallpaperFile(): Promise<string | null> {
+    if (!isTauri()) {
+      return '/home/user/Pictures/wallpaper.jpg';
+    }
+    return await invoke<string | null>('pick_wallpaper_file');
+  },
+
   async getSystemInfo(): Promise<SystemInfo> {
     if (!isTauri()) {
       return {

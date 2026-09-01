@@ -204,6 +204,47 @@ async fn ai_edit_code(
 // --- Config & System Commands ---
 
 #[tauri::command]
+async fn pick_wallpaper_file() -> Result<Option<String>, String> {
+    tokio::task::spawn_blocking(|| {
+        // Try zenity first (standard native dialog on GTK/Linux desktop)
+        if let Ok(output) = std::process::Command::new("zenity")
+            .args([
+                "--file-selection",
+                "--title=壁紙画像を選択",
+                "--file-filter=画像ファイル (*.png, *.jpg, *.jpeg, *.webp, *.svg) | *.png *.jpg *.jpeg *.webp *.gif *.svg *.bmp",
+            ])
+            .output()
+        {
+            if output.status.success() {
+                let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                if !path.is_empty() {
+                    return Ok(Some(path));
+                }
+            }
+            return Ok(None);
+        }
+
+        // Try kdialog fallback
+        if let Ok(output) = std::process::Command::new("kdialog")
+            .args(["--getopenfilename", ".", "*.png *.jpg *.jpeg *.webp *.gif *.svg *.bmp"])
+            .output()
+        {
+            if output.status.success() {
+                let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                if !path.is_empty() {
+                    return Ok(Some(path));
+                }
+            }
+            return Ok(None);
+        }
+
+        Err("ファイル選択ダイアログを開けませんでした。パスを手動で入力してください。".to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
 fn save_wallpaper_file(
     state: State<'_, AppState>,
     file_name: String,
@@ -293,6 +334,7 @@ pub fn run() {
             get_config,
             save_config,
             save_wallpaper_file,
+            pick_wallpaper_file,
             get_system_info,
         ])
         .run(tauri::generate_context!())

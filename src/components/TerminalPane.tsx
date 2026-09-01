@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
+import { CanvasAddon } from '@xterm/addon-canvas';
 import { THEMES } from '../theme';
 import { AppConfig, TerminalTab } from '../types';
 import { TauriApi } from '../services/tauriApi';
@@ -58,6 +59,14 @@ export const TerminalPane: React.FC<TerminalPaneProps> = ({
     term.loadAddon(new WebLinksAddon());
 
     term.open(containerRef.current);
+
+    // Hardware accelerated Canvas rendering (graceful fallback to DOM if unavailable)
+    try {
+      const canvasAddon = new CanvasAddon();
+      term.loadAddon(canvasAddon);
+    } catch (e) {
+      console.warn('CanvasAddon fallback:', e);
+    }
 
     termRef.current = term;
     fitAddonRef.current = fitAddon;
