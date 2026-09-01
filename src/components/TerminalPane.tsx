@@ -51,7 +51,7 @@ export const TerminalPane: React.FC<TerminalPaneProps> = ({
       theme: terminalTheme,
       allowTransparency: true,
       convertEol: true,
-      smoothScrollDuration: 100,
+      smoothScrollDuration: 0,
     });
 
     const fitAddon = new FitAddon();
@@ -59,6 +59,19 @@ export const TerminalPane: React.FC<TerminalPaneProps> = ({
     term.loadAddon(new WebLinksAddon());
 
     term.open(containerRef.current);
+
+    // Initial immediate fit to avoid allocating small canvas then re-allocating
+    if (containerRef.current && containerRef.current.clientWidth > 0) {
+      try {
+        fitAddon.fit();
+        const { rows, cols } = term;
+        if (rows > 2 && cols > 2) {
+          TauriApi.resizePty(tab.sessionId, rows, cols);
+        }
+      } catch (e) {
+        // ignore fit error
+      }
+    }
 
     // Hardware accelerated Canvas rendering (graceful fallback to DOM if unavailable)
     try {

@@ -127,7 +127,11 @@ export function App() {
 
   const createNewTab = async () => {
     try {
-      const pty = await TauriApi.createPty(24, 80);
+      const w = typeof window !== 'undefined' ? window.innerWidth : 1440;
+      const h = typeof window !== 'undefined' ? window.innerHeight : 1440;
+      const initialCols = Math.max(80, Math.floor((w - 24) / 9.2));
+      const initialRows = Math.max(24, Math.floor((h - 80) / 17.5));
+      const pty = await TauriApi.createPty(initialRows, initialCols);
       const newTabId = generateTabId();
       const newTab: TerminalTab = {
         id: newTabId,
@@ -291,18 +295,25 @@ export function App() {
                 loading="eager"
                 style={{
                   position: 'absolute',
-                  inset: 0,
-                  width: '100%',
-                  height: '100%',
+                  inset:
+                    config.terminal.background_blur && config.terminal.background_blur > 0
+                      ? '-20px'
+                      : 0,
+                  width:
+                    config.terminal.background_blur && config.terminal.background_blur > 0
+                      ? 'calc(100% + 40px)'
+                      : '100%',
+                  height:
+                    config.terminal.background_blur && config.terminal.background_blur > 0
+                      ? 'calc(100% + 40px)'
+                      : '100%',
                   objectFit: 'cover',
                   filter:
                     config.terminal.background_blur && config.terminal.background_blur > 0
-                      ? `blur(${config.terminal.background_blur}px)`
+                      ? `blur(${Math.min(config.terminal.background_blur, 10)}px)`
                       : undefined,
-                  transform:
-                    config.terminal.background_blur && config.terminal.background_blur > 0
-                      ? 'scale(1.05) translateZ(0)'
-                      : 'translateZ(0)',
+                  transform: 'translate3d(0, 0, 0)',
+                  willChange: config.terminal.background_blur && config.terminal.background_blur > 0 ? 'filter' : undefined,
                   pointerEvents: 'none',
                   userSelect: 'none',
                 }}

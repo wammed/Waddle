@@ -13,8 +13,8 @@
     "windows": [
       {
         "title": "Waddle",
-        "width": 1080,
-        "height": 720,
+        "width": 1440,
+        "height": 1440,
         "minWidth": 640,
         "minHeight": 480,
         "decorations": true,
