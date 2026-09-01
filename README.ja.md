@@ -201,7 +201,12 @@ npm run tauri dev
 Waddle を最適化された単一バイナリやパッケージとしてビルドする場合：
 
 ```bash
-npm run tauri build
+# 全パッケージ（AppImage, deb, rpm）を一括ビルド
+npm run build:all
+
+# または AppImage 単体のみをビルド
+npm run build:appimage
+# （※ 最新の Arch/CachyOS 環境での binutils 互換性のため NO_STRIP=true を自動適用）
 ```
 
 ### 生成される成果物:

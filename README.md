@@ -191,7 +191,12 @@ npm run tauri dev
 To package Waddle into an optimized standalone binary or Linux bundle:
 
 ```bash
-npm run tauri build
+# Build all bundles (AppImage, deb, rpm)
+npm run build:all
+
+# Or build standalone AppImage only
+npm run build:appimage
+# (Note: NO_STRIP=true is set to ensure compatibility with modern Arch/CachyOS binutils)
 ```
 
 ### Output Artifacts:
