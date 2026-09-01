@@ -56,10 +56,11 @@
 - 危険な破壊的コマンド（`rm -rf` やパーティション操作等）は、AI が自動で警告タグを表示します。
 - `Enter` でターミナルへ入力挿入、`Ctrl + Enter` で即座に実行できます。
 
-### 2. 🖼️ 背景画像・壁紙の自由なカスタマイズ (`Ctrl + ,`)
-- **公式プリセット**: ワンクリックで適用できる **Waddle Official Cyberpunk** 壁紙。
-- **カスタム画像・ファイル参照**: ファイル選択ピッカーボタン（📁 参照...）からローカルの画像（PNG, JPG, SVG, WebP）を即座に適用、またはパス・Web 画像 URL を直接指定可能。
-- **透過度 & すりガラスぼかし調整**: 画像不透明度（10%〜100%）とぼかし（0〜20px）をスライダーで直感的に調整。ターミナル文字のコントラストを維持するオーバーレイも完備。
+### 2. 🖼️ 背景画像・壁紙の自由なカスタマイズ & ネイティブピッカー (`Ctrl + ,`)
+- **OS ネイティブファイル選択**: 「📁 参照...」ボタンから Linux デスクトップ標準のファイル選択ダイアログ（`zenity` / `kdialog`）が直接起動し、PC 内の任意の画像（PNG, JPG, SVG, WebP, GIF, BMP）を迷わず選択・適用可能。
+- **軽量ストレージ & アセットプロトコル**: 画像は Base64 ではなく `~/.config/waddle/wallpapers/` へ独立保存され、Tauri v2 のセキュアな `protocol-asset` 経由で直接ロード。設定ファイル `config.json` は常に数十〜数百バイトの超軽量を維持します。
+- **起動遅延ゼロ（非同期デコード & GPU 隔離）**: 画像デコードをバックグラウンドスレッドで非同期処理（`decoding="async"`）し、CSS の GPU レイヤー分離（`contain: strict`）を行うことで、高解像度 4K 壁紙を設定していてもターミナルが **0ms で即座に起動** します。
+- **透過度 & すりガラスぼかし調整**: 画像不透明度（10%〜100%）とぼかし（0〜20px）をスライダーで直感的に調整。ターミナル文字のコントラストを維持するダークオーバーレイも完備。
 
 ### 3. 📝 簡易内蔵エディタ & AI コード支援 (`Ctrl + E`)
 - ターミナルとシームレスに切り替えられるスライドイン型コードエディタを内蔵。
@@ -80,14 +81,29 @@
 - 設定画面（`Ctrl + ,`）からいつでもモデルを切り替え可能。
 - **API キー不要、クラウドレス、データ流出の心配ゼロ。**
 
-### 7. ⚡ 高性能 PTY & xterm.js ターミナル
+### 7. ⚡ 高性能 PTY & Canvas ハードウェアアクセラレーション描画
 - Rust ネイティブの疑似端末マネージャー（`portable-pty`）による極小レイテンシ。
-- Linux `/proc/<pid>/cwd` を監視し、`cd` 移動を正確にリアルタイム追跡。
-- TrueColor（24-bit カラー）、Nerd Fonts・Powerline 記号の完全描画に対応。
+- Linux `/proc/<pid>/cwd` を監視し、`cd` 移動を正確にリアルタイム追跡（Git リポジトリの事前高速検出機能付き）。
+- `@xterm/addon-canvas` による 2D Canvas ハードウェア描画エンジンを搭載。透過背景上でも DOM レンダリング比で圧倒的に軽快な高速描画を実現。
+- 同期ローカルキャッシュ機構により、初回起動時もテーマや壁紙のロード待ち・チラつきなしで即時描画。
 
-### 8. 🎨 テーマ & Nerd Fonts カスタマイズ
-- プリセットテーマ: **Waddle Cyber Dark** (標準), **Tokyo Night**, **Catppuccin Mocha**, **Dracula**。
-- **JetBrainsMono Nerd Font**, **MesloLGS NF**, **FiraCode Nerd Font**, **Hack Nerd Font** などのプリセット選択およびカスタムフォント指定に対応（Webフォントによる自動記号フォールバック付き）。
+### 8. 🎨 全13種類の洗練されたテーマ & UI 全体同期
+- **厳選された13種類の開発者向けプリセットテーマ**:
+  - **Waddle Cyber (Default)**: ネオンブルー×サイバーダーク
+  - **Tokyo Night**: 深い夜空の藍色×ネオンブルー
+  - **Catppuccin Mocha**: パステル調の上品なモダンダーク
+  - **Dracula**: 定番のゴシックパープル×ハイコントラスト
+  - **Nord (Arctic)**: 北極圏をイメージした静謐なアイスブルー
+  - **Gruvbox Dark**: レトロで目に優しい温かみのあるアースカラー
+  - **One Dark Pro**: Atom / VS Code の名作バランスダーク
+  - **Rosé Pine**: 洗練されたラベンダー＆ローズゴールド
+  - **Monokai Pro**: 高い視認性を誇る王道ビビッド配色
+  - **Cyberpunk 2077**: ネオンイエロー×シアン×ホットピンク
+  - **Solarized Dark**: 人間工学に基づいた深いシアン・ブルーベース
+  - **Synthwave '84**: 80年代レトロフューチャー・ネオンパープル
+  - **Midnight Abyss (OLED)**: 純黒（#000000）で高コントラストな漆黒テーマ
+- **UI 全体の動的カラー同期**: ターミナルの文字色（ANSI 16色）だけでなく、タイトルバー、タブ、枠線、ステータスバー、ダイアログのアクセントカラーまでテーマに合わせて自動統一。
+- **Nerd Fonts**: **JetBrainsMono Nerd Font**, **MesloLGS NF**, **FiraCode Nerd Font**, **Hack Nerd Font** などのプリセット選択およびカスタムフォント指定に対応。
 
 ---
 
@@ -204,11 +220,12 @@ sudo cp src-tauri/target/release/waddle /usr/local/bin/
 
 | レイヤー | 使用技術 |
 | :--- | :--- |
-| **フレームワーク** | [Tauri 2.0](https://tauri.app/) |
-| **バックエンド** | Rust, `portable-pty`, `tokio`, `reqwest`, `serde` |
+| **フレームワーク** | [Tauri 2.0](https://tauri.app/)（`protocol-asset`, `tray-icon` 対応） |
+| **バックエンド** | Rust, `portable-pty`, `tokio`, `reqwest`, `serde`, `base64` |
 | **フロントエンド** | React 19, TypeScript, Vite, Vanilla CSS |
-| **ターミナルコア** | `@xterm/xterm`, `@xterm/addon-fit`, `@xterm/addon-web-links` |
+| **ターミナルコア** | `@xterm/xterm`, `@xterm/addon-canvas`, `@xterm/addon-fit`, `@xterm/addon-web-links` |
 | **ローカル AI エンジン** | [Ollama](https://ollama.com/) (`/api/generate`, `/api/chat`, `/api/tags`) |
+| **ネイティブ連携** | GTK / Wayland ネイティブファイルピッカー（`zenity` / `kdialog`）、Linux `/proc` ファイルシステム |
 | **アイコン・マークダウン** | `lucide-react`, `react-markdown`, `remark-gfm` |
 
 ---

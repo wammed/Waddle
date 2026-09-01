@@ -87,6 +87,8 @@ export function App() {
     root.style.setProperty('--bg-secondary', activeTheme.ui.bgSecondary);
     root.style.setProperty('--bg-tertiary', activeTheme.ui.bgTertiary);
     root.style.setProperty('--bg-card', activeTheme.ui.cardBg);
+    root.style.setProperty('--fg-main', activeTheme.ui.fg);
+    root.style.setProperty('--fg-muted', activeTheme.ui.fgMuted);
     root.style.setProperty('--accent', activeTheme.ui.accent);
     root.style.setProperty('--accent-glow', activeTheme.ui.accentGlow);
     root.style.setProperty('--border', activeTheme.ui.border);
