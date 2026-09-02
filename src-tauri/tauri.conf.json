@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Waddle",
+        "title": "Waddle -- The AI Powered Terminal --",
         "width": 1440,
         "height": 1440,
         "minWidth": 640,
