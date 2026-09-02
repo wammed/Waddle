@@ -188,26 +188,23 @@ npm run tauri dev
 
 ## 📦 Production Build
 
-To package Waddle into an optimized standalone binary or Linux bundle:
+To package Waddle into an optimized standalone binary or native Arch Linux package:
 
 ```bash
-# Build all bundles (AppImage, deb, rpm)
-npm run build:all
+# Build native Arch Linux Pacman package (.pkg.tar.zst)
+npm run package
+# or: npm run build:pacman
+```
 
-# Or build standalone AppImage only
-npm run build:appimage
-# (Note: NO_STRIP=true is set to ensure compatibility with modern Arch/CachyOS binutils)
+### Install with Pacman (Arch Linux / CachyOS / Manjaro / EndeavourOS):
+```bash
+sudo pacman -U src-tauri/target/release/bundle/pacman/waddle-0.1.0-1-x86_64.pkg.tar.zst
 ```
 
 ### Output Artifacts:
-- **Standalone Binary (~12–19 MB)**: `src-tauri/target/release/waddle`
-- **AppImage Package**: `src-tauri/target/release/bundle/appimage/`
-- **Debian/Ubuntu Package**: `src-tauri/target/release/bundle/deb/`
-
-### System Installation Example:
-```bash
-sudo cp src-tauri/target/release/waddle /usr/local/bin/
-```
+- **Arch Linux Pacman Package (~6.9 MB)**: `src-tauri/target/release/bundle/pacman/waddle-0.1.0-1-x86_64.pkg.tar.zst`
+- **Standalone Binary (~18 MB)**: `src-tauri/target/release/waddle`
+- **PKGBUILD**: Included at repository root for `makepkg -si` support
 
 ---
 

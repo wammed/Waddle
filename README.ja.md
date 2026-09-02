@@ -198,26 +198,23 @@ npm run tauri dev
 
 ## 📦 プロダクションビルド（スタンドアロンバイナリ作成）
 
-Waddle を最適化された単一バイナリやパッケージとしてビルドする場合：
+Waddle を最適化された単一バイナリや Arch Linux 向けネイティブパッケージとしてビルドする場合：
 
 ```bash
-# 全パッケージ（AppImage, deb, rpm）を一括ビルド
-npm run build:all
+# Arch Linux 向け Pacman パッケージ (.pkg.tar.zst) をビルド
+npm run package
+# または: npm run build:pacman
+```
 
-# または AppImage 単体のみをビルド
-npm run build:appimage
-# （※ 最新の Arch/CachyOS 環境での binutils 互換性のため NO_STRIP=true を自動適用）
+### Pacman によるシステムインストール (Arch Linux / CachyOS / Manjaro / EndeavourOS):
+```bash
+sudo pacman -U src-tauri/target/release/bundle/pacman/waddle-0.1.0-1-x86_64.pkg.tar.zst
 ```
 
 ### 生成される成果物:
-- **スタンドアロン実行ファイル (~12–19 MB)**: `src-tauri/target/release/waddle`
-- **AppImage パッケージ**: `src-tauri/target/release/bundle/appimage/`
-- **Debian/Ubuntu パッケージ**: `src-tauri/target/release/bundle/deb/`
-
-### システムへのインストール例:
-```bash
-sudo cp src-tauri/target/release/waddle /usr/local/bin/
-```
+- **Arch Linux Pacman パッケージ (~6.9 MB)**: `src-tauri/target/release/bundle/pacman/waddle-0.1.0-1-x86_64.pkg.tar.zst`
+- **スタンドアロン実行ファイル (~18 MB)**: `src-tauri/target/release/waddle`
+- **PKGBUILD**: リポジトリ直下に配置済み（`makepkg -si` によるビルド・AUR対応）
 
 ---
 
