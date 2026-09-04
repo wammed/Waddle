@@ -95,7 +95,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       if (!bg || bg === 'none') {
         setBgMode('none');
         setCustomBgPath('');
-      } else if (bg === 'preset_cyberpunk') {
+      } else if (bg === 'preset_cyberpunk' || bg === 'preset_official') {
         setBgMode('preset_cyberpunk');
         setCustomBgPath('');
       } else {
@@ -497,7 +497,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 onChange={(e) => handleBgModeChange(e.target.value as any)}
               >
                 <option value="none" style={{ background: '#181e2e', color: '#f8fafc' }}>なし (デフォルトダーク背景)</option>
-                <option value="preset_cyberpunk" style={{ background: '#181e2e', color: '#f8fafc' }}>Waddle Official Cyberpunk (公式壁紙)</option>
+                <option value="preset_cyberpunk" style={{ background: '#181e2e', color: '#f8fafc' }}>Waddle Official (公式壁紙)</option>
                 <option value="custom" style={{ background: '#181e2e', color: '#f8fafc' }}>カスタム画像 (ファイル選択 / パス指定)...</option>
               </select>
 

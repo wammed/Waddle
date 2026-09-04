@@ -245,7 +245,7 @@ export function App() {
   const wallpaperUrl = React.useMemo(() => {
     const bgImage = config.terminal.background_image;
     if (!bgImage || bgImage === 'none') return null;
-    if (bgImage === 'preset_cyberpunk') return waddleWallpaper;
+    if (bgImage === 'preset_cyberpunk' || bgImage === 'preset_official') return waddleWallpaper;
     if (
       bgImage.startsWith('http://') ||
       bgImage.startsWith('https://') ||
