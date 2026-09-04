@@ -6,6 +6,7 @@ import {
   Settings,
   Bot,
   FileCode,
+  PanelLeft,
 } from 'lucide-react';
 import { TerminalTab } from '../types';
 import waddleIcon from '../assets/waddle-icon.svg';
@@ -22,6 +23,8 @@ interface TitleBarProps {
   onToggleAiSidebar: () => void;
   isEditorOpen: boolean;
   onToggleEditor: () => void;
+  isFileTreeOpen: boolean;
+  onToggleFileTree: () => void;
 }
 
 export const TitleBar: React.FC<TitleBarProps> = ({
@@ -36,6 +39,8 @@ export const TitleBar: React.FC<TitleBarProps> = ({
   onToggleAiSidebar,
   isEditorOpen,
   onToggleEditor,
+  isFileTreeOpen,
+  onToggleFileTree,
 }) => {
   return (
     <header className="titlebar-container" data-tauri-drag-region>
@@ -54,6 +59,17 @@ export const TitleBar: React.FC<TitleBarProps> = ({
           />
           <span>Waddle</span>
         </div>
+
+        <button
+          id="btn-filetree-toggle"
+          className={`action-btn ${isFileTreeOpen ? 'active' : ''}`}
+          onClick={onToggleFileTree}
+          title="Toggle File Tree Sidebar (Ctrl+B)"
+          style={{ height: '28px', padding: '0 8px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '5px' }}
+        >
+          <PanelLeft size={14} />
+          <span>Files</span>
+        </button>
 
         <nav className="tabs-list" aria-label="Terminal Tabs">
           {tabs.map((tab) => {

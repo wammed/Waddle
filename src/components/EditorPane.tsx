@@ -20,6 +20,7 @@ interface EditorPaneProps {
   config: AppConfig;
   context: TerminalContext;
   onExecuteInTerminal: (command: string) => void;
+  targetFilePath?: string | null;
 }
 
 export const EditorPane: React.FC<EditorPaneProps> = ({
@@ -29,6 +30,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
   config,
   context,
   onExecuteInTerminal,
+  targetFilePath,
 }) => {
   const [filePath, setFilePath] = useState('');
   const [content, setContent] = useState('');
@@ -63,6 +65,12 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
       loadDirectoryFiles();
     }
   }, [isOpen, cwd]);
+
+  useEffect(() => {
+    if (targetFilePath) {
+      handleOpenFile(targetFilePath);
+    }
+  }, [targetFilePath]);
 
   // Open a file
   const handleOpenFile = async (name: string) => {

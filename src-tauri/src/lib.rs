@@ -98,32 +98,99 @@ fn write_file(path: String, content: String) -> Result<(), String> {
     fs::write(p, content).map_err(|e| format!("Failed to write file: {}", e))
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FileEntry {
+    pub name: String,
+    pub path: String,
+    pub is_dir: bool,
+    pub is_symlink: bool,
+    pub size: u64,
+    pub readonly: bool,
+    pub modified: Option<u64>,
+}
+
 #[tauri::command]
-fn list_directory_files(path: String) -> Result<Vec<String>, String> {
+fn read_directory(path: String, show_hidden: bool) -> Result<Vec<FileEntry>, String> {
     let p = Path::new(&path);
     if !p.exists() || !p.is_dir() {
         return Ok(Vec::new());
     }
 
-    let mut files = Vec::new();
+    let mut entries_list = Vec::new();
     if let Ok(entries) = fs::read_dir(p) {
         for entry in entries.flatten() {
             if let Ok(file_name) = entry.file_name().into_string() {
-                // Skip hidden files if preferred, or keep
-                if !file_name.starts_with(".git") {
-                    let is_dir = entry.file_type().map(|t| t.is_dir()).unwrap_or(false);
-                    let display_name = if is_dir {
-                        format!("{}/", file_name)
-                    } else {
-                        file_name
-                    };
-                    files.push(display_name);
+                if !show_hidden && file_name.starts_with('.') {
+                    continue;
                 }
+                if !show_hidden && file_name == ".git" {
+                    continue;
+                }
+                let file_path = entry.path().to_string_lossy().to_string();
+                let file_type = entry.file_type();
+                let is_dir = file_type.as_ref().map(|t| t.is_dir()).unwrap_or(false);
+                let is_symlink = file_type.as_ref().map(|t| t.is_symlink()).unwrap_or(false);
+                let metadata = entry.metadata().ok();
+                let size = metadata.as_ref().map(|m| m.len()).unwrap_or(0);
+                let readonly = metadata.as_ref().map(|m| m.permissions().readonly()).unwrap_or(false);
+                let modified = metadata
+                    .and_then(|m| m.modified().ok())
+                    .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                    .map(|d| d.as_secs());
+
+                entries_list.push(FileEntry {
+                    name: file_name,
+                    path: file_path,
+                    is_dir,
+                    is_symlink,
+                    size,
+                    readonly,
+                    modified,
+                });
             }
         }
     }
-    files.sort();
-    Ok(files)
+
+    // Sort: directories first, then alphabetical case-insensitive
+    entries_list.sort_by(|a, b| {
+        b.is_dir
+            .cmp(&a.is_dir)
+            .then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase()))
+    });
+
+    Ok(entries_list)
+}
+
+#[tauri::command]
+fn create_file(path: String) -> Result<(), String> {
+    let p = Path::new(&path);
+    if let Some(parent) = p.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    if p.exists() {
+        return Err("File already exists".to_string());
+    }
+    fs::File::create(p).map_err(|e| format!("Failed to create file: {}", e))?;
+    Ok(())
+}
+
+#[tauri::command]
+fn create_directory(path: String) -> Result<(), String> {
+    let p = Path::new(&path);
+    fs::create_dir_all(p).map_err(|e| format!("Failed to create directory: {}", e))
+}
+
+#[tauri::command]
+fn delete_entry(path: String) -> Result<(), String> {
+    let p = Path::new(&path);
+    if !p.exists() {
+        return Ok(());
+    }
+    if p.is_dir() {
+        fs::remove_dir_all(p).map_err(|e| format!("Failed to delete directory: {}", e))
+    } else {
+        fs::remove_file(p).map_err(|e| format!("Failed to delete file: {}", e))
+    }
 }
 
 // --- AI Commands (Ollama) ---
@@ -325,7 +392,10 @@ pub fn run() {
             get_git_status,
             read_file,
             write_file,
-            list_directory_files,
+            read_directory,
+            create_file,
+            create_directory,
+            delete_entry,
             check_ollama_status,
             generate_command,
             explain_error,
@@ -339,4 +409,53 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running Waddle terminal application");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_file_tree_operations() {
+        let temp_dir = std::env::temp_dir().join(format!("waddle_tree_test_{}", uuid::Uuid::new_v4()));
+        let _ = fs::create_dir_all(&temp_dir);
+        let dir_path = temp_dir.to_str().unwrap().to_string();
+
+        // 1. Create sub-directory
+        let sub_dir = format!("{}/test_folder", dir_path);
+        assert!(create_directory(sub_dir.clone()).is_ok());
+
+        // 2. Create file
+        let file_a = format!("{}/alpha.txt", dir_path);
+        let file_b = format!("{}/beta.py", dir_path);
+        let hidden_file = format!("{}/.hidden", dir_path);
+        assert!(create_file(file_a.clone()).is_ok());
+        assert!(create_file(file_b.clone()).is_ok());
+        assert!(create_file(hidden_file.clone()).is_ok());
+
+        // 3. Read directory without hidden
+        let entries = read_directory(dir_path.clone(), false).expect("read_directory failed");
+        let names: Vec<String> = entries.iter().map(|e| e.name.clone()).collect();
+        assert!(names.contains(&"test_folder".to_string()));
+        assert!(names.contains(&"alpha.txt".to_string()));
+        assert!(names.contains(&"beta.py".to_string()));
+        assert!(!names.contains(&".hidden".to_string()));
+
+        // Folders should come first
+        assert!(entries[0].is_dir);
+        assert_eq!(entries[0].name, "test_folder");
+
+        // 4. Read directory with hidden
+        let entries_with_hidden = read_directory(dir_path.clone(), true).expect("read_directory failed");
+        let all_names: Vec<String> = entries_with_hidden.iter().map(|e| e.name.clone()).collect();
+        assert!(all_names.contains(&".hidden".to_string()));
+
+        // 5. Delete file and folder
+        assert!(delete_entry(file_a.clone()).is_ok());
+        assert!(!Path::new(&file_a).exists());
+        assert!(delete_entry(sub_dir.clone()).is_ok());
+        assert!(!Path::new(&sub_dir).exists());
+
+        let _ = fs::remove_dir_all(&temp_dir);
+    }
 }

@@ -62,7 +62,12 @@
 - **Sub-Millisecond 0ms Startup**: Asynchronous image decoding (`decoding="async"`) off the main thread with GPU hardware isolation (`contain: strict`) ensures instantaneous terminal launch even with 4K wallpapers.
 - **Opacity & Blur Controls**: Real-time slider adjustments for image opacity (10%–100%) and frosted glass blur (0–20px) with automatic contrast overlay for crystal-clear terminal text readability.
 
-### 3. 📝 Embedded Lightweight Editor & AI Code Assistant (`Ctrl + E`)
+### 3. 📂 Left Sidebar: File Tree Explorer (`Ctrl + B`)
+- **Hierarchical Directory Navigation**: Synchronizes in real time with the active terminal tab's CWD (`/proc/<pid>/cwd`), featuring lazy-loaded subfolders and file-type-specific icons.
+- **Instant Search & Hidden Files Toggle**: Quickly filter files in the directory with the embedded search bar, and toggle dotfiles (`.git`, `.env`, etc.) with one click.
+- **Editor & Terminal Integration**: Click any file to open it in the Embedded Editor (`Ctrl + E`), or use hover quick-actions to insert paths or run commands directly in the shell.
+
+### 4. 📝 Embedded Lightweight Editor & AI Code Assistant (`Ctrl + E`)
 - Seamlessly toggle a side-by-side code editor right inside your terminal.
 - **Quick Open & Save**: Browse files in the current working directory, open by path, and save changes (`Ctrl + S`).
 - **Run in Terminal**: Send scripts (Python, Bash, JS/TS, Rust, etc.) directly into the active shell with one click.
@@ -102,6 +107,7 @@
 | Shortcut | Action |
 | :--- | :--- |
 | `Ctrl + K` | Open **AI Command Generator** |
+| `Ctrl + B` | Toggle **File Tree Sidebar** |
 | `Ctrl + E` | Toggle **Embedded Code Editor** |
 | `Ctrl + S` *(in editor)* | Save file |
 | `Ctrl + Shift + K` *(in editor)* | Open **AI Code Edit / Refactor** |

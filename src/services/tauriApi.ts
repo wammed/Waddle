@@ -5,6 +5,7 @@ import {
   ChatMessage,
   CommandSuggestion,
   ErrorExplanation,
+  FileEntry,
   GitStatus,
   OllamaStatus,
   PtySessionInfo,
@@ -107,11 +108,40 @@ export const TauriApi = {
     return await invoke('write_file', { path, content });
   },
 
-  async listDirectoryFiles(path: string): Promise<string[]> {
+  async readDirectory(path: string, showHidden = false): Promise<FileEntry[]> {
     if (!isTauri()) {
-      return ['main.py', 'test.sh', 'package.json', 'src/'];
+      return [
+        { name: 'src', path: `${path}/src`, is_dir: true, is_symlink: false, size: 4096, readonly: false },
+        { name: 'public', path: `${path}/public`, is_dir: true, is_symlink: false, size: 4096, readonly: false },
+        { name: 'package.json', path: `${path}/package.json`, is_dir: false, is_symlink: false, size: 1024, readonly: false },
+        { name: 'README.md', path: `${path}/README.md`, is_dir: false, is_symlink: false, size: 2048, readonly: false },
+      ];
     }
-    return await invoke<string[]>('list_directory_files', { path });
+    return await invoke<FileEntry[]>('read_directory', { path, showHidden });
+  },
+
+  async createFile(path: string): Promise<void> {
+    if (!isTauri()) return;
+    return await invoke('create_file', { path });
+  },
+
+  async createDirectory(path: string): Promise<void> {
+    if (!isTauri()) return;
+    return await invoke('create_directory', { path });
+  },
+
+  async deleteEntry(path: string): Promise<void> {
+    if (!isTauri()) return;
+    return await invoke('delete_entry', { path });
+  },
+
+  async listDirectoryFiles(path: string): Promise<string[]> {
+    try {
+      const entries = await this.readDirectory(path, false);
+      return entries.map((e) => (e.is_dir ? `${e.name}/` : e.name));
+    } catch {
+      return [];
+    }
   },
 
   async aiEditCode(

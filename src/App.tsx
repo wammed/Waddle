@@ -6,6 +6,7 @@ import { AiCommandModal } from './components/AiCommandModal';
 import { AiErrorBanner } from './components/AiErrorBanner';
 import { AiSidebar } from './components/AiSidebar';
 import { EditorPane } from './components/EditorPane';
+import { FileTreeSidebar } from './components/FileTreeSidebar';
 import { SettingsModal } from './components/SettingsModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { AppConfig, SystemInfo, TerminalContext, TerminalTab } from './types';
@@ -69,6 +70,8 @@ export function App() {
   const [isAiSidebarOpen, setIsAiSidebarOpen] = useState(false);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isFileTreeOpen, setIsFileTreeOpen] = useState(true);
+  const [targetEditorFile, setTargetEditorFile] = useState<string | null>(null);
 
   // Active error alert
   const [errorAlert, setErrorAlert] = useState<{
@@ -127,9 +130,10 @@ export function App() {
 
   const createNewTab = async () => {
     try {
-      const w = typeof window !== 'undefined' ? window.innerWidth : 1440;
+      const w = typeof window !== 'undefined' ? window.innerWidth : 1700;
       const h = typeof window !== 'undefined' ? window.innerHeight : 1440;
-      const initialCols = Math.max(80, Math.floor((w - 24) / 9.2));
+      const sidebarOffset = isFileTreeOpen ? 260 : 0;
+      const initialCols = Math.max(80, Math.floor((w - 24 - sidebarOffset) / 9.2));
       const initialRows = Math.max(24, Math.floor((h - 80) / 17.5));
       const pty = await TauriApi.createPty(initialRows, initialCols);
       const newTabId = generateTabId();
@@ -232,6 +236,9 @@ export function App() {
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'w') {
         e.preventDefault();
         if (activeTabId) closeTab(activeTabId);
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
+        e.preventDefault();
+        setIsFileTreeOpen((prev) => !prev);
       } else if ((e.ctrlKey || e.metaKey) && e.key === ',') {
         e.preventDefault();
         setIsSettingsOpen((prev) => !prev);
@@ -275,10 +282,24 @@ export function App() {
         onToggleAiSidebar={() => setIsAiSidebarOpen(!isAiSidebarOpen)}
         isEditorOpen={isEditorOpen}
         onToggleEditor={() => setIsEditorOpen(!isEditorOpen)}
+        isFileTreeOpen={isFileTreeOpen}
+        onToggleFileTree={() => setIsFileTreeOpen(!isFileTreeOpen)}
       />
 
       {/* Main Content Area */}
       <main className="main-content">
+        {/* Left Sidebar: File Tree Explorer */}
+        <FileTreeSidebar
+          isOpen={isFileTreeOpen}
+          onClose={() => setIsFileTreeOpen(false)}
+          cwd={activeTab?.cwd || ''}
+          onOpenFile={(filePath) => {
+            setTargetEditorFile(filePath);
+            setIsEditorOpen(true);
+          }}
+          onInsertToTerminal={handleInsertCommand}
+        />
+
         <section className="terminal-area" style={{ position: 'relative', overflow: 'hidden' }}>
           {/* Wallpaper Layer */}
           {wallpaperUrl && (
@@ -364,11 +385,15 @@ export function App() {
         {/* Embedded Editor Panel */}
         <EditorPane
           isOpen={isEditorOpen}
-          onClose={() => setIsEditorOpen(false)}
+          onClose={() => {
+            setIsEditorOpen(false);
+            setTargetEditorFile(null);
+          }}
           cwd={activeTab?.cwd || ''}
           config={config}
           context={currentAiContext}
           onExecuteInTerminal={handleExecuteCommand}
+          targetFilePath={targetEditorFile}
         />
 
         {/* AI Sidebar (Copilot) */}
