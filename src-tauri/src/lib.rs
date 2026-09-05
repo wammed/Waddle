@@ -45,6 +45,11 @@ async fn create_pty(
 }
 
 #[tauri::command]
+async fn start_pty(state: State<'_, AppState>, session_id: String) -> Result<(), String> {
+    state.pty_manager.start_pty(&session_id).await
+}
+
+#[tauri::command]
 async fn write_pty(
     state: State<'_, AppState>,
     session_id: String,
@@ -552,6 +557,7 @@ pub fn run() {
         .manage(state)
         .invoke_handler(tauri::generate_handler![
             create_pty,
+            start_pty,
             write_pty,
             resize_pty,
             close_pty,

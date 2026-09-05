@@ -41,6 +41,15 @@ export const TauriApi = {
     });
   },
 
+  async startPty(sessionId: string): Promise<void> {
+    if (!isTauri()) return;
+    try {
+      await invoke('start_pty', { sessionId });
+    } catch {
+      // ignore
+    }
+  },
+
   async writePty(sessionId: string, data: string): Promise<void> {
     if (!isTauri()) return;
     return await invoke('write_pty', { sessionId, data });

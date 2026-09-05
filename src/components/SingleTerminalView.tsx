@@ -17,6 +17,7 @@ interface SingleTerminalViewProps {
   isActivePane: boolean;
   isTabActive: boolean;
   isZoomed?: boolean;
+  isResizing?: boolean;
   config: AppConfig;
   slotClassName?: string;
   onFocus: () => void;
@@ -33,6 +34,7 @@ export const SingleTerminalView: React.FC<SingleTerminalViewProps> = ({
   isActivePane,
   isTabActive,
   isZoomed = false,
+  isResizing = false,
   config,
   slotClassName = '',
   onFocus,
@@ -65,6 +67,8 @@ export const SingleTerminalView: React.FC<SingleTerminalViewProps> = ({
   isTabActiveRef.current = isTabActive;
   const isActivePaneRef = useRef(isActivePane);
   isActivePaneRef.current = isActivePane;
+  const isResizingRef = useRef(isResizing);
+  isResizingRef.current = isResizing;
 
   const focusTerminal = useCallback(() => {
     if (termRef.current) {
@@ -76,6 +80,8 @@ export const SingleTerminalView: React.FC<SingleTerminalViewProps> = ({
     }
   }, []);
 
+  const lastDimensionsRef = useRef<{ cols: number; rows: number }>({ cols: 0, rows: 0 });
+
   const fitTerminal = useCallback(() => {
     if (!containerRef.current || !fitAddonRef.current || !termRef.current) return;
     const w = containerRef.current.clientWidth;
@@ -85,7 +91,13 @@ export const SingleTerminalView: React.FC<SingleTerminalViewProps> = ({
       fitAddonRef.current.fit();
       const { rows, cols } = termRef.current;
       if (rows > 2 && cols > 2) {
-        TauriApi.resizePty(pane.sessionId, rows, cols);
+        if (
+          lastDimensionsRef.current.rows !== rows ||
+          lastDimensionsRef.current.cols !== cols
+        ) {
+          lastDimensionsRef.current = { rows, cols };
+          TauriApi.resizePty(pane.sessionId, rows, cols);
+        }
       }
     } catch (e) {
       // ignore
@@ -297,6 +309,8 @@ export const SingleTerminalView: React.FC<SingleTerminalViewProps> = ({
       detectErrorPatterns(output);
     }).then((unlisten) => {
       unlistenOutput = unlisten;
+      // Start streaming now that frontend listener is ready
+      TauriApi.startPty(pane.sessionId);
     });
 
     TauriApi.onPtyExit(pane.sessionId, () => {
@@ -316,11 +330,20 @@ export const SingleTerminalView: React.FC<SingleTerminalViewProps> = ({
       }
     }, 4000);
 
-    // Resize observer
+    // Resize observer with requestAnimationFrame throttling
+    let resizeRafId: number | null = null;
     const resizeObserver = new ResizeObserver((entries) => {
+      // While dragging pane divider, do NOT wipe canvas or refit!
+      // The CSS container smoothly clips/reveals without any flicker.
+      if (isResizingRef.current) return;
       for (const entry of entries) {
         if (entry.contentRect.width > 50 && entry.contentRect.height > 40) {
-          fitTerminal();
+          if (resizeRafId === null) {
+            resizeRafId = requestAnimationFrame(() => {
+              resizeRafId = null;
+              fitTerminal();
+            });
+          }
         }
       }
     });
@@ -328,6 +351,9 @@ export const SingleTerminalView: React.FC<SingleTerminalViewProps> = ({
     resizeObserver.observe(containerRef.current);
 
     return () => {
+      if (resizeRafId !== null) {
+        cancelAnimationFrame(resizeRafId);
+      }
       cancelAnimationFrame(rafId);
       clearTimeout(settleTimeout);
       clearTimeout(initialFetchTimer);
@@ -380,6 +406,15 @@ export const SingleTerminalView: React.FC<SingleTerminalViewProps> = ({
       return () => clearTimeout(timer);
     }
   }, [isTabActive, isActivePane, totalPanes, isZoomed, fitTerminal, focusTerminal]);
+
+  // Clean single refit when pane drag resizing completes
+  const prevIsResizingRef = useRef(isResizing);
+  useEffect(() => {
+    if (prevIsResizingRef.current && !isResizing) {
+      fitTerminal();
+    }
+    prevIsResizingRef.current = isResizing;
+  }, [isResizing, fitTerminal]);
 
   const detectErrorPatterns = (chunk: string) => {
     const cmd = lastCommandRef.current;

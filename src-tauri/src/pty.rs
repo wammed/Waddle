@@ -35,6 +35,7 @@ struct Session {
     alive: Arc<AtomicBool>,
     last_known_cwd: String,
     shell: String,
+    start_tx: Arc<parking_lot::Mutex<Option<std::sync::mpsc::Sender<()>>>>,
 }
 
 pub struct PtyManager {
@@ -105,8 +106,16 @@ impl PtyManager {
         let app_clone = app.clone();
         let session_id_clone = id.clone();
 
+        let (start_tx, start_rx) = std::sync::mpsc::channel::<()>();
+        let start_tx = Arc::new(parking_lot::Mutex::new(Some(start_tx)));
+
         // Background thread for reading PTY output
         thread::spawn(move || {
+            // Wait up to 1000ms for frontend to register its listener via start_pty.
+            // If frontend calls start_pty immediately upon mounting, this wakes up in 0ms!
+            // If not, timeout after 1000ms to ensure headless/background operations proceed.
+            let _ = start_rx.recv_timeout(std::time::Duration::from_millis(1000));
+
             let mut reader = reader;
             let mut buffer = [0u8; 8192];
             let mut pending_bytes: Vec<u8> = Vec::new();
@@ -186,6 +195,7 @@ impl PtyManager {
             alive,
             last_known_cwd: target_cwd.to_string_lossy().to_string(),
             shell: shell_cmd.clone(),
+            start_tx,
         };
 
         let session_info = PtySessionInfo {
@@ -199,9 +209,24 @@ impl PtyManager {
         Ok(session_info)
     }
 
+    pub async fn start_pty(&self, session_id: &str) -> Result<(), String> {
+        let sessions = self.sessions.lock().await;
+        if let Some(session) = sessions.get(session_id) {
+            if let Some(tx) = session.start_tx.lock().take() {
+                let _ = tx.send(());
+            }
+            Ok(())
+        } else {
+            Err("Session not found".to_string())
+        }
+    }
+
     pub async fn write(&self, session_id: &str, data: &str) -> Result<(), String> {
         let sessions = self.sessions.lock().await;
         if let Some(session) = sessions.get(session_id) {
+            if let Some(tx) = session.start_tx.lock().take() {
+                let _ = tx.send(());
+            }
             let mut writer = session.writer.lock();
             writer
                 .write_all(data.as_bytes())
@@ -250,6 +275,9 @@ impl PtyManager {
     pub async fn close(&self, session_id: &str) -> Result<(), String> {
         let mut sessions = self.sessions.lock().await;
         if let Some(session) = sessions.remove(session_id) {
+            if let Some(tx) = session.start_tx.lock().take() {
+                let _ = tx.send(());
+            }
             session.alive.store(false, Ordering::SeqCst);
             // On Linux, kill child process and process group
             if session.pid > 0 {

@@ -36,6 +36,9 @@ const DEFAULT_CONFIG: AppConfig = {
     cursor_blink: true,
     opacity: 0.95,
     scrollback: 10000,
+    background_image: 'preset_cyberpunk',
+    background_opacity: 0.85,
+    background_blur: 0,
   },
 };
 
@@ -56,7 +59,12 @@ export function App() {
   const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
 
   const handleUpdateConfig = useCallback((newConfig: AppConfig) => {
-    setConfig(newConfig);
+    setConfig((prev) => {
+      if (JSON.stringify(prev) === JSON.stringify(newConfig)) {
+        return prev;
+      }
+      return newConfig;
+    });
     try {
       localStorage.setItem('waddle_config_cache', JSON.stringify(newConfig));
     } catch {}

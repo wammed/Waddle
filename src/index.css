@@ -4,7 +4,9 @@
 /* Nerd Fonts Symbols Font-Face (for glyphs, icons, Powerline, and devicons) */
 @font-face {
   font-family: 'Symbols Nerd Font Mono';
-  src: url('https://cdn.jsdelivr.net/gh/ryanoasis/nerd-fonts@3.2.1/patched-fonts/NerdFontsSymbolsOnly/SymbolsNerdFontMono-Regular.ttf') format('truetype');
+  src: local('Symbols Nerd Font Mono'),
+       local('Symbols Nerd Font'),
+       local('SymbolsNerdFontMono-Regular');
   font-weight: normal;
   font-style: normal;
   font-display: swap;
@@ -1330,6 +1332,7 @@ input::placeholder {
   overflow: hidden;
   padding: 0;
   box-sizing: border-box;
+  contain: strict;
 }
 
 .pane-item:not(.single) .pane-terminal-viewport {
@@ -1489,56 +1492,95 @@ input::placeholder {
   position: absolute;
   top: 0;
   bottom: 0;
-  width: 8px;
+  width: 16px;
+  margin-left: -8px;
   cursor: col-resize;
-  z-index: 25;
+  z-index: 50;
   display: flex;
   justify-content: center;
   align-items: center;
   user-select: none;
+  touch-action: none;
 }
 
 .pane-divider-x::after {
   content: '';
   width: 2px;
   height: 100%;
-  background-color: rgba(255, 255, 255, 0.08);
+  background-color: rgba(255, 255, 255, 0.12);
   transition: all 0.15s ease;
+  pointer-events: none;
 }
 
 .pane-divider-x:hover::after,
 .pane-divider-x.active-drag::after {
-  background-color: var(--accent-blue, #38bdf8);
-  width: 3px;
-  box-shadow: 0 0 10px rgba(56, 189, 248, 0.7);
+  background-color: var(--accent, #38bdf8);
+  width: 4px;
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.8);
 }
 
 .pane-divider-y {
   position: absolute;
   left: 0;
   right: 0;
-  height: 8px;
+  height: 16px;
+  margin-top: -8px;
   cursor: row-resize;
-  z-index: 25;
+  z-index: 50;
   display: flex;
   justify-content: center;
   align-items: center;
   user-select: none;
+  touch-action: none;
 }
 
 .pane-divider-y::after {
   content: '';
   height: 2px;
   width: 100%;
-  background-color: rgba(255, 255, 255, 0.08);
+  background-color: rgba(255, 255, 255, 0.12);
   transition: all 0.15s ease;
+  pointer-events: none;
 }
 
 .pane-divider-y:hover::after,
 .pane-divider-y.active-drag::after {
-  background-color: var(--accent-blue, #38bdf8);
-  height: 3px;
-  box-shadow: 0 0 10px rgba(56, 189, 248, 0.7);
+  background-color: var(--accent, #38bdf8);
+  height: 4px;
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.8);
+}
+
+.pane-divider-corner {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  margin-left: -10px;
+  margin-top: -10px;
+  cursor: move;
+  z-index: 55;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  touch-action: none;
+}
+
+.pane-divider-corner::after {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: rgba(255, 255, 255, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  transition: all 0.15s ease;
+  pointer-events: none;
+}
+
+.pane-divider-corner:hover::after,
+.pane-divider-corner.active-drag::after {
+  background-color: var(--accent, #38bdf8);
+  box-shadow: 0 0 12px var(--accent, #38bdf8);
+  transform: scale(1.3);
 }
 
 /* Terminal search bar active button filter */
@@ -1547,4 +1589,23 @@ input::placeholder {
   color: var(--accent-blue, #38bdf8) !important;
   border-color: rgba(56, 189, 248, 0.3) !important;
 }
+
+/* Dragging Overlay and Pane States */
+.terminal-wrapper.is-dragging-divider {
+  user-select: none;
+}
+
+.terminal-wrapper.is-dragging-divider .pane-item {
+  pointer-events: none;
+  user-select: none;
+}
+
+.pane-drag-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: transparent;
+  user-select: none;
+}
+
 
