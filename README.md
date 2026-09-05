@@ -74,37 +74,46 @@
 - **Run in Terminal with Safety Interception**: Send scripts (Python, Bash, JS/TS, Rust, or raw buffer) directly into the active shell with one click. If the script contains dangerous operations, it is intercepted by `DangerousCommandModal` before execution.
 - **AI Edit (`Ctrl + Shift + K`)**: Instruct Ollama to refactor, add error handling, or generate code directly inside the editor.
 
-### 5. 🪟 Flexible Multi-Pane Split (2, 3, 4 Panes & 10 Selectable Layouts)
+### 5. 🪟 Flexible Multi-Pane Split & Draggable Resizing (2, 3, 4 Panes)
 - **Multi-Terminal Workflows**: Split any tab into 2, 3, or 4 independent pseudo-terminals with dedicated PTY processes, working directory inheritance, and real-time Git status.
 - **10 Visual Layout Presets**:
   - **1 Pane**: Single (`single`)
   - **2 Panes**: Side by Side (`split-2-h`), Top & Bottom (`split-2-v`)
   - **3 Panes**: Left Main + 2 Right (`split-3-left-main`), Top Main + 2 Bottom (`split-3-top-main`), 3 Columns (`split-3-h`), 3 Rows (`split-3-v`)
   - **4 Panes**: 2×2 Grid (`grid-4`), Left Main + 3 Right (`split-4-left-main`), 4 Columns (`split-4-h`)
-- **Visual Layout Popover**: Select your preferred layout from the TitleBar with interactive miniature diagram previews and quick layout switching.
+- **Interactive Draggable Dividers**: Hover over any split divider to reveal a neon glowing handle (`col-resize` / `row-resize`), then drag to dynamically adjust pane ratios (15% to 85%).
+- **Automatic Layout Re-fitting**: Releasing the divider automatically recalculates character rows and columns via `@xterm/addon-fit`, instantly adjusting text wrap.
 - **Pane Zoom & Focus**: Zoom in on any active pane for full-screen focus, with a single-click restore banner. Luminous accent border highlights the currently active pane.
-- **Smart Active Routing**: AI Command Generator (`Ctrl + K`), Copilot chat, embedded editor, and status bar automatically target whichever pane is focused.
 
-### 6. 🚨 Intelligent Error Diagnosis & One-Click Fixes
-- Automatically detects failed commands (non-zero exit codes or stderr keywords) and displays an actionable smart banner.
+### 6. 🔎 In-Terminal Log Search (`Ctrl + Shift + F` / `Ctrl + F`)
+- **Full Scrollback Search**: Fast, hardware-accelerated text search across all terminal scrollback lines powered by `@xterm/addon-search`.
+- **Floating Search Overlay**: Sleek dark-glass search bar with match navigation (`Enter` / `Shift + Enter` or Previous/Next buttons).
+- **Match Controls**: Toggle case-sensitive search (`Aa`) and regular expression matching (`.*`) with real-time highlighted matches. Close instantly with `Esc`.
+
+### 7. 🚨 Intelligent Error Diagnosis & Smart False-Positive Suppression
+- Automatically detects failed commands (non-zero exit codes or standard shell error signatures) and displays an actionable smart banner.
+- **Noise Suppression**: Excludes common inspection commands (`grep`, `find`, `cat`, `echo`, `diff`, `git log`) and prevents repeated error alerts for the same command output.
 - With one click, local AI analyzes why the command failed and suggests a verified remedy command you can run instantly.
 
-### 7. 💬 Context-Aware AI Copilot Sidebar
+### 8. 💬 Context-Aware AI Copilot Sidebar & Chat Export
 - Interactive chat assistant with real-time awareness of your terminal context: CWD (`pwd`), Git branch & dirty status, and recent command history.
 - Run, insert, or copy code snippets directly from Markdown response blocks.
+- **Conversation Export**: Export chat sessions directly to structured **Markdown (`.md`)** or machine-readable **JSON (`.json`)** with one click, preserving timestamps, shell info, and command suggestions.
 
-### 8. 🦙 Auto-Discovery of Local Ollama Models (100% Private & Offline)
+### 9. 🦙 Auto-Discovery of Local Ollama Models & Robust Line-Buffered Streaming
 - Automatically detects installed Ollama models (`llama3.2`, `deepseek-r1`, `qwen2.5-coder`, `codellama`, `mistral`, etc.).
+- **Line-Buffered Streaming**: Incoming HTTP chunk streams are reassembled across packet boundaries before JSON deserialization, preventing dropped tokens or corrupted responses.
 - Switch models on the fly from the Settings modal (`Ctrl + ,`).
 - **Zero API keys, zero cloud dependencies, zero data leakage.**
 
-### 9. ⚡ High-Performance PTY & Hardware-Accelerated Canvas Rendering
-- Native Rust pseudo-terminal manager (`portable-pty`) with sub-millisecond latency.
-- Accurate real-time directory tracking via Linux `/proc/<pid>/cwd` with smart fast-path Git discovery.
-- Hardware-accelerated 2D Canvas rendering (`@xterm/addon-canvas`) over transparent background, TrueColor (24-bit), and full Nerd Fonts & Powerline glyph support.
-- Synchronous `localStorage` state cache for instant Frame 0 render without IPC delay.
+### 10. ⚡ High-Performance PTY & Zero-Lag 2D Canvas Acceleration
+- **Native Rust PTY Core**: `portable-pty` pseudo-terminal manager with sub-millisecond I/O latency.
+- **Multi-Byte UTF-8 Boundary Protection**: Buffers incomplete UTF-8 codepoint bytes across the 8192-byte read buffer boundary, completely preventing `\u{FFFD}` character corruption for Japanese, CJK characters, and emojis.
+- **Process Group Termination & Zombie Prevention**: Closing a tab or pane signals the entire process group (`-pid`) with `SIGHUP` and `SIGTERM`/`SIGKILL`, ensuring no orphan subshells or runaway pipeline commands persist.
+- **Sub-Millisecond 0ms Startup**: High-efficiency 2D Canvas rendering (`@xterm/addon-canvas`) over transparent background without GPU driver stalls, ensuring immediate terminal readiness and keyboard input acceptance from Frame 0.
+- **Smart Git & CWD Polling**: Automatically pauses polling when the window is hidden (`document.hidden`) or inactive, and updates immediately upon command submission.
 
-### 10. 🎨 13 Premium Themes & Dynamic UI Color Sync
+### 11. 🎨 13 Premium Themes & Dynamic UI Color Sync
 - **13 Built-in Designer Themes**:
   - **Waddle Cyber (Default)**, **Tokyo Night**, **Catppuccin Mocha**, **Dracula**
   - **Nord (Arctic)**, **Gruvbox Dark**, **One Dark Pro**, **Rosé Pine**
@@ -112,12 +121,12 @@
 - **Full UI Synchronization**: Window titlebar, tabs, borders, status bar, and modal accents dynamically adapt to the selected theme.
 - **Nerd Fonts**: Presets for **JetBrainsMono Nerd Font**, **MesloLGS NF**, **FiraCode Nerd Font**, **Hack Nerd Font**, or custom local fonts with automatic glyph fallback.
 
-### 11. 🌐 Multi-Language Support (English US / UK, 日本語)
+### 12. 🌐 Multi-Language Support (English US / UK, 日本語)
 - **Selectable UI Language**: Switch seamlessly between **English (US)**, **English (GB / UK)**, and **Japanese (日本語)** from Settings (`Ctrl + ,`).
-- **Live Preview & Persistence**: Switching languages instantly updates all dialogs, toolbars, error banners, and copilot prompts, and persists across restarts in `~/.config/waddle/config.json`.
+- **Live Preview & Persistence**: Switching languages instantly updates all dialogs, toolbars, error banners, search bars, and copilot prompts, and persists across restarts in `~/.config/waddle/config.json`.
 - **Sensible Default**: Defaults to English (`en-US`) for international Linux users while providing full native Japanese support.
 
-### 12. 🛡️ Hardened Multi-Layer Security & AI Safety Guardrails
+### 13. 🛡️ Hardened Multi-Layer Security & AI Safety Guardrails
 - **Protected File Operations & Guardrails**:
   - **Prefix-Matched System Deletion Guard**: System directory protection (`/etc`, `/usr`, `/bin`, `/sbin`, `/boot`, `/lib`, `/sys`, `/proc`, `/dev`, `/root`, `/run`) uses prefix matching (`canonical.starts_with(sys_path)`), blocking deletion of subdirectories and files like `/etc/nginx` or `/usr/bin/local`.
   - **Sensitive User Credential Protection**: Completely blocks reading, writing, and deletion of user secrets, including SSH private keys (`id_rsa`, `id_ed25519`, `id_ecdsa`, `id_dsa`), GPG private keys (`~/.gnupg/private-keys-v1.d`), and system keyrings (`~/.local/share/keyrings`). Prevents deletion of `~/.config` root directory.
@@ -126,8 +135,9 @@
 - **AI Indirect Prompt Injection Defense**:
   - Delimiter escaping: XML tags (`<untrusted_terminal_output>` and `</untrusted_terminal_output>`) within terminal output are sanitized and escaped, neutralizing tag breakout attacks.
   - Context sanitization: Git branch names, recent commands, and CWD inputs are sanitized to strip control characters and prompt breakout delimiters.
-- **Comprehensive Dangerous Command Interception (`DangerousCommandModal`)**:
-  - Synchronized deterministic keyword matching across Rust backend and React frontend.
+- **Word-Boundary Dangerous Command Interception (`DangerousCommandModal`)**:
+  - Synchronized deterministic keyword matching with word boundary checks (`\b`) across Rust backend and React frontend.
+  - Avoids false positives on harmless commands and variable names (e.g., `echo 'imparted wisdom'`).
   - Detects destructive operations:
     - Filesystem deletion: `rm`, `rmdir`, `find -delete`, `find -exec rm`, `truncate -s 0`, `shutil.rmtree`
     - Destructive Git operations: `git clean -f`, `git clean -fdx`, `git reset --hard`, `git push --force`
@@ -153,6 +163,7 @@
 | `Ctrl + E` | Toggle **Embedded Code Editor** |
 | `Ctrl + S` *(in editor)* | Save file |
 | `Ctrl + Shift + K` *(in editor)* | Open **AI Code Edit / Refactor** |
+| `Ctrl + Shift + F` / `Ctrl + F` | Toggle **Terminal In-Log Search** |
 | `Ctrl + T` | Open new terminal tab |
 | `Ctrl + W` | Close current terminal tab |
 | `Ctrl + Shift + W` | Close active split pane |
@@ -165,7 +176,8 @@
 | `Ctrl + ,` | Open **Settings** (Ollama model, wallpaper, themes, fonts, language) |
 | `Enter` *(in AI modal)* | Insert generated command into terminal |
 | `Ctrl + Enter` *(in AI modal)* | Execute generated command immediately |
-| `Esc` | Close active modal / popup |
+| `Enter` / `Shift + Enter` *(in search)* | Find next / previous match in terminal |
+| `Esc` | Close active modal / search bar / popup |
 
 ---
 
@@ -174,18 +186,19 @@
 ```mermaid
 graph TD
     subgraph UI_Layer ["Frontend: Tauri 2.0 Webview / React 19 + TypeScript"]
-        TermView["Terminal View: xterm.js + WebLinks + Fit + Transparency"]
+        TermView["Terminal View: xterm.js + WebLinks + Canvas + Search + Fit"]
         WallLayer["Wallpaper Layer: Custom Image + Blur + Opacity Overlay"]
         Editor["Embedded Editor: Quick Open + Run in Terminal"]
         AIOverlay["AI Command Modal Ctrl+K / Smart Error Banner"]
-        Copilot["AI Copilot Sidebar: Context-Aware Chat"]
+        Copilot["AI Copilot Sidebar: Context-Aware Chat + Export"]
         Settings["Settings Modal: Ollama Model & Wallpaper & Fonts"]
+        Hooks["Custom Hooks: useTerminalTabs + useGlobalShortcuts"]
     end
 
     subgraph Rust_Backend ["Backend: Rust + Tauri Core"]
-        PtyMgr["PTY Manager: portable-pty + /proc/PID/cwd"]
-        AiCore["Ollama Client: Streaming / Tags / Generate"]
-        FileIO["File System: Read / Write / List"]
+        PtyMgr["PTY Manager: portable-pty + UTF-8 buffer + Process Group Kill"]
+        AiCore["Ollama Client: Line-Buffered Streaming / Tags / Generate"]
+        FileIO["File System: Read / Write / List with Guardrails"]
         ConfigMgr["Config Manager: ~/.config/waddle/config.json"]
     end
 
@@ -199,6 +212,8 @@ graph TD
     Editor <-->|File Commands| FileIO
     AIOverlay & Copilot & Editor <-->|AI Commands| AiCore
     AiCore <-->|REST / SSE Stream| Ollama
+    Hooks --> TermView
+    Hooks --> AIOverlay
 ```
 
 ---
@@ -268,9 +283,9 @@ sudo pacman -U src-tauri/target/release/bundle/pacman/waddle-0.1.0-1-x86_64.pkg.
 | Layer | Technologies |
 | :--- | :--- |
 | **Framework** | [Tauri 2.0](https://tauri.app/) (with `protocol-asset`, `tray-icon`) |
-| **Backend** | Rust, `portable-pty`, `tokio`, `reqwest`, `serde`, `base64` |
+| **Backend** | Rust, `portable-pty`, `tokio`, `reqwest`, `serde`, `base64`, `libc` |
 | **Frontend** | React 19, TypeScript, Vite, Vanilla CSS |
-| **Terminal Core** | `@xterm/xterm`, `@xterm/addon-canvas`, `@xterm/addon-fit`, `@xterm/addon-web-links` |
+| **Terminal Core** | `@xterm/xterm`, `@xterm/addon-canvas`, `@xterm/addon-search`, `@xterm/addon-fit`, `@xterm/addon-web-links` |
 | **Local AI Engine** | [Ollama](https://ollama.com/) (`/api/generate`, `/api/chat`, `/api/tags`) |
 | **Native Integration** | GTK / Wayland Native File Chooser (`zenity` / `kdialog`), Linux `/proc` filesystem |
 | **Icons & Markdown** | `lucide-react`, `react-markdown`, `remark-gfm` |
@@ -286,7 +301,7 @@ sudo pacman -U src-tauri/target/release/bundle/pacman/waddle-0.1.0-1-x86_64.pkg.
   - **Scoped Asset Protocol**: Confines custom asset loading to `$CONFIG/waddle/**/*` and user pictures/downloads, shielding sensitive configuration files and cookies in `~/.config`.
   - **Protected File Operations**: Rust handlers enforce prefix matching to protect all system directories (`/etc`, `/usr`, `/bin`, etc.) and block reading/writing/deletion of credential stores (`~/.ssh`, `~/.gnupg`, keyrings).
   - **Indirect Prompt Injection Shield**: Delimiter escaping (`</untrusted_terminal_output>`) and system prompt guardrails neutralize malicious log payloads.
-  - **Dangerous Command Interception**: Intercepts destructive actions (`rm -rf`, `git clean -fdx`, `git reset --hard`, process substitutions, disk tools) across both terminal and editor.
+  - **Word-Boundary Dangerous Command Interception**: Intercepts destructive actions (`rm -rf`, `git clean -fdx`, `git reset --hard`, process substitutions, disk tools) with precision word boundaries.
   - **Wallpaper Integrity Validation**: Magic byte checks ensure only genuine image files are stored.
   - **Remote Endpoint Warning**: Alerts users when a non-localhost Ollama endpoint is configured.
 

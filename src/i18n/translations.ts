@@ -112,6 +112,9 @@ export interface Translations {
     contextBadge: string;
     promptPlaceholder: string;
     welcomeMessage: string;
+    exportChat: string;
+    exportMarkdown: string;
+    exportJson: string;
   };
   errorBanner: {
     detected: (command: string) => string;
@@ -180,6 +183,15 @@ export interface Translations {
     dangerousWarningDesc: string;
     dangerousConfirmRun: string;
     dangerousSafeInsert: string;
+  };
+  terminal: {
+    search: string;
+    searchPlaceholder: string;
+    matchCase: string;
+    useRegex: string;
+    prevMatch: string;
+    nextMatch: string;
+    closeSearch: string;
   };
 }
 
@@ -297,6 +309,9 @@ export const translations: Record<Language, Translations> = {
       promptPlaceholder: 'Ask Copilot anything... (e.g., How do I parse JSON with jq?)',
       welcomeMessage:
         "Hello! I'm your Waddle AI Assistant.\nFeel free to ask me anything about terminal tasks, troubleshooting, or command generation.\n\nExamples:\n- `How do I find duplicate files in the current directory?`\n- `Explain the previous error output`\n- `What are the build steps for this project?`",
+      exportChat: 'Export Chat',
+      exportMarkdown: 'Export as Markdown (.md)',
+      exportJson: 'Export as JSON (.json)',
     },
     errorBanner: {
       detected: (command) => `Command \`${command}\` failed with an error`,
@@ -365,6 +380,15 @@ export const translations: Record<Language, Translations> = {
       dangerousWarningDesc: 'This command contains potentially destructive operations (file deletion, system modification, or elevated privileges). Are you sure you want to execute it directly?',
       dangerousConfirmRun: 'Execute Anyway',
       dangerousSafeInsert: 'Insert into Terminal (Safe)',
+    },
+    terminal: {
+      search: 'Search in Terminal',
+      searchPlaceholder: 'Find in terminal (Enter / Shift+Enter)...',
+      matchCase: 'Match Case',
+      useRegex: 'Use Regular Expression',
+      prevMatch: 'Previous Match',
+      nextMatch: 'Next Match',
+      closeSearch: 'Close Search (Esc)',
     },
   },
 
@@ -481,6 +505,9 @@ export const translations: Record<Language, Translations> = {
       promptPlaceholder: 'Ask Copilot anything... (e.g. How do I parse JSON with jq?)',
       welcomeMessage:
         "Hello! I'm your Waddle AI Assistant.\nFeel free to ask me anything about terminal tasks, troubleshooting, or command generation.\n\nExamples:\n- `How do I find duplicate files in the current directory?`\n- `Explain the previous error output`\n- `What are the build steps for this project?`",
+      exportChat: 'Export Chat',
+      exportMarkdown: 'Export as Markdown (.md)',
+      exportJson: 'Export as JSON (.json)',
     },
     errorBanner: {
       detected: (command) => `Command \`${command}\` failed with an error`,
@@ -549,6 +576,15 @@ export const translations: Record<Language, Translations> = {
       dangerousWarningDesc: 'This command contains potentially destructive operations (file deletion, system modification, or elevated privileges). Are you sure you want to execute it directly?',
       dangerousConfirmRun: 'Execute Anyway',
       dangerousSafeInsert: 'Insert into Terminal (Safe)',
+    },
+    terminal: {
+      search: 'Search in Terminal',
+      searchPlaceholder: 'Find in terminal (Enter / Shift+Enter)...',
+      matchCase: 'Match Case',
+      useRegex: 'Use Regular Expression',
+      prevMatch: 'Previous Match',
+      nextMatch: 'Next Match',
+      closeSearch: 'Close Search (Esc)',
     },
   },
 
@@ -665,6 +701,9 @@ export const translations: Record<Language, Translations> = {
       promptPlaceholder: 'Copilot に質問を入力... (例: jqコマンドの使い方, エラーの解説)',
       welcomeMessage:
         'こんにちは！Waddle AI アシスタントです。\nターミナルでの作業やトラブルシューティング、コマンドの生成など何でもご相談ください。\n\n例:\n- `カレントディレクトリ内の重複ファイルを探すコマンドは？`\n- `直前のエラー出力を解説して`\n- `このプロジェクトのビルド手順を教えて`',
+      exportChat: 'チャット履歴をエクスポート',
+      exportMarkdown: 'Markdown形式で保存 (.md)',
+      exportJson: 'JSON形式で保存 (.json)',
     },
     errorBanner: {
       detected: (command) => `コマンド \`${command}\` でエラーが検出されました`,
@@ -729,10 +768,20 @@ export const translations: Record<Language, Translations> = {
       retry: '再試行',
     },
     security: {
-      dangerousWarningTitle: '危険なコマンドの警告',
-      dangerousWarningDesc: 'このコマンドには破壊的な操作（ファイル削除、システム変更、特権実行など）が含まれている可能性があります。本当に端末で直接実行しますか？',
-      dangerousConfirmRun: 'リスクを理解して実行',
-      dangerousSafeInsert: '端末に入力のみ行う（安全）',
+      dangerousWarningTitle: '危険なコマンドを検出',
+      dangerousWarningDesc:
+        'このコマンドはファイルの完全削除、システム設定の変更、または動作中プロセスの強制終了を引き起こす可能性があります。',
+      dangerousConfirmRun: 'リスクを理解した上で強制実行',
+      dangerousSafeInsert: 'ターミナルへの挿入のみ（実行前に確認）',
+    },
+    terminal: {
+      search: 'ターミナル内を検索',
+      searchPlaceholder: '検索語句を入力 (Enter / Shift+Enter)...',
+      matchCase: '大文字/小文字を区別',
+      useRegex: '正規表現',
+      prevMatch: '前の一致',
+      nextMatch: '次の一致',
+      closeSearch: '検索を閉じる (Esc)',
     },
   },
 };

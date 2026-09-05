@@ -1480,3 +1480,71 @@ input::placeholder {
   color: var(--fg-dim);
   font-family: var(--font-mono);
 }
+
+/* ==========================================================================
+   Resizable Split Pane Dividers & Terminal Search Overlay
+   ========================================================================== */
+
+.pane-divider-x {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  cursor: col-resize;
+  z-index: 25;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  user-select: none;
+}
+
+.pane-divider-x::after {
+  content: '';
+  width: 2px;
+  height: 100%;
+  background-color: rgba(255, 255, 255, 0.08);
+  transition: all 0.15s ease;
+}
+
+.pane-divider-x:hover::after,
+.pane-divider-x.active-drag::after {
+  background-color: var(--accent-blue, #38bdf8);
+  width: 3px;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.7);
+}
+
+.pane-divider-y {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 8px;
+  cursor: row-resize;
+  z-index: 25;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  user-select: none;
+}
+
+.pane-divider-y::after {
+  content: '';
+  height: 2px;
+  width: 100%;
+  background-color: rgba(255, 255, 255, 0.08);
+  transition: all 0.15s ease;
+}
+
+.pane-divider-y:hover::after,
+.pane-divider-y.active-drag::after {
+  background-color: var(--accent-blue, #38bdf8);
+  height: 3px;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.7);
+}
+
+/* Terminal search bar active button filter */
+.pane-action-btn.active-filter {
+  background-color: rgba(56, 189, 248, 0.15) !important;
+  color: var(--accent-blue, #38bdf8) !important;
+  border-color: rgba(56, 189, 248, 0.3) !important;
+}
+

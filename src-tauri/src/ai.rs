@@ -449,15 +449,29 @@ Output ONLY the resulting code. Wrap the code in a single markdown code block li
         let chunk_event = format!("ai-chat-chunk-{}", chat_id);
         let done_event = format!("ai-chat-done-{}", chat_id);
 
+        let mut pending_buffer = String::new();
         while let Some(chunk_result) = stream.next().await {
             if let Ok(bytes) = chunk_result {
-                let text = String::from_utf8_lossy(&bytes);
-                for line in text.lines() {
-                    if let Ok(val) = serde_json::from_str::<serde_json::Value>(line) {
-                        if let Some(delta) = val["message"]["content"].as_str() {
-                            let _ = app.emit(&chunk_event, delta);
+                pending_buffer.push_str(&String::from_utf8_lossy(&bytes));
+                while let Some(pos) = pending_buffer.find('\n') {
+                    let line = pending_buffer[..pos].trim().to_string();
+                    pending_buffer.drain(..=pos);
+                    if !line.is_empty() {
+                        if let Ok(val) = serde_json::from_str::<serde_json::Value>(&line) {
+                            if let Some(delta) = val["message"]["content"].as_str() {
+                                let _ = app.emit(&chunk_event, delta);
+                            }
                         }
                     }
+                }
+            }
+        }
+
+        let remaining = pending_buffer.trim();
+        if !remaining.is_empty() {
+            if let Ok(val) = serde_json::from_str::<serde_json::Value>(remaining) {
+                if let Some(delta) = val["message"]["content"].as_str() {
+                    let _ = app.emit(&chunk_event, delta);
                 }
             }
         }
@@ -469,13 +483,11 @@ Output ONLY the resulting code. Wrap the code in a single markdown code block li
 
 fn clean_json_string(s: &str) -> String {
     let trimmed = s.trim();
-    if trimmed.starts_with("```json") {
-        let rest = &trimmed[7..];
+    if let Some(rest) = trimmed.strip_prefix("```json") {
         if let Some(end_idx) = rest.rfind("```") {
             return rest[..end_idx].trim().to_string();
         }
-    } else if trimmed.starts_with("```") {
-        let rest = &trimmed[3..];
+    } else if let Some(rest) = trimmed.strip_prefix("```") {
         if let Some(end_idx) = rest.rfind("```") {
             return rest[..end_idx].trim().to_string();
         }
@@ -503,12 +515,35 @@ fn extract_code_from_markdown(s: &str) -> String {
 
 pub fn is_command_dangerous(cmd: &str) -> bool {
     let lower = cmd.to_lowercase();
-    let patterns = [
+    let trimmed = lower.trim();
+
+    // Dangerous standalone commands or utilities checked at word boundaries
+    let standalone_dangerous = [
+        "reboot",
+        "shutdown",
+        "poweroff",
+        "init 0",
+        "init 6",
+        "wipefs",
+        "fdisk",
+        "parted",
+        "gdisk",
+        "rmdir",
+        "mkfs",
+        "shred",
+        "truncate",
+    ];
+
+    for &word in &standalone_dangerous {
+        if matches_word_boundary(trimmed, word) {
+            return true;
+        }
+    }
+
+    let substring_patterns = [
         "rm -",
         "rm ",
         "rm\t",
-        "rmdir",
-        "mkfs",
         "dd if=",
         "dd of=",
         "> /dev/",
@@ -518,11 +553,6 @@ pub fn is_command_dangerous(cmd: &str) -> bool {
         "chmod -r",
         "chmod 777",
         "chown -r",
-        "reboot",
-        "shutdown",
-        "poweroff",
-        "init 0",
-        "init 6",
         ":(){ :|:& };:",
         "curl ",
         "wget ",
@@ -542,16 +572,10 @@ pub fn is_command_dangerous(cmd: &str) -> bool {
         "git reset --hard",
         "git push --force",
         "git push -f",
-        "truncate ",
-        "shred ",
-        "wipefs",
-        "fdisk",
-        "parted",
-        "gdisk",
         "shutil.rmtree",
     ];
 
-    if patterns.iter().any(|p| lower.contains(p)) {
+    if substring_patterns.iter().any(|p| lower.contains(p)) {
         return true;
     }
 
@@ -559,6 +583,34 @@ pub fn is_command_dangerous(cmd: &str) -> bool {
         return true;
     }
 
+    false
+}
+
+fn matches_word_boundary(text: &str, word: &str) -> bool {
+    let mut start = 0;
+    while let Some(pos) = text[start..].find(word) {
+        let abs_pos = start + pos;
+        let end_pos = abs_pos + word.len();
+
+        let before_ok = if abs_pos == 0 {
+            true
+        } else {
+            let prev = text[..abs_pos].chars().next_back().unwrap();
+            !prev.is_alphanumeric() && prev != '_' && prev != '-'
+        };
+
+        let after_ok = if end_pos >= text.len() {
+            true
+        } else {
+            let next = text[end_pos..].chars().next().unwrap();
+            !next.is_alphanumeric() && next != '_' && next != '-'
+        };
+
+        if before_ok && after_ok {
+            return true;
+        }
+        start = abs_pos + 1;
+    }
     false
 }
 
@@ -609,6 +661,9 @@ mod tests {
         assert!(!is_command_dangerous("cargo test"));
         assert!(!is_command_dangerous("npm run build"));
         assert!(!is_command_dangerous("echo 'hello world'"));
+        assert!(!is_command_dangerous("echo 'imparted wisdom'"));
+        assert!(!is_command_dangerous("echo 'rebooting server'"));
+        assert!(!is_command_dangerous("echo 'fdisks not installed'"));
     }
 
     #[test]

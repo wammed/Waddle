@@ -109,6 +109,8 @@ impl PtyManager {
         thread::spawn(move || {
             let mut reader = reader;
             let mut buffer = [0u8; 8192];
+            let mut pending_bytes: Vec<u8> = Vec::new();
+            let event_name = format!("pty-output-{}", session_id_clone);
 
             while alive_clone.load(Ordering::SeqCst) {
                 match reader.read(&mut buffer) {
@@ -117,12 +119,45 @@ impl PtyManager {
                         break;
                     }
                     Ok(n) => {
-                        let data = &buffer[..n];
-                        // Convert to String lossy or emit bytes as base64/string
-                        let text = String::from_utf8_lossy(data).to_string();
-                        let event_name = format!("pty-output-{}", session_id_clone);
-                        if let Err(e) = app_clone.emit(&event_name, text) {
-                            eprintln!("Error emitting PTY output: {}", e);
+                        let chunk = &buffer[..n];
+                        let to_process = if pending_bytes.is_empty() {
+                            chunk.to_vec()
+                        } else {
+                            pending_bytes.extend_from_slice(chunk);
+                            std::mem::take(&mut pending_bytes)
+                        };
+
+                        let mut slice = &to_process[..];
+                        while !slice.is_empty() {
+                            match std::str::from_utf8(slice) {
+                                Ok(valid) => {
+                                    if let Err(e) = app_clone.emit(&event_name, valid) {
+                                        eprintln!("Error emitting PTY output: {}", e);
+                                    }
+                                    break;
+                                }
+                                Err(e) => {
+                                    let valid_len = e.valid_up_to();
+                                    if valid_len > 0 {
+                                        if let Err(err) = app_clone.emit(&event_name, &slice[..valid_len]) {
+                                            eprintln!("Error emitting PTY output: {}", err);
+                                        }
+                                        slice = &slice[valid_len..];
+                                    }
+                                    if let Some(err_len) = e.error_len() {
+                                        // Actual invalid byte sequence (e.g. binary output)
+                                        if let Err(err) = app_clone.emit(&event_name, "\u{FFFD}") {
+                                            eprintln!("Error emitting PTY output: {}", err);
+                                        }
+                                        slice = &slice[err_len..];
+                                    } else {
+                                        // Incomplete multi-byte UTF-8 sequence at the end of buffer!
+                                        // Retain in pending_bytes for next chunk
+                                        pending_bytes.extend_from_slice(slice);
+                                        break;
+                                    }
+                                }
+                            }
                         }
                     }
                     Err(e) => {
@@ -130,6 +165,12 @@ impl PtyManager {
                         break;
                     }
                 }
+            }
+
+            // Flush any remaining pending bytes if EOF occurs
+            if !pending_bytes.is_empty() {
+                let remaining_text = String::from_utf8_lossy(&pending_bytes).to_string();
+                let _ = app_clone.emit(&event_name, remaining_text);
             }
 
             alive_clone.store(false, Ordering::SeqCst);
@@ -210,10 +251,18 @@ impl PtyManager {
         let mut sessions = self.sessions.lock().await;
         if let Some(session) = sessions.remove(session_id) {
             session.alive.store(false, Ordering::SeqCst);
-            // On Linux, kill child process if needed
+            // On Linux, kill child process and process group
             if session.pid > 0 {
                 unsafe {
-                    libc::kill(session.pid as libc::pid_t, libc::SIGKILL);
+                    let pid = session.pid as libc::pid_t;
+                    // First send SIGHUP to process group so interactive programs & subshells terminate cleanly
+                    let _ = libc::kill(-pid, libc::SIGHUP);
+                    let _ = libc::kill(pid, libc::SIGHUP);
+                    // Send SIGTERM then SIGKILL to ensure no leaked background processes
+                    let _ = libc::kill(-pid, libc::SIGTERM);
+                    let _ = libc::kill(pid, libc::SIGTERM);
+                    let _ = libc::kill(-pid, libc::SIGKILL);
+                    let _ = libc::kill(pid, libc::SIGKILL);
                 }
             }
             Ok(())

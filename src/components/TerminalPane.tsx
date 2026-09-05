@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { AppConfig, TerminalPaneInfo, TerminalTab } from '../types';
 import { SingleTerminalView } from './SingleTerminalView';
 import { Minimize2 } from 'lucide-react';
@@ -28,6 +28,63 @@ export const TerminalPane: React.FC<TerminalPaneProps> = ({
   const { t } = useI18n();
   const activePaneId = tab.activePaneId || tab.panes[0]?.id;
   const activePane = tab.panes.find((p) => p.id === activePaneId) || tab.panes[0];
+
+  const [ratioX, setRatioX] = useState(0.5);
+  const [ratioY, setRatioY] = useState(0.5);
+  const [activeDrag, setActiveDrag] = useState<'x' | 'y' | null>(null);
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const isDraggingRef = useRef<'x' | 'y' | null>(null);
+
+  // Reset default ratios per layout
+  useEffect(() => {
+    if (tab.layout === 'split-3-left-main') {
+      setRatioX(0.55);
+      setRatioY(0.5);
+    } else if (tab.layout === 'split-3-top-main') {
+      setRatioX(0.5);
+      setRatioY(0.55);
+    } else if (tab.layout === 'split-4-left-main') {
+      setRatioX(0.55);
+      setRatioY(0.5);
+    } else {
+      setRatioX(0.5);
+      setRatioY(0.5);
+    }
+  }, [tab.layout]);
+
+  const handleStartDrag = (axis: 'x' | 'y') => (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    isDraggingRef.current = axis;
+    setActiveDrag(axis);
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      if (!isDraggingRef.current || !containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      if (isDraggingRef.current === 'x') {
+        const offset = moveEvent.clientX - rect.left;
+        const newRatio = Math.max(0.15, Math.min(0.85, offset / rect.width));
+        setRatioX(newRatio);
+      } else if (isDraggingRef.current === 'y') {
+        const offset = moveEvent.clientY - rect.top;
+        const newRatio = Math.max(0.15, Math.min(0.85, offset / rect.height));
+        setRatioY(newRatio);
+      }
+    };
+
+    const handleMouseUp = () => {
+      isDraggingRef.current = null;
+      setActiveDrag(null);
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      // Trigger resize for fitAddon
+      window.dispatchEvent(new Event('resize'));
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  };
 
   if (!tab.panes || tab.panes.length === 0) {
     return null;
@@ -63,10 +120,45 @@ export const TerminalPane: React.FC<TerminalPaneProps> = ({
     }
   };
 
+  // Dynamic grid styles when resized
+  const getDynamicGridStyle = (): React.CSSProperties => {
+    if (tab.isZoomed || tab.panes.length === 1 || tab.layout === 'single') {
+      return {};
+    }
+    switch (tab.layout) {
+      case 'split-2-h':
+        return {
+          gridTemplateColumns: `${(ratioX * 100).toFixed(2)}% calc(${(100 - ratioX * 100).toFixed(2)}% - 4px)`,
+        };
+      case 'split-2-v':
+        return {
+          gridTemplateRows: `${(ratioY * 100).toFixed(2)}% calc(${(100 - ratioY * 100).toFixed(2)}% - 4px)`,
+        };
+      case 'split-3-left-main':
+        return {
+          gridTemplateColumns: `${(ratioX * 100).toFixed(2)}% calc(${(100 - ratioX * 100).toFixed(2)}% - 4px)`,
+          gridTemplateRows: `${(ratioY * 100).toFixed(2)}% calc(${(100 - ratioY * 100).toFixed(2)}% - 4px)`,
+        };
+      case 'split-3-top-main':
+        return {
+          gridTemplateColumns: `${(ratioX * 100).toFixed(2)}% calc(${(100 - ratioX * 100).toFixed(2)}% - 4px)`,
+          gridTemplateRows: `${(ratioY * 100).toFixed(2)}% calc(${(100 - ratioY * 100).toFixed(2)}% - 4px)`,
+        };
+      case 'grid-4':
+        return {
+          gridTemplateColumns: `${(ratioX * 100).toFixed(2)}% calc(${(100 - ratioX * 100).toFixed(2)}% - 4px)`,
+          gridTemplateRows: `${(ratioY * 100).toFixed(2)}% calc(${(100 - ratioY * 100).toFixed(2)}% - 4px)`,
+        };
+      default:
+        return {};
+    }
+  };
+
   const displayedPanes = tab.isZoomed && activePane ? [activePane] : tab.panes;
 
   return (
     <div
+      ref={containerRef}
       className={`terminal-wrapper ${isMultiPane ? 'multi-pane' : ''}`}
       style={{ display: isActive ? 'block' : 'none', position: 'relative' }}
     >
@@ -84,7 +176,10 @@ export const TerminalPane: React.FC<TerminalPaneProps> = ({
         </div>
       )}
 
-      <div className={`panes-grid ${getLayoutGridClass()}`}>
+      <div
+        className={`panes-grid ${getLayoutGridClass()}`}
+        style={getDynamicGridStyle()}
+      >
         {displayedPanes.map((pane, index) => {
           const isThisActive = pane.id === activePaneId;
           return (
@@ -107,6 +202,57 @@ export const TerminalPane: React.FC<TerminalPaneProps> = ({
           );
         })}
       </div>
+
+      {/* Interactive Drag Dividers for Resizable Panes */}
+      {isMultiPane && tab.layout === 'split-2-h' && (
+        <div
+          className={`pane-divider-x ${activeDrag === 'x' ? 'active-drag' : ''}`}
+          style={{ left: `calc(${(ratioX * 100).toFixed(2)}% - 4px)` }}
+          onMouseDown={handleStartDrag('x')}
+        />
+      )}
+
+      {isMultiPane && tab.layout === 'split-2-v' && (
+        <div
+          className={`pane-divider-y ${activeDrag === 'y' ? 'active-drag' : ''}`}
+          style={{ top: `calc(${(ratioY * 100).toFixed(2)}% - 4px)` }}
+          onMouseDown={handleStartDrag('y')}
+        />
+      )}
+
+      {isMultiPane && tab.layout === 'split-3-left-main' && (
+        <>
+          <div
+            className={`pane-divider-x ${activeDrag === 'x' ? 'active-drag' : ''}`}
+            style={{ left: `calc(${(ratioX * 100).toFixed(2)}% - 4px)` }}
+            onMouseDown={handleStartDrag('x')}
+          />
+          <div
+            className={`pane-divider-y ${activeDrag === 'y' ? 'active-drag' : ''}`}
+            style={{
+              left: `${(ratioX * 100).toFixed(2)}%`,
+              right: 0,
+              top: `calc(${(ratioY * 100).toFixed(2)}% - 4px)`,
+            }}
+            onMouseDown={handleStartDrag('y')}
+          />
+        </>
+      )}
+
+      {isMultiPane && tab.layout === 'grid-4' && (
+        <>
+          <div
+            className={`pane-divider-x ${activeDrag === 'x' ? 'active-drag' : ''}`}
+            style={{ left: `calc(${(ratioX * 100).toFixed(2)}% - 4px)` }}
+            onMouseDown={handleStartDrag('x')}
+          />
+          <div
+            className={`pane-divider-y ${activeDrag === 'y' ? 'active-drag' : ''}`}
+            style={{ top: `calc(${(ratioY * 100).toFixed(2)}% - 4px)` }}
+            onMouseDown={handleStartDrag('y')}
+          />
+        </>
+      )}
     </div>
   );
 };

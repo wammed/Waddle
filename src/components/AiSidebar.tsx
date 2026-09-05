@@ -9,6 +9,9 @@ import {
   Copy,
   Check,
   Loader2,
+  Download,
+  FileText,
+  FileJson,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -44,7 +47,61 @@ export const AiSidebar: React.FC<AiSidebarProps> = ({
   const [isStreaming, setIsStreaming] = useState(false);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [confirmCmd, setConfirmCmd] = useState<string | null>(null);
+  const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
   const chatBottomRef = useRef<HTMLDivElement>(null);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
+
+  const downloadFile = (filename: string, mimeType: string, content: string) => {
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportMarkdown = () => {
+    const now = new Date();
+    const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const header = `# Waddle AI Chat Export\n\n- Date: ${now.toLocaleString()}\n- Working Directory: \`${context.cwd}\`\n- Shell: \`${context.shell}\`\n\n---\n\n`;
+    const body = messages
+      .map((msg) => {
+        const roleName = msg.role === 'user' ? 'User' : 'Assistant';
+        return `### ${roleName}\n\n${msg.content}\n`;
+      })
+      .join('\n---\n\n');
+    downloadFile(`waddle-ai-chat-${timestamp}.md`, 'text/markdown;charset=utf-8', header + body);
+    setIsExportMenuOpen(false);
+  };
+
+  const handleExportJson = () => {
+    const now = new Date();
+    const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const exportData = {
+      exportedAt: now.toISOString(),
+      context,
+      messages,
+    };
+    const jsonStr = JSON.stringify(exportData, null, 2);
+    downloadFile(`waddle-ai-chat-${timestamp}.json`, 'application/json;charset=utf-8', jsonStr);
+    setIsExportMenuOpen(false);
+  };
+
+  // Close export menu on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+        setIsExportMenuOpen(false);
+      }
+    };
+    if (isExportMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [isExportMenuOpen]);
 
   const handleRun = (cmd: string) => {
     if (isDangerousCommand(cmd)) {
@@ -132,7 +189,85 @@ export const AiSidebar: React.FC<AiSidebarProps> = ({
           <Bot size={16} />
           <span>{t.copilot.title}</span>
         </div>
-        <div style={{ display: 'flex', gap: '4px' }}>
+        <div style={{ display: 'flex', gap: '4px', position: 'relative' }}>
+          <div ref={exportMenuRef} style={{ position: 'relative' }}>
+            <button
+              className={`action-btn ${isExportMenuOpen ? 'active' : ''}`}
+              onClick={() => setIsExportMenuOpen(!isExportMenuOpen)}
+              title={t.copilot.exportChat}
+              disabled={messages.length <= 1}
+            >
+              <Download size={13} />
+            </button>
+            {isExportMenuOpen && (
+              <div
+                className="ai-export-dropdown"
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  right: 0,
+                  marginTop: '6px',
+                  backgroundColor: '#1e2330',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  borderRadius: '6px',
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+                  zIndex: 1000,
+                  minWidth: '180px',
+                  padding: '4px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '2px',
+                }}
+              >
+                <button
+                  className="export-item-btn"
+                  onClick={handleExportMarkdown}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '6px 10px',
+                    background: 'transparent',
+                    border: 'none',
+                    borderRadius: '4px',
+                    color: '#e2e8f0',
+                    fontSize: '12px',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    width: '100%',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.08)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                >
+                  <FileText size={13} color="#38bdf8" />
+                  <span>{t.copilot.exportMarkdown}</span>
+                </button>
+                <button
+                  className="export-item-btn"
+                  onClick={handleExportJson}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '6px 10px',
+                    background: 'transparent',
+                    border: 'none',
+                    borderRadius: '4px',
+                    color: '#e2e8f0',
+                    fontSize: '12px',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    width: '100%',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.08)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                >
+                  <FileJson size={13} color="#f59e0b" />
+                  <span>{t.copilot.exportJson}</span>
+                </button>
+              </div>
+            )}
+          </div>
           <button
             className="action-btn"
             onClick={handleClearHistory}

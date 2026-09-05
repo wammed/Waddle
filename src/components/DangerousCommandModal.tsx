@@ -4,12 +4,35 @@ import { useI18n } from '../i18n';
 
 export function isDangerousCommand(cmd: string): boolean {
   const lower = cmd.toLowerCase().trim();
-  const patterns = [
+
+  // Dangerous standalone commands or utilities checked at word boundaries
+  const standaloneDangerous = [
+    'reboot',
+    'shutdown',
+    'poweroff',
+    'init 0',
+    'init 6',
+    'wipefs',
+    'fdisk',
+    'parted',
+    'gdisk',
+    'rmdir',
+    'mkfs',
+    'shred',
+    'truncate',
+  ];
+
+  for (const word of standaloneDangerous) {
+    const regex = new RegExp(`(^|[^a-zA-Z0-9_-])${word}([^a-zA-Z0-9_-]|$)`);
+    if (regex.test(lower)) {
+      return true;
+    }
+  }
+
+  const substringPatterns = [
     'rm -',
     'rm ',
     'rm\t',
-    'rmdir',
-    'mkfs',
     'dd if=',
     'dd of=',
     '> /dev/',
@@ -19,11 +42,6 @@ export function isDangerousCommand(cmd: string): boolean {
     'chmod -r',
     'chmod 777',
     'chown -r',
-    'reboot',
-    'shutdown',
-    'poweroff',
-    'init 0',
-    'init 6',
     ':(){ :|:& };:',
     'curl ',
     'wget ',
@@ -43,20 +61,17 @@ export function isDangerousCommand(cmd: string): boolean {
     'git reset --hard',
     'git push --force',
     'git push -f',
-    'truncate ',
-    'shred ',
-    'wipefs',
-    'fdisk',
-    'parted',
-    'gdisk',
     'shutil.rmtree',
   ];
-  if (patterns.some((p) => lower.includes(p))) {
+
+  if (substringPatterns.some((p) => lower.includes(p))) {
     return true;
   }
+
   if (lower.includes('find ') && (lower.includes('-delete') || lower.includes('-exec rm'))) {
     return true;
   }
+
   return false;
 }
 
