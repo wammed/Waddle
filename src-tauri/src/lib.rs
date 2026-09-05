@@ -83,6 +83,74 @@ fn get_git_status(path: String) -> GitStatus {
     check_git_status(&path)
 }
 
+#[tauri::command]
+fn git_stage_file(path: String, file_path: String) -> Result<(), String> {
+    pty::git_stage_file(&path, &file_path)
+}
+
+#[tauri::command]
+fn git_unstage_file(path: String, file_path: String) -> Result<(), String> {
+    pty::git_unstage_file(&path, &file_path)
+}
+
+#[tauri::command]
+fn git_stage_all(path: String) -> Result<(), String> {
+    pty::git_stage_all(&path)
+}
+
+#[tauri::command]
+fn git_unstage_all(path: String) -> Result<(), String> {
+    pty::git_unstage_all(&path)
+}
+
+#[tauri::command]
+fn git_discard_file(path: String, file_path: String) -> Result<(), String> {
+    pty::git_discard_file(&path, &file_path)
+}
+
+#[tauri::command]
+fn git_commit(path: String, message: String) -> Result<String, String> {
+    pty::git_commit(&path, &message)
+}
+
+#[tauri::command]
+fn git_get_branches(path: String) -> Result<Vec<String>, String> {
+    pty::git_get_branches(&path)
+}
+
+#[tauri::command]
+fn git_checkout_branch(path: String, branch: String) -> Result<(), String> {
+    pty::git_checkout_branch(&path, &branch)
+}
+
+#[tauri::command]
+fn git_get_diff(path: String, file_path: Option<String>, staged: bool) -> Result<String, String> {
+    pty::git_get_diff(&path, file_path, staged)
+}
+
+#[tauri::command]
+async fn git_generate_commit_message(
+    state: State<'_, AppState>,
+    path: String,
+) -> Result<String, String> {
+    let diff = pty::git_get_diff(&path, None, true)?;
+    let target_diff = if diff.trim().is_empty() {
+        pty::git_get_diff(&path, None, false)?
+    } else {
+        diff
+    };
+
+    if target_diff.trim().is_empty() {
+        return Err("No staged or unstaged changes found to generate commit message.".to_string());
+    }
+
+    let config = state.config_manager.load();
+    state
+        .ai_client
+        .generate_commit_message(&target_diff, &config.ai)
+        .await
+}
+
 // --- Editor & File System Commands ---
 
 fn resolve_canonical_path(path: &Path) -> PathBuf {
@@ -563,6 +631,16 @@ pub fn run() {
             close_pty,
             get_session_cwd,
             get_git_status,
+            git_stage_file,
+            git_unstage_file,
+            git_stage_all,
+            git_unstage_all,
+            git_discard_file,
+            git_commit,
+            git_get_branches,
+            git_checkout_branch,
+            git_get_diff,
+            git_generate_commit_message,
             read_file,
             write_file,
             read_directory,

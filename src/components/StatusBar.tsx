@@ -17,6 +17,8 @@ interface StatusBarProps {
   systemInfo: SystemInfo | null;
   onOpenAiCommand: () => void;
   onOpenSettings: () => void;
+  onToggleGitPopover?: () => void;
+  isGitPopoverOpen?: boolean;
 }
 
 export const StatusBar: React.FC<StatusBarProps> = ({
@@ -26,6 +28,8 @@ export const StatusBar: React.FC<StatusBarProps> = ({
   systemInfo,
   onOpenAiCommand,
   onOpenSettings,
+  onToggleGitPopover,
+  isGitPopoverOpen,
 }) => {
   const { t } = useI18n();
   const [copied, setCopied] = useState(false);
@@ -60,9 +64,50 @@ export const StatusBar: React.FC<StatusBarProps> = ({
         </div>
 
         {gitStatus.is_repo && (
-          <div className="status-item git-badge" title={t.statusBar.gitRepoTooltip}>
+          <div
+            className={`status-item git-badge ${isGitPopoverOpen ? 'active' : ''}`}
+            onClick={onToggleGitPopover}
+            title={t.statusBar.gitRepoTooltip}
+            style={{ cursor: 'pointer' }}
+          >
             <GitBranch size={13} />
             <span>{gitStatus.branch || 'HEAD'}</span>
+
+            {/* Ahead / Behind Remote */}
+            {((gitStatus.ahead ?? 0) > 0 || (gitStatus.behind ?? 0) > 0) && (
+              <span
+                className="git-sync-badge"
+                title={t.gitPopover.aheadBehind(
+                  gitStatus.ahead ?? 0,
+                  gitStatus.behind ?? 0
+                )}
+              >
+                {(gitStatus.ahead ?? 0) > 0 && `↑${gitStatus.ahead}`}
+                {(gitStatus.behind ?? 0) > 0 && `↓${gitStatus.behind}`}
+              </span>
+            )}
+
+            {/* Merge Conflicts */}
+            {(gitStatus.conflicted_count ?? 0) > 0 && (
+              <span
+                className="git-conflicted-badge"
+                title={t.statusBar.gitConflicted(gitStatus.conflicted_count ?? 0)}
+              >
+                !{gitStatus.conflicted_count}
+              </span>
+            )}
+
+            {/* Staged files */}
+            {(gitStatus.staged_count ?? 0) > 0 && (
+              <span
+                className="git-staged-badge"
+                title={`${gitStatus.staged_count} staged`}
+              >
+                +{gitStatus.staged_count}
+              </span>
+            )}
+
+            {/* Modified files */}
             {gitStatus.modified_count > 0 && (
               <span
                 className="git-modified"
@@ -71,6 +116,8 @@ export const StatusBar: React.FC<StatusBarProps> = ({
                 *{gitStatus.modified_count}
               </span>
             )}
+
+            {/* Untracked files */}
             {gitStatus.untracked_count > 0 && (
               <span
                 className="git-untracked"

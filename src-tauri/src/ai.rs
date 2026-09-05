@@ -338,6 +338,75 @@ Output ONLY the resulting code. Wrap the code in a single markdown code block li
         Ok(extract_code_from_markdown(response))
     }
 
+    /// Git Diff から Conventional Commits 形式のコミットメッセージを自動生成 (Ollama)
+    pub async fn generate_commit_message(
+        &self,
+        diff: &str,
+        config: &AiConfig,
+    ) -> Result<String, String> {
+        let system_prompt = "You are an expert Git assistant. Given a git diff, generate a concise and descriptive Conventional Commits message (e.g. 'feat: add user login' or 'fix: resolve race condition in pty listener'). Output ONLY the commit message itself on a single line with no markdown code blocks, no backticks, and no explanations.";
+
+        let truncated_diff = if diff.len() > 6000 {
+            &diff[..6000]
+        } else {
+            diff
+        };
+
+        let user_prompt = format!("Generate a commit message for this diff:\n\n```diff\n{}\n```", truncated_diff);
+
+        let endpoint = if config.ollama_endpoint.is_empty() {
+            "http://localhost:11434"
+        } else {
+            &config.ollama_endpoint
+        };
+        let url = format!("{}/api/generate", endpoint.trim_end_matches('/'));
+        let model = if config.ollama_model.is_empty() {
+            "llama3.2"
+        } else {
+            &config.ollama_model
+        };
+
+        let body = serde_json::json!({
+            "model": model,
+            "system": system_prompt,
+            "prompt": user_prompt,
+            "stream": false,
+            "options": {
+                "temperature": 0.2
+            }
+        });
+
+        let res = self
+            .client
+            .post(&url)
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| format!("Ollamaへの接続に失敗しました: {}", e))?;
+
+        if !res.status().is_success() {
+            return Err(format!("Ollama HTTP Error: {}", res.status()));
+        }
+
+        let json: serde_json::Value = res
+            .json()
+            .await
+            .map_err(|e| format!("Failed to parse response: {}", e))?;
+
+        let raw = json["response"].as_str().unwrap_or("").trim();
+        let cleaned = raw
+            .trim_matches('`')
+            .trim_matches('"')
+            .trim_matches('\'')
+            .trim();
+        let first_line = cleaned.lines().next().unwrap_or(cleaned).trim();
+        if first_line.is_empty() {
+            Ok("chore: update project files".to_string())
+        } else {
+            Ok(first_line.to_string())
+        }
+    }
+
     // --- Ollama Implementation ---
 
     async fn call_ollama(

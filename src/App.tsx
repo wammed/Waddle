@@ -7,6 +7,8 @@ import { AiErrorBanner } from './components/AiErrorBanner';
 import { AiSidebar } from './components/AiSidebar';
 import { EditorPane } from './components/EditorPane';
 import { FileTreeSidebar } from './components/FileTreeSidebar';
+import { GitQuickPopover } from './components/GitQuickPopover';
+import { GitDiffModal } from './components/GitDiffModal';
 import { SettingsModal } from './components/SettingsModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { AppConfig, SystemInfo, TerminalContext } from './types';
@@ -78,6 +80,18 @@ export function App() {
   const [isFileTreeOpen, setIsFileTreeOpen] = useState(true);
   const [targetEditorFile, setTargetEditorFile] = useState<string | null>(null);
 
+  // Git Popover and Diff Modal
+  const [isGitPopoverOpen, setIsGitPopoverOpen] = useState(false);
+  const [diffModalState, setDiffModalState] = useState<{
+    isOpen: boolean;
+    filePath: string;
+    isStaged: boolean;
+  }>({
+    isOpen: false,
+    filePath: '',
+    isStaged: false,
+  });
+
   // Active error alert
   const [errorAlert, setErrorAlert] = useState<{
     command: string;
@@ -103,6 +117,19 @@ export function App() {
     handleApplyLayout,
     handleDirectionalFocus,
   } = useTerminalTabs({ isFileTreeOpen });
+
+  // Git status refresh handler
+  const handleRefreshGitStatus = useCallback(async () => {
+    const targetPane = activePane || activeTab?.panes[0];
+    const cwd = targetPane?.cwd || activeTab?.cwd;
+    if (!cwd || !targetPane || !activeTabId) return;
+    try {
+      const gitStatus = await TauriApi.getGitStatus(cwd);
+      updatePane(activeTabId, targetPane.id, { gitStatus });
+    } catch {
+      // ignore
+    }
+  }, [activePane, activeTab, activeTabId, updatePane]);
 
   // Global Keyboard Shortcuts hook
   useGlobalShortcuts({
@@ -237,11 +264,15 @@ export function App() {
             isOpen={isFileTreeOpen}
             onClose={() => setIsFileTreeOpen(false)}
             cwd={activePane?.cwd || activeTab?.cwd || '/'}
+            gitStatus={activePane?.gitStatus || activeTab?.gitStatus}
             onOpenFile={(filePath) => {
               setTargetEditorFile(filePath);
               setIsEditorOpen(true);
             }}
             onInsertToTerminal={handleInsertCommand}
+            onOpenDiff={(filePath, isStaged) => {
+              setDiffModalState({ isOpen: true, filePath, isStaged });
+            }}
           />
 
           {/* Central Terminal / Editor Area */}
@@ -374,7 +405,44 @@ export function App() {
         systemInfo={systemInfo}
         onOpenAiCommand={() => setIsAiCommandOpen(true)}
         onOpenSettings={() => setIsSettingsOpen(true)}
+        onToggleGitPopover={() => setIsGitPopoverOpen((prev) => !prev)}
+        isGitPopoverOpen={isGitPopoverOpen}
       />
+
+      {/* Git Quick Popover */}
+      {isGitPopoverOpen && (
+        <GitQuickPopover
+          isOpen={isGitPopoverOpen}
+          onClose={() => setIsGitPopoverOpen(false)}
+          repoPath={activePane?.cwd || activeTab?.cwd || ''}
+          gitStatus={
+            activePane?.gitStatus ||
+            activeTab?.gitStatus || {
+              is_repo: false,
+              modified_count: 0,
+              untracked_count: 0,
+            }
+          }
+          onRefreshGit={handleRefreshGitStatus}
+          onOpenDiff={(filePath, isStaged) => {
+            setDiffModalState({ isOpen: true, filePath, isStaged });
+          }}
+        />
+      )}
+
+      {/* Git Diff Modal */}
+      {diffModalState.isOpen && (
+        <GitDiffModal
+          isOpen={diffModalState.isOpen}
+          onClose={() =>
+            setDiffModalState({ isOpen: false, filePath: '', isStaged: false })
+          }
+          repoPath={activePane?.cwd || activeTab?.cwd || ''}
+          filePath={diffModalState.filePath}
+          isStaged={diffModalState.isStaged}
+          onFileChanged={handleRefreshGitStatus}
+        />
+      )}
 
       {/* AI Command Generator Modal (Ctrl+K) */}
       <AiCommandModal

@@ -133,8 +133,43 @@ export interface Translations {
     gitRepoTooltip: string;
     gitModified: string;
     gitUntracked: string;
+    gitAhead: (count: number) => string;
+    gitBehind: (count: number) => string;
+    gitConflicted: (count: number) => string;
     aiPromptTooltip: string;
     aiSettingsTooltip: string;
+  };
+  gitPopover: {
+    title: string;
+    branch: string;
+    switchBranch: string;
+    stagedChanges: string;
+    unstagedChanges: string;
+    untrackedFiles: string;
+    noChanges: string;
+    stageAll: string;
+    unstageAll: string;
+    commitMessagePlaceholder: string;
+    commitBtn: string;
+    committing: string;
+    generateAiCommit: string;
+    generatingAiCommit: string;
+    discardConfirm: (file: string) => string;
+    discardTooltip: string;
+    viewDiffTooltip: string;
+    stageTooltip: string;
+    unstageTooltip: string;
+    aheadBehind: (ahead: number, behind: number) => string;
+    conflictedFiles: string;
+  };
+  diffViewer: {
+    title: (file: string) => string;
+    stagedBadge: string;
+    unstagedBadge: string;
+    stageFile: string;
+    unstageFile: string;
+    discardFile: string;
+    noDiff: string;
   };
   settings: {
     modalTitle: string;
@@ -330,8 +365,43 @@ export const translations: Record<Language, Translations> = {
       gitRepoTooltip: 'Git repository',
       gitModified: 'modified files',
       gitUntracked: 'untracked files',
+      gitAhead: (count) => `${count} commit(s) ahead of remote`,
+      gitBehind: (count) => `${count} commit(s) behind remote`,
+      gitConflicted: (count) => `${count} merge conflict(s)`,
       aiPromptTooltip: 'Open AI Command Generator (Ctrl+K)',
       aiSettingsTooltip: 'Click to change AI settings',
+    },
+    gitPopover: {
+      title: 'Git Status & Staging',
+      branch: 'Branch',
+      switchBranch: 'Switch branch...',
+      stagedChanges: 'Staged Changes',
+      unstagedChanges: 'Changes',
+      untrackedFiles: 'Untracked Files',
+      noChanges: 'Working tree clean, no changes',
+      stageAll: 'Stage All',
+      unstageAll: 'Unstage All',
+      commitMessagePlaceholder: 'Commit message (e.g., feat: add new feature)...',
+      commitBtn: 'Commit',
+      committing: 'Committing...',
+      generateAiCommit: 'AI Generate Conventional Commit',
+      generatingAiCommit: 'AI generating commit message...',
+      discardConfirm: (file) => `Discard all changes to "${file}"? This action cannot be undone.`,
+      discardTooltip: 'Discard changes',
+      viewDiffTooltip: 'View Diff',
+      stageTooltip: 'Stage changes',
+      unstageTooltip: 'Unstage changes',
+      aheadBehind: (ahead, behind) => `${ahead} ahead, ${behind} behind remote`,
+      conflictedFiles: 'Merge Conflicts',
+    },
+    diffViewer: {
+      title: (file) => `Diff: ${file}`,
+      stagedBadge: 'Staged (INDEX)',
+      unstagedBadge: 'Working Tree',
+      stageFile: 'Stage File',
+      unstageFile: 'Unstage File',
+      discardFile: 'Discard Changes',
+      noDiff: 'No diff available or file is identical.',
     },
     settings: {
       modalTitle: 'Waddle Settings (Ollama Local AI & Appearance)',
@@ -526,8 +596,43 @@ export const translations: Record<Language, Translations> = {
       gitRepoTooltip: 'Git repository',
       gitModified: 'modified files',
       gitUntracked: 'untracked files',
+      gitAhead: (count) => `${count} commit(s) ahead of remote`,
+      gitBehind: (count) => `${count} commit(s) behind remote`,
+      gitConflicted: (count) => `${count} merge conflict(s)`,
       aiPromptTooltip: 'Open AI Command Generator (Ctrl+K)',
       aiSettingsTooltip: 'Click to change AI settings',
+    },
+    gitPopover: {
+      title: 'Git Status & Staging',
+      branch: 'Branch',
+      switchBranch: 'Switch branch...',
+      stagedChanges: 'Staged Changes',
+      unstagedChanges: 'Changes',
+      untrackedFiles: 'Untracked Files',
+      noChanges: 'Working tree clean, no changes',
+      stageAll: 'Stage All',
+      unstageAll: 'Unstage All',
+      commitMessagePlaceholder: 'Commit message (e.g., feat: add new feature)...',
+      commitBtn: 'Commit',
+      committing: 'Committing...',
+      generateAiCommit: 'AI Generate Conventional Commit',
+      generatingAiCommit: 'AI generating commit message...',
+      discardConfirm: (file) => `Discard all changes to "${file}"? This action cannot be undone.`,
+      discardTooltip: 'Discard changes',
+      viewDiffTooltip: 'View Diff',
+      stageTooltip: 'Stage changes',
+      unstageTooltip: 'Unstage changes',
+      aheadBehind: (ahead, behind) => `${ahead} ahead, ${behind} behind remote`,
+      conflictedFiles: 'Merge Conflicts',
+    },
+    diffViewer: {
+      title: (file) => `Diff: ${file}`,
+      stagedBadge: 'Staged (INDEX)',
+      unstagedBadge: 'Working Tree',
+      stageFile: 'Stage File',
+      unstageFile: 'Unstage File',
+      discardFile: 'Discard Changes',
+      noDiff: 'No diff available or file is identical.',
     },
     settings: {
       modalTitle: 'Waddle Settings (Ollama Local AI & Appearance)',
@@ -722,8 +827,43 @@ export const translations: Record<Language, Translations> = {
       gitRepoTooltip: 'Git リポジトリ',
       gitModified: '個の変更ファイル',
       gitUntracked: '個の未追跡ファイル',
+      gitAhead: (count) => `リモートより${count}コミット先行`,
+      gitBehind: (count) => `リモートより${count}コミット遅延`,
+      gitConflicted: (count) => `${count}件の競合 (マージコンフリクト)`,
       aiPromptTooltip: 'AI コマンド生成を開く (Ctrl+K)',
       aiSettingsTooltip: 'クリックしてAI設定を変更',
+    },
+    gitPopover: {
+      title: 'Git ステータス & ステージング',
+      branch: 'ブランチ',
+      switchBranch: 'ブランチを切り替え...',
+      stagedChanges: 'ステージされた変更',
+      unstagedChanges: '変更されたファイル',
+      untrackedFiles: '追跡対象外のファイル',
+      noChanges: '変更はありません (クリーンな作業ツリー)',
+      stageAll: 'すべてステージ',
+      unstageAll: 'すべてのステージを解除',
+      commitMessagePlaceholder: 'コミットメッセージを入力 (例: feat: 機能を追加)...',
+      commitBtn: 'コミット',
+      committing: 'コミット中...',
+      generateAiCommit: 'AI Conventional Commit 自動生成',
+      generatingAiCommit: 'AIがコミットメッセージを生成中...',
+      discardConfirm: (file) => `"${file}" の変更を破棄しますか？この操作は取り消せません。`,
+      discardTooltip: '変更を破棄',
+      viewDiffTooltip: '差分を表示 (Diff)',
+      stageTooltip: 'ステージに追加',
+      unstageTooltip: 'ステージから除外',
+      aheadBehind: (ahead, behind) => `リモート: ↑${ahead}先行 / ↓${behind}遅延`,
+      conflictedFiles: 'マージの競合',
+    },
+    diffViewer: {
+      title: (file) => `差分: ${file}`,
+      stagedBadge: 'ステージ済み (INDEX)',
+      unstagedBadge: 'ワーキングツリー',
+      stageFile: 'ステージに追加',
+      unstageFile: 'ステージから除外',
+      discardFile: '変更を破棄',
+      noDiff: '差分はありません、またはファイルの内容は一致しています。',
     },
     settings: {
       modalTitle: 'Waddle 設定 (Ollama Local AI & Appearance)',

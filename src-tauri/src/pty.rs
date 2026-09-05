@@ -18,12 +18,26 @@ pub struct PtySessionInfo {
     pub cwd: String,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+pub struct GitFileEntry {
+    pub path: String,
+    pub status_x: String,
+    pub status_y: String,
+    pub is_staged: bool,
+    pub is_conflicted: bool,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct GitStatus {
     pub is_repo: bool,
     pub branch: Option<String>,
     pub modified_count: usize,
     pub untracked_count: usize,
+    pub staged_count: usize,
+    pub conflicted_count: usize,
+    pub ahead: usize,
+    pub behind: usize,
+    pub files: Vec<GitFileEntry>,
 }
 
 #[allow(dead_code)]
@@ -308,6 +322,11 @@ pub fn check_git_status(path_str: &str) -> GitStatus {
             branch: None,
             modified_count: 0,
             untracked_count: 0,
+            staged_count: 0,
+            conflicted_count: 0,
+            ahead: 0,
+            behind: 0,
+            files: Vec::new(),
         };
     }
 
@@ -333,6 +352,11 @@ pub fn check_git_status(path_str: &str) -> GitStatus {
             branch: None,
             modified_count: 0,
             untracked_count: 0,
+            staged_count: 0,
+            conflicted_count: 0,
+            ahead: 0,
+            behind: 0,
+            files: Vec::new(),
         };
     }
 
@@ -346,18 +370,87 @@ pub fn check_git_status(path_str: &str) -> GitStatus {
         Ok(out) if out.status.success() => {
             let text = String::from_utf8_lossy(&out.stdout);
             let mut branch = None;
+            let mut ahead = 0;
+            let mut behind = 0;
             let mut modified_count = 0;
             let mut untracked_count = 0;
+            let mut staged_count = 0;
+            let mut conflicted_count = 0;
+            let mut files = Vec::new();
 
             for (i, line) in text.lines().enumerate() {
                 if i == 0 && line.starts_with("## ") {
                     let branch_part = &line[3..];
-                    let branch_name = branch_part.split("...").next().unwrap_or(branch_part);
-                    branch = Some(branch_name.trim().to_string());
-                } else if line.starts_with("??") {
-                    untracked_count += 1;
-                } else if !line.trim().is_empty() {
-                    modified_count += 1;
+                    let (name_part, sync_part) = if let Some(bracket_start) = branch_part.find('[') {
+                        let name = &branch_part[..bracket_start];
+                        let sync = branch_part[bracket_start..].trim_matches(|c| c == '[' || c == ']');
+                        (name.trim(), Some(sync))
+                    } else {
+                        (branch_part.trim(), None)
+                    };
+
+                    let branch_name = name_part.split("...").next().unwrap_or(name_part).trim();
+                    if branch_name.starts_with("HEAD") {
+                        branch = Some("HEAD".to_string());
+                    } else if let Some(b) = branch_name.strip_prefix("No commits yet on ") {
+                        branch = Some(b.trim().to_string());
+                    } else if let Some(b) = branch_name.strip_prefix("Initial commit on ") {
+                        branch = Some(b.trim().to_string());
+                    } else if !branch_name.is_empty() {
+                        branch = Some(branch_name.to_string());
+                    }
+
+                    if let Some(sync_str) = sync_part {
+                        for part in sync_str.split(',') {
+                            let part = part.trim();
+                            if let Some(num_str) = part.strip_prefix("ahead ") {
+                                ahead = num_str.trim().parse().unwrap_or(0);
+                            } else if let Some(num_str) = part.strip_prefix("behind ") {
+                                behind = num_str.trim().parse().unwrap_or(0);
+                            }
+                        }
+                    }
+                } else if line.len() >= 3 {
+                    let status_x = line.chars().next().unwrap_or(' ');
+                    let status_y = line.chars().nth(1).unwrap_or(' ');
+                    let file_path = if line.len() >= 4 {
+                        line[3..].trim().to_string()
+                    } else {
+                        "".to_string()
+                    };
+
+                    if file_path.is_empty() {
+                        continue;
+                    }
+
+                    let is_conflicted = (status_x == 'U' || status_y == 'U')
+                        || (status_x == 'A' && status_y == 'A')
+                        || (status_x == 'D' && status_y == 'D');
+
+                    let is_untracked = status_x == '?' && status_y == '?';
+                    let is_staged = !is_untracked && !is_conflicted && status_x != ' ' && status_x != '?';
+                    let is_modified = !is_untracked && !is_conflicted && status_y != ' ';
+
+                    if is_conflicted {
+                        conflicted_count += 1;
+                    } else if is_untracked {
+                        untracked_count += 1;
+                    } else {
+                        if is_staged {
+                            staged_count += 1;
+                        }
+                        if is_modified {
+                            modified_count += 1;
+                        }
+                    }
+
+                    files.push(GitFileEntry {
+                        path: file_path,
+                        status_x: status_x.to_string(),
+                        status_y: status_y.to_string(),
+                        is_staged,
+                        is_conflicted,
+                    });
                 }
             }
 
@@ -366,6 +459,11 @@ pub fn check_git_status(path_str: &str) -> GitStatus {
                 branch,
                 modified_count,
                 untracked_count,
+                staged_count,
+                conflicted_count,
+                ahead,
+                behind,
+                files,
             }
         }
         _ => GitStatus {
@@ -373,6 +471,185 @@ pub fn check_git_status(path_str: &str) -> GitStatus {
             branch: None,
             modified_count: 0,
             untracked_count: 0,
+            staged_count: 0,
+            conflicted_count: 0,
+            ahead: 0,
+            behind: 0,
+            files: Vec::new(),
         },
+    }
+}
+
+pub fn git_stage_file(path_str: &str, file_path: &str) -> Result<(), String> {
+    let output = std::process::Command::new("git")
+        .args(["add", "--", file_path])
+        .current_dir(path_str)
+        .output()
+        .map_err(|e| format!("Failed to run git add: {}", e))?;
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(String::from_utf8_lossy(&output.stderr).to_string())
+    }
+}
+
+pub fn git_unstage_file(path_str: &str, file_path: &str) -> Result<(), String> {
+    let output = std::process::Command::new("git")
+        .args(["restore", "--staged", "--", file_path])
+        .current_dir(path_str)
+        .output()
+        .map_err(|e| format!("Failed to run git restore --staged: {}", e))?;
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(String::from_utf8_lossy(&output.stderr).to_string())
+    }
+}
+
+pub fn git_stage_all(path_str: &str) -> Result<(), String> {
+    let output = std::process::Command::new("git")
+        .args(["add", "-A"])
+        .current_dir(path_str)
+        .output()
+        .map_err(|e| format!("Failed to run git add -A: {}", e))?;
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(String::from_utf8_lossy(&output.stderr).to_string())
+    }
+}
+
+pub fn git_unstage_all(path_str: &str) -> Result<(), String> {
+    let output = std::process::Command::new("git")
+        .args(["restore", "--staged", "."])
+        .current_dir(path_str)
+        .output()
+        .map_err(|e| format!("Failed to run git restore --staged: {}", e))?;
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(String::from_utf8_lossy(&output.stderr).to_string())
+    }
+}
+
+pub fn git_discard_file(path_str: &str, file_path: &str) -> Result<(), String> {
+    let status = std::process::Command::new("git")
+        .args(["status", "--porcelain", "--", file_path])
+        .current_dir(path_str)
+        .output();
+    if let Ok(st) = status {
+        let out = String::from_utf8_lossy(&st.stdout);
+        if out.starts_with("??") {
+            let p = std::path::Path::new(path_str).join(file_path);
+            if p.is_dir() {
+                let _ = std::fs::remove_dir_all(&p);
+            } else if p.is_file() {
+                let _ = std::fs::remove_file(&p);
+            }
+            return Ok(());
+        }
+    }
+
+    let output = std::process::Command::new("git")
+        .args(["restore", "--", file_path])
+        .current_dir(path_str)
+        .output()
+        .map_err(|e| format!("Failed to run git restore: {}", e))?;
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(String::from_utf8_lossy(&output.stderr).to_string())
+    }
+}
+
+pub fn git_commit(path_str: &str, message: &str) -> Result<String, String> {
+    if message.trim().is_empty() {
+        return Err("Commit message cannot be empty".to_string());
+    }
+    let output = std::process::Command::new("git")
+        .args(["commit", "-m", message])
+        .current_dir(path_str)
+        .output()
+        .map_err(|e| format!("Failed to run git commit: {}", e))?;
+    if output.status.success() {
+        Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    } else {
+        Err(String::from_utf8_lossy(&output.stderr).to_string())
+    }
+}
+
+pub fn git_get_branches(path_str: &str) -> Result<Vec<String>, String> {
+    let output = std::process::Command::new("git")
+        .args(["branch", "--list", "--format=%(refname:short)"])
+        .current_dir(path_str)
+        .output()
+        .map_err(|e| format!("Failed to run git branch: {}", e))?;
+    if output.status.success() {
+        let text = String::from_utf8_lossy(&output.stdout);
+        let branches: Vec<String> = text
+            .lines()
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+        Ok(branches)
+    } else {
+        Err(String::from_utf8_lossy(&output.stderr).to_string())
+    }
+}
+
+pub fn git_checkout_branch(path_str: &str, branch: &str) -> Result<(), String> {
+    let output = std::process::Command::new("git")
+        .args(["checkout", branch])
+        .current_dir(path_str)
+        .output()
+        .map_err(|e| format!("Failed to run git checkout: {}", e))?;
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(String::from_utf8_lossy(&output.stderr).to_string())
+    }
+}
+
+pub fn git_get_diff(path_str: &str, file_path: Option<String>, staged: bool) -> Result<String, String> {
+    let mut args = vec!["diff", "--no-color"];
+    if staged {
+        args.push("--cached");
+    }
+    if let Some(ref fp) = file_path {
+        args.push("--");
+        args.push(fp.as_str());
+    }
+
+    let output = std::process::Command::new("git")
+        .args(&args)
+        .current_dir(path_str)
+        .output()
+        .map_err(|e| format!("Failed to run git diff: {}", e))?;
+    if output.status.success() {
+        let diff_str = String::from_utf8_lossy(&output.stdout).to_string();
+        if diff_str.is_empty() {
+            // If it's an untracked file, generate a clean synthetic addition diff
+            if let Some(ref fp) = file_path {
+                let full_p = std::path::Path::new(path_str).join(fp);
+                if full_p.is_file() {
+                    if let Ok(content) = std::fs::read_to_string(&full_p) {
+                        let mut synthetic = format!(
+                            "--- /dev/null\n+++ b/{}\n@@ -0,0 +1,{} @@\n",
+                            fp,
+                            content.lines().count()
+                        );
+                        for l in content.lines() {
+                            synthetic.push('+');
+                            synthetic.push_str(l);
+                            synthetic.push('\n');
+                        }
+                        return Ok(synthetic);
+                    }
+                }
+            }
+        }
+        Ok(diff_str)
+    } else {
+        Err(String::from_utf8_lossy(&output.stderr).to_string())
     }
 }

@@ -75,11 +75,78 @@ export const TauriApi = {
       return {
         is_repo: true,
         branch: 'main',
+        ahead: 1,
+        behind: 0,
         modified_count: 2,
         untracked_count: 1,
+        staged_count: 1,
+        conflicted_count: 0,
+        files: [
+          { path: 'src/components/StatusBar.tsx', status_code: ' M', staged: false, unstaged: true, is_untracked: false, is_conflicted: false },
+          { path: 'src/types.ts', status_code: 'M ', staged: true, unstaged: false, is_untracked: false, is_conflicted: false },
+          { path: 'scratch.txt', status_code: '??', staged: false, unstaged: true, is_untracked: true, is_conflicted: false },
+        ],
       };
     }
     return await invoke<GitStatus>('get_git_status', { path });
+  },
+
+  async gitStageFile(repoPath: string, filePath: string): Promise<void> {
+    if (!isTauri()) return;
+    return await invoke('git_stage_file', { repoPath, filePath });
+  },
+
+  async gitUnstageFile(repoPath: string, filePath: string): Promise<void> {
+    if (!isTauri()) return;
+    return await invoke('git_unstage_file', { repoPath, filePath });
+  },
+
+  async gitStageAll(repoPath: string): Promise<void> {
+    if (!isTauri()) return;
+    return await invoke('git_stage_all', { repoPath });
+  },
+
+  async gitUnstageAll(repoPath: string): Promise<void> {
+    if (!isTauri()) return;
+    return await invoke('git_unstage_all', { repoPath });
+  },
+
+  async gitDiscardFile(repoPath: string, filePath: string): Promise<void> {
+    if (!isTauri()) return;
+    return await invoke('git_discard_file', { repoPath, filePath });
+  },
+
+  async gitCommit(repoPath: string, message: string): Promise<string> {
+    if (!isTauri()) return '[main 1a2b3c] ' + message;
+    return await invoke<string>('git_commit', { repoPath, message });
+  },
+
+  async gitGetBranches(repoPath: string): Promise<string[]> {
+    if (!isTauri()) return ['main', 'feature/git-integration', 'dev'];
+    return await invoke<string[]>('git_get_branches', { repoPath });
+  },
+
+  async gitCheckoutBranch(repoPath: string, branch: string): Promise<string> {
+    if (!isTauri()) return `Switched to branch '${branch}'`;
+    return await invoke<string>('git_checkout_branch', { repoPath, branch });
+  },
+
+  async gitGetDiff(repoPath: string, filePath?: string, staged?: boolean): Promise<string> {
+    if (!isTauri()) {
+      return `--- a/${filePath || 'file'}\n+++ b/${filePath || 'file'}\n@@ -1,5 +1,6 @@\n // Example diff\n-const oldVal = 1;\n+const newVal = 2;\n+const added = true;\n`;
+    }
+    return await invoke<string>('git_get_diff', {
+      repoPath,
+      filePath: filePath || null,
+      staged: staged ?? false,
+    });
+  },
+
+  async gitGenerateCommitMessage(repoPath: string): Promise<string> {
+    if (!isTauri()) {
+      return 'feat(git): add interactive git popover and diff viewer';
+    }
+    return await invoke<string>('git_generate_commit_message', { repoPath });
   },
 
   // Event Listeners

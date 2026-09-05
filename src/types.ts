@@ -46,11 +46,25 @@ export interface PtySessionInfo {
   cwd: string;
 }
 
+export interface GitFileEntry {
+  path: string;
+  status_code: string;
+  staged: boolean;
+  unstaged: boolean;
+  is_untracked: boolean;
+  is_conflicted: boolean;
+}
+
 export interface GitStatus {
   is_repo: boolean;
   branch?: string;
+  ahead?: number;
+  behind?: number;
   modified_count: number;
   untracked_count: number;
+  staged_count?: number;
+  conflicted_count?: number;
+  files?: GitFileEntry[];
 }
 
 export interface TerminalContext {

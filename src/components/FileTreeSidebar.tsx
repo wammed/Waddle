@@ -20,8 +20,9 @@ import {
   PanelLeftClose,
   X,
   Loader2,
+  GitCommit,
 } from 'lucide-react';
-import { FileEntry } from '../types';
+import { FileEntry, GitStatus, GitFileEntry } from '../types';
 import { TauriApi } from '../services/tauriApi';
 import { useI18n } from '../i18n';
 
@@ -29,16 +30,20 @@ interface FileTreeSidebarProps {
   isOpen: boolean;
   onClose: () => void;
   cwd: string;
+  gitStatus?: GitStatus;
   onOpenFile: (filePath: string) => void;
   onInsertToTerminal?: (text: string) => void;
+  onOpenDiff?: (filePath: string, isStaged: boolean) => void;
 }
 
 export const FileTreeSidebar: React.FC<FileTreeSidebarProps> = ({
   isOpen,
   onClose,
   cwd,
+  gitStatus,
   onOpenFile,
   onInsertToTerminal,
+  onOpenDiff,
 }) => {
   const { t } = useI18n();
   const [rootPath, setRootPath] = useState<string>(cwd);
@@ -247,6 +252,44 @@ export const FileTreeSidebar: React.FC<FileTreeSidebarProps> = ({
     return parts[parts.length - 1] || rootPath;
   }, [rootPath]);
 
+  // Helper to match file with gitStatus
+  const gitFilesMap = useMemo(() => {
+    const map = new Map<string, GitFileEntry>();
+    if (!gitStatus?.files) return map;
+    for (const f of gitStatus.files) {
+      map.set(f.path, f);
+      if (!f.path.startsWith('/')) {
+        map.set('/' + f.path, f);
+      }
+    }
+    return map;
+  }, [gitStatus?.files]);
+
+  const getGitEntryForPath = useCallback(
+    (entryPath: string): GitFileEntry | undefined => {
+      if (!gitStatus?.files || !rootPath) return undefined;
+      let rel = entryPath;
+      if (entryPath.startsWith(rootPath)) {
+        rel = entryPath.slice(rootPath.length).replace(/^[/\\]+/, '');
+      }
+      return gitFilesMap.get(rel) || gitFilesMap.get(entryPath);
+    },
+    [gitFilesMap, rootPath, gitStatus?.files]
+  );
+
+  const folderHasGitChanges = useCallback(
+    (folderPath: string): boolean => {
+      if (!gitStatus?.files || !rootPath) return false;
+      let rel = folderPath;
+      if (folderPath.startsWith(rootPath)) {
+        rel = folderPath.slice(rootPath.length).replace(/^[/\\]+/, '');
+      }
+      const prefix = rel.endsWith('/') ? rel : rel + '/';
+      return gitStatus.files.some((f) => f.path.startsWith(prefix));
+    },
+    [gitStatus?.files, rootPath]
+  );
+
   // Recursive Tree Node renderer
   const renderTree = (parentPath: string, depth = 0) => {
     const entries = directoryCache[parentPath] || [];
@@ -282,6 +325,8 @@ export const FileTreeSidebar: React.FC<FileTreeSidebarProps> = ({
           const isExpanded = expandedPaths.has(entry.path);
           const isSelected = selectedPath === entry.path;
           const isLoading = loadingPaths.has(entry.path);
+          const gitEntry = !isDir ? getGitEntryForPath(entry.path) : undefined;
+          const hasFolderChanges = isDir && folderHasGitChanges(entry.path);
 
           return (
             <div key={entry.path} className="tree-node-wrapper">
@@ -298,7 +343,7 @@ export const FileTreeSidebar: React.FC<FileTreeSidebarProps> = ({
                     onOpenFile(entry.path);
                   }
                 }}
-                title={`${entry.name} (${isDir ? t.fileTree.folderType : formatSize(entry.size)})\n${entry.path}`}
+                title={`${entry.name} (${isDir ? t.fileTree.folderType : formatSize(entry.size)})\n${entry.path}${gitEntry ? ` [Git: ${gitEntry.status_code}]` : ''}`}
               >
                 {/* Arrow / Folder Icon */}
                 <div className="node-icon-wrapper">
@@ -331,12 +376,65 @@ export const FileTreeSidebar: React.FC<FileTreeSidebarProps> = ({
                 </div>
 
                 {/* File / Folder Name */}
-                <span className={`node-label ${isDir ? 'is-dir' : ''}`}>
+                <span
+                  className={`node-label ${isDir ? 'is-dir' : ''} ${
+                    gitEntry
+                      ? gitEntry.is_conflicted
+                        ? 'git-text-conflict'
+                        : gitEntry.staged
+                        ? 'git-text-staged'
+                        : gitEntry.is_untracked
+                        ? 'git-text-untracked'
+                        : 'git-text-modified'
+                      : ''
+                  }`}
+                >
                   {entry.name}
                 </span>
 
+                {/* Folder change dot */}
+                {isDir && hasFolderChanges && (
+                  <span className="folder-git-dot" title="Contains modified files" />
+                )}
+
+                {/* Git Status Badge */}
+                {gitEntry && (
+                  <span
+                    className={`tree-git-badge ${
+                      gitEntry.is_conflicted
+                        ? 'git-badge-c'
+                        : gitEntry.staged
+                        ? 'git-badge-staged'
+                        : gitEntry.is_untracked
+                        ? 'git-badge-u'
+                        : 'git-badge-m'
+                    }`}
+                    title={`Git: ${gitEntry.status_code}`}
+                  >
+                    {gitEntry.is_conflicted
+                      ? 'C'
+                      : gitEntry.staged
+                      ? 'S'
+                      : gitEntry.is_untracked
+                      ? 'U'
+                      : 'M'}
+                  </span>
+                )}
+
                 {/* Hover Quick Action Buttons */}
                 <div className="node-actions" onClick={(e) => e.stopPropagation()}>
+                  {gitEntry && onOpenDiff && (
+                    <button
+                      className="node-action-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenDiff(gitEntry.path, gitEntry.staged);
+                      }}
+                      title={`${t.gitPopover.viewDiffTooltip}: ${gitEntry.path}`}
+                    >
+                      <GitCommit size={12} color="var(--accent)" />
+                    </button>
+                  )}
                   {!isDir && (
                     <button
                       className="node-action-btn"
