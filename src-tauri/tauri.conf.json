@@ -31,8 +31,14 @@
           "allow": [
             "$APPCONFIG/**/*",
             "$CONFIG/**/*",
-            "$PICTURES/**/*",
-            "$DOWNLOAD/**/*"
+            "$PICTURE/*",
+            "$PICTURE/**/*",
+            "$HOME/Pictures/*",
+            "$HOME/Pictures/**/*",
+            "$DOWNLOAD/*",
+            "$DOWNLOAD/**/*",
+            "$HOME/Downloads/*",
+            "$HOME/Downloads/**/*"
           ]
         }
       }

@@ -307,6 +307,10 @@ async fn ai_edit_code(
 #[tauri::command]
 async fn pick_wallpaper_file() -> Result<Option<String>, String> {
     tokio::task::spawn_blocking(|| {
+        let initial_dir = dirs::picture_dir()
+            .unwrap_or_else(|| dirs::home_dir().unwrap_or_else(|| std::path::PathBuf::from("/")));
+        let initial_filename = format!("{}/", initial_dir.to_string_lossy().trim_end_matches('/'));
+
         // Prefer /usr/bin/zenity to prevent PATH spoofing
         let zenity_bin = if Path::new("/usr/bin/zenity").is_file() {
             "/usr/bin/zenity"
@@ -317,7 +321,9 @@ async fn pick_wallpaper_file() -> Result<Option<String>, String> {
             .args([
                 "--file-selection",
                 "--title=壁紙画像を選択",
-                "--file-filter=画像ファイル (*.png, *.jpg, *.jpeg, *.webp, *.svg) | *.png *.jpg *.jpeg *.webp *.gif *.svg *.bmp",
+                &format!("--filename={}", initial_filename),
+                "--file-filter=画像ファイル (*.png, *.jpg, *.jpeg, *.webp, *.svg, *.bmp) | *.png *.jpg *.jpeg *.webp *.gif *.svg *.bmp *.PNG *.JPG *.JPEG *.WEBP *.SVG *.BMP",
+                "--file-filter=すべてのファイル (*) | *",
             ])
             .output()
         {
@@ -337,7 +343,11 @@ async fn pick_wallpaper_file() -> Result<Option<String>, String> {
             "kdialog"
         };
         if let Ok(output) = std::process::Command::new(kdialog_bin)
-            .args(["--getopenfilename", ".", "*.png *.jpg *.jpeg *.webp *.gif *.svg *.bmp"])
+            .args([
+                "--getopenfilename",
+                &initial_filename,
+                "*.png *.jpg *.jpeg *.webp *.gif *.svg *.bmp *.PNG *.JPG *.JPEG *.WEBP|画像ファイル (*.png *.jpg *.jpeg *.webp)\n*|すべてのファイル (*)",
+            ])
             .output()
         {
             if output.status.success() {

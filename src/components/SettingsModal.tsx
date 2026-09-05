@@ -152,12 +152,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         terminal: { ...prev.terminal, background_image: 'preset_cyberpunk' },
       }));
     } else {
-      const path = customBgPath || '/home/susie/Pictures/wallpaper.jpg';
-      setCustomBgPath(path);
-      setFormData((prev) => ({
-        ...prev,
-        terminal: { ...prev.terminal, background_image: path },
-      }));
+      if (!customBgPath) {
+        handleBrowseClick();
+      } else {
+        setFormData((prev) => ({
+          ...prev,
+          terminal: { ...prev.terminal, background_image: customBgPath },
+        }));
+      }
     }
   };
 
