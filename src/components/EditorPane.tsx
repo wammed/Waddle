@@ -13,6 +13,7 @@ import {
 import { AppConfig, TerminalContext } from '../types';
 import { TauriApi } from '../services/tauriApi';
 import { useI18n } from '../i18n';
+import { DangerousCommandModal, isDangerousCommand } from './DangerousCommandModal';
 
 interface EditorPaneProps {
   isOpen: boolean;
@@ -21,6 +22,7 @@ interface EditorPaneProps {
   config: AppConfig;
   context: TerminalContext;
   onExecuteInTerminal: (command: string) => void;
+  onInsertInTerminal?: (command: string) => void;
   targetFilePath?: string | null;
 }
 
@@ -31,6 +33,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
   config,
   context,
   onExecuteInTerminal,
+  onInsertInTerminal,
   targetFilePath,
 }) => {
   const { t } = useI18n();
@@ -40,6 +43,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [dirFiles, setDirFiles] = useState<string[]>([]);
   const [isLoadingFile, setIsLoadingFile] = useState(false);
+  const [confirmDangerousCmd, setConfirmDangerousCmd] = useState<string | null>(null);
 
   // AI Edit popup
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
@@ -108,19 +112,28 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
 
   // Run in terminal
   const handleRun = () => {
+    let cmd = '';
     if (filePath.endsWith('.py')) {
-      onExecuteInTerminal(`python3 "${filePath}"`);
+      cmd = `python3 "${filePath}"`;
     } else if (filePath.endsWith('.js') || filePath.endsWith('.ts')) {
-      onExecuteInTerminal(`node "${filePath}"`);
+      cmd = `node "${filePath}"`;
     } else if (filePath.endsWith('.sh') || filePath.endsWith('.bash')) {
-      onExecuteInTerminal(`bash "${filePath}"`);
+      cmd = `bash "${filePath}"`;
     } else if (filePath.endsWith('.rs')) {
-      onExecuteInTerminal(`cargo run`);
+      cmd = `cargo run`;
     } else if (filePath) {
-      onExecuteInTerminal(`cat "${filePath}"`);
+      cmd = `cat "${filePath}"`;
     } else {
       // Execute buffer directly
-      onExecuteInTerminal(content);
+      cmd = content;
+    }
+
+    if (!cmd.trim()) return;
+
+    if (isDangerousCommand(cmd) || (!filePath && isDangerousCommand(content))) {
+      setConfirmDangerousCmd(cmd);
+    } else {
+      onExecuteInTerminal(cmd);
     }
   };
 
@@ -497,6 +510,28 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {confirmDangerousCmd && (
+        <DangerousCommandModal
+          isOpen={!!confirmDangerousCmd}
+          command={confirmDangerousCmd}
+          onConfirmExecute={() => {
+            if (confirmDangerousCmd) onExecuteInTerminal(confirmDangerousCmd);
+            setConfirmDangerousCmd(null);
+          }}
+          onSafeInsert={() => {
+            if (confirmDangerousCmd) {
+              if (onInsertInTerminal) {
+                onInsertInTerminal(confirmDangerousCmd);
+              } else {
+                onExecuteInTerminal(confirmDangerousCmd);
+              }
+            }
+            setConfirmDangerousCmd(null);
+          }}
+          onClose={() => setConfirmDangerousCmd(null)}
+        />
       )}
     </aside>
   );

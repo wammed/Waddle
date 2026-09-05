@@ -148,6 +148,7 @@ export interface Translations {
     ollamaRefetch: string;
     ollamaHint: string;
     ollamaEndpointLabel: string;
+    ollamaRemoteWarning: string;
     ollamaModelLabel: string;
     temperatureLabel: (temp: number) => string;
     terminalSectionTitle: string;
@@ -332,6 +333,7 @@ export const translations: Record<Language, Translations> = {
       ollamaRefetch: 'Refetch Models',
       ollamaHint: '💡 How to start Ollama: In another terminal, run `ollama serve`, then run `ollama pull llama3.2` or `ollama pull deepseek-r1`.',
       ollamaEndpointLabel: 'Ollama Endpoint URL',
+      ollamaRemoteWarning: '⚠️ Security Warning: A remote Ollama endpoint is configured. Terminal logs, command history, and edited code will be transmitted over the network to this external host. Ensure this network is trusted and HTTPS is used.',
       ollamaModelLabel: 'Local Model to Use',
       temperatureLabel: (temp) => `Generation Temperature (${temp})`,
       terminalSectionTitle: 'Terminal Appearance',
@@ -515,6 +517,7 @@ export const translations: Record<Language, Translations> = {
       ollamaRefetch: 'Refetch Models',
       ollamaHint: '💡 How to start Ollama: In another terminal, run `ollama serve`, then run `ollama pull llama3.2` or `ollama pull deepseek-r1`.',
       ollamaEndpointLabel: 'Ollama Endpoint URL',
+      ollamaRemoteWarning: '⚠️ Security Warning: A remote Ollama endpoint is configured. Terminal logs, command history, and edited code will be transmitted over the network to this external host. Ensure this network is trusted and HTTPS is used.',
       ollamaModelLabel: 'Local Model to Use',
       temperatureLabel: (temp) => `Generation Temperature (${temp})`,
       terminalSectionTitle: 'Terminal Appearance',
@@ -698,6 +701,7 @@ export const translations: Record<Language, Translations> = {
       ollamaRefetch: 'モデル再取得',
       ollamaHint: '💡 Ollamaの起動方法: 別のターミナルで `ollama serve` を実行し、`ollama pull llama3.2` または `ollama pull deepseek-r1` を実行してください。',
       ollamaEndpointLabel: 'Ollama エンドポイント URL',
+      ollamaRemoteWarning: '⚠️ セキュリティ警告: リモートのOllamaエンドポイントが設定されています。ターミナルログ、コマンド履歴、および編集コードがネットワーク経由で外部ホストに送信されます。信頼できるネットワーク環境かつHTTPS暗号化の使用を推奨します。',
       ollamaModelLabel: '使用するローカルモデル',
       temperatureLabel: (temp) => `生成 Temperature (${temp})`,
       terminalSectionTitle: 'ターミナル外観',

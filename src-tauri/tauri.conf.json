@@ -30,7 +30,7 @@
           "requireLiteralLeadingDot": false,
           "allow": [
             "$APPCONFIG/**/*",
-            "$CONFIG/**/*",
+            "$CONFIG/waddle/**/*",
             "$PICTURE/*",
             "$PICTURE/**/*",
             "$HOME/Pictures/*",

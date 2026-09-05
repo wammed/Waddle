@@ -13,6 +13,7 @@ import {
   Image as ImageIcon,
   FolderOpen,
   Globe,
+  AlertTriangle,
 } from 'lucide-react';
 import { AppConfig, Language, OllamaStatus } from '../types';
 import { THEMES } from '../theme';
@@ -359,6 +360,39 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 }
               />
             </div>
+
+            {/* Remote Ollama Endpoint Security Warning */}
+            {(() => {
+              const ep = formData.ai.ollama_endpoint?.trim().toLowerCase() || '';
+              const isRemote =
+                ep !== '' &&
+                !ep.includes('localhost') &&
+                !ep.includes('127.0.0.1') &&
+                !ep.includes('0.0.0.0') &&
+                !ep.includes('::1');
+              if (!isRemote) return null;
+              return (
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '8px',
+                    padding: '8px 12px',
+                    marginTop: '-4px',
+                    marginBottom: '12px',
+                    background: 'rgba(245, 158, 11, 0.12)',
+                    border: '1px solid rgba(245, 158, 11, 0.35)',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    color: '#fbbf24',
+                    lineHeight: 1.5,
+                  }}
+                >
+                  <AlertTriangle size={15} style={{ flexShrink: 0, marginTop: '2px' }} />
+                  <span>{t.settings.ollamaRemoteWarning}</span>
+                </div>
+              );
+            })()}
 
             <div className="form-group">
               <label className="form-label" style={{ color: '#94a3b8' }}>{t.settings.ollamaModelLabel}</label>

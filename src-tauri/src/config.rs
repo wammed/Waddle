@@ -96,6 +96,56 @@ pub struct ConfigManager {
     config_dir: PathBuf,
 }
 
+fn validate_image_data_and_filename(file_name: &str, data: &[u8]) -> Result<String, String> {
+    if data.is_empty() {
+        return Err("画像データが空です。".to_string());
+    }
+
+    // 1. Validate magic bytes for supported image formats
+    let detected_ext = if data.starts_with(b"\x89PNG\r\n\x1a\n") {
+        "png"
+    } else if data.starts_with(b"\xFF\xD8\xFF") {
+        "jpg"
+    } else if data.len() >= 12 && &data[0..4] == b"RIFF" && &data[8..12] == b"WEBP" {
+        "webp"
+    } else if data.starts_with(b"GIF87a") || data.starts_with(b"GIF89a") {
+        "gif"
+    } else if data.starts_with(b"BM") {
+        "bmp"
+    } else if data.starts_with(b"<svg")
+        || (data.starts_with(b"<?xml") && String::from_utf8_lossy(&data[..data.len().min(512)]).contains("<svg"))
+    {
+        "svg"
+    } else {
+        return Err("許可されていないファイル形式です。PNG, JPEG, WebP, GIF, BMP, SVG 画像のみ対応しています。".to_string());
+    };
+
+    // 2. Prevent path traversal by taking only the file name
+    let clean_name = Path::new(file_name)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("wallpaper.png");
+
+    let allowed_extensions = ["png", "jpg", "jpeg", "webp", "gif", "bmp", "svg"];
+    let ext = Path::new(clean_name)
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.to_lowercase());
+
+    let final_name = match ext {
+        Some(ref e) if allowed_extensions.contains(&e.as_str()) => clean_name.to_string(),
+        _ => {
+            let stem = Path::new(clean_name)
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("wallpaper");
+            format!("{}.{}", stem, detected_ext)
+        }
+    };
+
+    Ok(final_name)
+}
+
 impl ConfigManager {
     pub fn new() -> Self {
         let config_dir = dirs::config_dir()
@@ -109,19 +159,11 @@ impl ConfigManager {
     }
 
     pub fn save_wallpaper_data(&self, file_name: &str, data: &[u8]) -> Result<String, String> {
+        let safe_name = validate_image_data_and_filename(file_name, data)?;
         let wallpapers_dir = self.config_dir.join("wallpapers");
         let _ = fs::create_dir_all(&wallpapers_dir);
 
-        let clean_name = Path::new(file_name)
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("wallpaper.png");
-
-        let file_path = if clean_name.contains('.') {
-            wallpapers_dir.join(clean_name)
-        } else {
-            wallpapers_dir.join(format!("{}.png", clean_name))
-        };
+        let file_path = wallpapers_dir.join(safe_name);
 
         fs::write(&file_path, data)
             .map_err(|e| format!("Failed to save wallpaper image: {}", e))?;
@@ -203,7 +245,7 @@ mod tests {
             config_dir: temp_dir.clone(),
         };
 
-        let dummy_png_bytes = b"fake-png-image-binary-data";
+        let dummy_png_bytes = b"\x89PNG\r\n\x1a\nfake-png-image-binary-data";
         let encoded = BASE64_STANDARD.encode(dummy_png_bytes);
         let mut cfg = AppConfig::default();
         cfg.terminal.background_image = Some(format!("data:image/png;base64,{}", encoded));
@@ -223,6 +265,32 @@ mod tests {
         let saved_json = fs::read_to_string(&manager.config_path).unwrap();
         assert!(!saved_json.contains("data:image/png;base64"));
         assert!(saved_json.contains("migrated_wallpaper.png"));
+
+        let _ = fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_save_wallpaper_validation() {
+        let temp_dir = std::env::temp_dir().join(format!("waddle_wp_test_{}", uuid::Uuid::new_v4()));
+        let manager = ConfigManager {
+            config_path: temp_dir.join("config.json"),
+            config_dir: temp_dir.clone(),
+        };
+
+        // 1. Valid PNG
+        let valid_png = b"\x89PNG\r\n\x1a\nvalid_png_content";
+        assert!(manager.save_wallpaper_data("custom.png", valid_png).is_ok());
+
+        // 2. Valid JPEG
+        let valid_jpg = b"\xFF\xD8\xFFvalid_jpg_content";
+        assert!(manager.save_wallpaper_data("photo.jpg", valid_jpg).is_ok());
+
+        // 3. Invalid script or binary must be rejected
+        let evil_script = b"#!/bin/bash\nrm -rf /";
+        assert!(manager.save_wallpaper_data("script.sh", evil_script).is_err());
+
+        let evil_png_named_script = b"#!/bin/bash\necho pwned";
+        assert!(manager.save_wallpaper_data("fake.png", evil_png_named_script).is_err());
 
         let _ = fs::remove_dir_all(&temp_dir);
     }

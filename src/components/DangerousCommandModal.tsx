@@ -5,6 +5,7 @@ import { useI18n } from '../i18n';
 export function isDangerousCommand(cmd: string): boolean {
   const lower = cmd.toLowerCase().trim();
   const patterns = [
+    'rm -',
     'rm ',
     'rm\t',
     'rmdir',
@@ -12,22 +13,51 @@ export function isDangerousCommand(cmd: string): boolean {
     'dd if=',
     'dd of=',
     '> /dev/',
+    '> /etc/',
+    '> /boot/',
+    '> /sys/',
     'chmod -r',
+    'chmod 777',
     'chown -r',
     'reboot',
     'shutdown',
     'poweroff',
+    'init 0',
+    'init 6',
     ':(){ :|:& };:',
     'curl ',
     'wget ',
     '| sh',
     '| bash',
     '| zsh',
+    'bash <(',
+    'sh <(',
+    'zsh <(',
+    'eval "$(',
     'sudo ',
+    'su -',
     'sh -c',
     'bash -c',
+    'zsh -c',
+    'git clean',
+    'git reset --hard',
+    'git push --force',
+    'git push -f',
+    'truncate ',
+    'shred ',
+    'wipefs',
+    'fdisk',
+    'parted',
+    'gdisk',
+    'shutil.rmtree',
   ];
-  return patterns.some((p) => lower.includes(p));
+  if (patterns.some((p) => lower.includes(p))) {
+    return true;
+  }
+  if (lower.includes('find ') && (lower.includes('-delete') || lower.includes('-exec rm'))) {
+    return true;
+  }
+  return false;
 }
 
 interface DangerousCommandModalProps {

@@ -800,6 +800,7 @@ export function App() {
           config={config}
           context={currentAiContext}
           onExecuteInTerminal={handleExecuteCommand}
+          onInsertInTerminal={handleInsertCommand}
           targetFilePath={targetEditorFile}
         />
 

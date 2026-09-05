@@ -9,7 +9,7 @@ use config::{AppConfig, ConfigManager};
 use pty::{check_git_status, GitStatus, PtyManager, PtySessionInfo};
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use tauri::{AppHandle, State};
 
 pub struct AppState {
@@ -80,9 +80,152 @@ fn get_git_status(path: String) -> GitStatus {
 
 // --- Editor & File System Commands ---
 
+fn resolve_canonical_path(path: &Path) -> PathBuf {
+    if let Ok(c) = path.canonicalize() {
+        return c;
+    }
+    // If path does not exist yet (e.g. creating/writing a new file),
+    // traverse up until an existing ancestor is found and canonicalize that,
+    // then append the remaining components.
+    let mut components = Vec::new();
+    let mut curr = path.to_path_buf();
+    while !curr.exists() {
+        if let Some(file_name) = curr.file_name() {
+            components.push(file_name.to_os_string());
+            if let Some(parent) = curr.parent() {
+                curr = parent.to_path_buf();
+            } else {
+                break;
+            }
+        } else {
+            break;
+        }
+    }
+    let base = curr.canonicalize().unwrap_or(curr);
+    let mut resolved = base;
+    for comp in components.into_iter().rev() {
+        resolved.push(comp);
+    }
+    resolved
+}
+
+fn validate_safe_read(path: &Path) -> Result<(), String> {
+    let canonical = resolve_canonical_path(path);
+
+    // 1. Block reading private SSH keys
+    if let Some(file_name) = canonical.file_name().and_then(|n| n.to_str()) {
+        let sensitive_keys = ["id_rsa", "id_ed25519", "id_ecdsa", "id_dsa"];
+        if sensitive_keys.contains(&file_name) {
+            return Err("安全上の理由によりSSH秘密鍵の直接読み出しは禁止されています。".to_string());
+        }
+    }
+
+    // 2. Block reading sensitive GPG private keys
+    if let Some(home) = dirs::home_dir() {
+        let home_canon = home.canonicalize().unwrap_or(home);
+        let gpg_private = home_canon.join(".gnupg").join("private-keys-v1.d");
+        if canonical.starts_with(&gpg_private) {
+            return Err("安全上の理由によりGPG秘密鍵領域の読み出しは禁止されています。".to_string());
+        }
+    }
+
+    Ok(())
+}
+
+fn validate_safe_write(path: &Path) -> Result<(), String> {
+    let canonical = resolve_canonical_path(path);
+
+    // 1. Never allow root directory "/"
+    if canonical.parent().is_none() || canonical == Path::new("/") {
+        return Err("安全上の理由によりルートディレクトリ (/) への書き込みは禁止されています。".to_string());
+    }
+
+    // 2. Protect user home directly and sensitive credential directories
+    if let Some(home) = dirs::home_dir() {
+        let home_canon = home.canonicalize().unwrap_or(home);
+        if canonical == home_canon {
+            return Err("安全上の理由によりホームディレクトリパス自体への書き込みは禁止されています。".to_string());
+        }
+
+        let sensitive_home_dirs = [".ssh", ".gnupg", ".local/share/keyrings"];
+        for rel in &sensitive_home_dirs {
+            let target = home_canon.join(rel);
+            if canonical == target || canonical.starts_with(&target) {
+                return Err(format!("安全上の理由により重要資格情報領域 (~/{}) への書き込みは禁止されています。", rel));
+            }
+        }
+    }
+
+    // 3. Protect critical system directories
+    let forbidden_system_dirs = [
+        "/etc", "/usr", "/bin", "/sbin", "/boot", "/lib", "/lib64",
+        "/sys", "/proc", "/dev", "/var", "/opt", "/root", "/run"
+    ];
+    for &sys_dir in &forbidden_system_dirs {
+        let sys_path = Path::new(sys_dir);
+        if canonical == sys_path || canonical.starts_with(sys_path) {
+            // Allow temporary files inside /var/tmp if used by system
+            if sys_dir == "/var" && canonical.starts_with("/var/tmp") {
+                continue;
+            }
+            return Err(format!("安全上の理由によりシステム領域 ({}) 配下への書き込みは禁止されています。", sys_dir));
+        }
+    }
+
+    Ok(())
+}
+
+fn validate_safe_deletion(path: &Path) -> Result<(), String> {
+    let canonical = resolve_canonical_path(path);
+
+    // 1. Never allow root directory "/"
+    if canonical.parent().is_none() || canonical == Path::new("/") {
+        return Err("安全上の理由によりルートディレクトリ (/) の削除は禁止されています。".to_string());
+    }
+
+    // 2. Never allow user home directory directly and protect sensitive credential stores
+    if let Some(home) = dirs::home_dir() {
+        let home_canon = home.canonicalize().unwrap_or(home);
+        if canonical == home_canon {
+            return Err("安全上の理由によりホームディレクトリ自体の削除は禁止されています。".to_string());
+        }
+
+        let sensitive_home_dirs = [".ssh", ".gnupg", ".local/share/keyrings"];
+        for rel in &sensitive_home_dirs {
+            let target = home_canon.join(rel);
+            if canonical == target || canonical.starts_with(&target) {
+                return Err(format!("安全上の理由により重要資格情報領域 (~/{}) の削除は禁止されています。", rel));
+            }
+        }
+
+        let config_root = home_canon.join(".config");
+        if canonical == config_root {
+            return Err("安全上の理由により設定ルートディレクトリ (~/.config) の削除は禁止されています。".to_string());
+        }
+    }
+
+    // 3. Never allow critical system directories or subdirectories (prefix match)
+    let forbidden_system_dirs = [
+        "/etc", "/usr", "/bin", "/sbin", "/boot", "/lib", "/lib64",
+        "/sys", "/proc", "/dev", "/var", "/opt", "/root", "/run"
+    ];
+    for &sys_dir in &forbidden_system_dirs {
+        let sys_path = Path::new(sys_dir);
+        if canonical == sys_path || canonical.starts_with(sys_path) {
+            if sys_dir == "/var" && canonical.starts_with("/var/tmp/") {
+                continue;
+            }
+            return Err(format!("安全上の理由によりシステム領域 ({}) 配下の削除は禁止されています。", sys_dir));
+        }
+    }
+
+    Ok(())
+}
+
 #[tauri::command]
 fn read_file(path: String) -> Result<String, String> {
     let p = Path::new(&path);
+    validate_safe_read(p)?;
     if !p.exists() {
         return Err(format!("File not found: {}", path));
     }
@@ -92,6 +235,7 @@ fn read_file(path: String) -> Result<String, String> {
 #[tauri::command]
 fn write_file(path: String, content: String) -> Result<(), String> {
     let p = Path::new(&path);
+    validate_safe_write(p)?;
     if let Some(parent) = p.parent() {
         let _ = fs::create_dir_all(parent);
     }
@@ -164,6 +308,7 @@ fn read_directory(path: String, show_hidden: bool) -> Result<Vec<FileEntry>, Str
 #[tauri::command]
 fn create_file(path: String) -> Result<(), String> {
     let p = Path::new(&path);
+    validate_safe_write(p)?;
     if let Some(parent) = p.parent() {
         let _ = fs::create_dir_all(parent);
     }
@@ -177,49 +322,17 @@ fn create_file(path: String) -> Result<(), String> {
 #[tauri::command]
 fn create_directory(path: String) -> Result<(), String> {
     let p = Path::new(&path);
+    validate_safe_write(p)?;
     fs::create_dir_all(p).map_err(|e| format!("Failed to create directory: {}", e))
-}
-
-fn validate_safe_deletion(path: &Path) -> Result<(), String> {
-    let canonical = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
-
-    // 1. Never allow root directory "/"
-    if canonical.parent().is_none() || canonical == Path::new("/") {
-        return Err("安全上の理由によりルートディレクトリ (/) の削除は禁止されています。".to_string());
-    }
-
-    // 2. Never allow user home directory directly
-    if let Some(home) = dirs::home_dir() {
-        if let Ok(home_canonical) = home.canonicalize() {
-            if canonical == home_canonical {
-                return Err("安全上の理由によりホームディレクトリ自体の削除は禁止されています。".to_string());
-            }
-        } else if canonical == home {
-            return Err("安全上の理由によりホームディレクトリ自体の削除は禁止されています。".to_string());
-        }
-    }
-
-    // 3. Never allow critical system directories
-    let forbidden_system_dirs = [
-        "/etc", "/usr", "/bin", "/sbin", "/boot", "/lib", "/lib64",
-        "/sys", "/proc", "/dev", "/var", "/opt", "/root", "/run"
-    ];
-    for &sys_dir in &forbidden_system_dirs {
-        if canonical == Path::new(sys_dir) {
-            return Err(format!("安全上の理由によりシステムディレクトリ ({}) の削除は禁止されています。", sys_dir));
-        }
-    }
-
-    Ok(())
 }
 
 #[tauri::command]
 fn delete_entry(path: String) -> Result<(), String> {
     let p = Path::new(&path);
+    validate_safe_deletion(p)?;
     if !p.exists() {
         return Ok(());
     }
-    validate_safe_deletion(p)?;
     if p.is_dir() {
         fs::remove_dir_all(p).map_err(|e| format!("Failed to delete directory: {}", e))
     } else {
@@ -518,14 +631,62 @@ mod tests {
         // Root deletion should be blocked
         assert!(delete_entry("/".to_string()).is_err());
 
-        // System dir deletion should be blocked
+        // System dir and subdirectories deletion should be blocked
         assert!(delete_entry("/etc".to_string()).is_err());
+        assert!(delete_entry("/etc/hosts".to_string()).is_err());
         assert!(delete_entry("/usr".to_string()).is_err());
+        assert!(delete_entry("/usr/bin".to_string()).is_err());
+        assert!(delete_entry("/bin".to_string()).is_err());
+        assert!(delete_entry("/boot".to_string()).is_err());
 
-        // User home dir deletion should be blocked
+        // User home dir and sensitive credential dirs should be blocked
         if let Some(home) = dirs::home_dir() {
             let home_str = home.to_string_lossy().to_string();
-            assert!(delete_entry(home_str).is_err());
+            assert!(delete_entry(home_str.clone()).is_err());
+
+            let ssh_path = home.join(".ssh").to_string_lossy().to_string();
+            assert!(delete_entry(ssh_path).is_err());
+
+            let ssh_key_path = home.join(".ssh").join("id_rsa").to_string_lossy().to_string();
+            assert!(delete_entry(ssh_key_path).is_err());
+
+            let gpg_path = home.join(".gnupg").to_string_lossy().to_string();
+            assert!(delete_entry(gpg_path).is_err());
+
+            let config_root = home.join(".config").to_string_lossy().to_string();
+            assert!(delete_entry(config_root).is_err());
         }
+    }
+
+    #[test]
+    fn test_forbidden_write_prevention() {
+        // Root write should be blocked
+        assert!(write_file("/test_root_file.txt".to_string(), "malicious".to_string()).is_err());
+        assert!(create_file("/test_root_file.txt".to_string()).is_err());
+
+        // System dir write should be blocked
+        assert!(write_file("/etc/malicious_cron".to_string(), "* * * * *".to_string()).is_err());
+        assert!(create_file("/usr/bin/malicious_binary".to_string()).is_err());
+
+        // Sensitive credential store write should be blocked
+        if let Some(home) = dirs::home_dir() {
+            let ssh_auth_keys = home.join(".ssh").join("authorized_keys").to_string_lossy().to_string();
+            assert!(write_file(ssh_auth_keys.clone(), "ssh-rsa ...".to_string()).is_err());
+            assert!(create_file(ssh_auth_keys).is_err());
+
+            let gpg_key = home.join(".gnupg").join("private-keys-v1.d").join("key.sec").to_string_lossy().to_string();
+            assert!(write_file(gpg_key.clone(), "secret".to_string()).is_err());
+        }
+    }
+
+    #[test]
+    fn test_forbidden_read_prevention() {
+        // Sensitive private key reading should be blocked
+        assert!(validate_safe_read(Path::new("/home/user/.ssh/id_rsa")).is_err());
+        assert!(validate_safe_read(Path::new("/home/user/.ssh/id_ed25519")).is_err());
+        assert!(validate_safe_read(Path::new("/home/user/.ssh/id_ecdsa")).is_err());
+
+        // Normal files should be allowed
+        assert!(validate_safe_read(Path::new("/tmp/some_script.py")).is_ok());
     }
 }
