@@ -73,26 +73,37 @@
 - **Run in Terminal**: Send scripts (Python, Bash, JS/TS, Rust, etc.) directly into the active shell with one click.
 - **AI Edit (`Ctrl + Shift + K`)**: Instruct Ollama to refactor, add error handling, or generate code directly inside the editor.
 
-### 4. 🚨 Intelligent Error Diagnosis & One-Click Fixes
+### 5. 🪟 Flexible Multi-Pane Split (2, 3, 4 Panes & 10 Selectable Layouts)
+- **Multi-Terminal Workflows**: Split any tab into 2, 3, or 4 independent pseudo-terminals with dedicated PTY processes, working directory inheritance, and real-time Git status.
+- **10 Visual Layout Presets**:
+  - **1 Pane**: Single (`single`)
+  - **2 Panes**: Side by Side (`split-2-h`), Top & Bottom (`split-2-v`)
+  - **3 Panes**: Left Main + 2 Right (`split-3-left-main`), Top Main + 2 Bottom (`split-3-top-main`), 3 Columns (`split-3-h`), 3 Rows (`split-3-v`)
+  - **4 Panes**: 2×2 Grid (`grid-4`), Left Main + 3 Right (`split-4-left-main`), 4 Columns (`split-4-h`)
+- **Visual Layout Popover**: Select your preferred layout from the TitleBar with interactive miniature diagram previews and quick layout switching.
+- **Pane Zoom & Focus**: Zoom in on any active pane for full-screen focus, with a single-click restore banner. Luminous accent border highlights the currently active pane.
+- **Smart Active Routing**: AI Command Generator (`Ctrl + K`), Copilot chat, embedded editor, and status bar automatically target whichever pane is focused.
+
+### 6. 🚨 Intelligent Error Diagnosis & One-Click Fixes
 - Automatically detects failed commands (non-zero exit codes or stderr keywords) and displays an actionable smart banner.
 - With one click, local AI analyzes why the command failed and suggests a verified remedy command you can run instantly.
 
-### 5. 💬 Context-Aware AI Copilot Sidebar
+### 7. 💬 Context-Aware AI Copilot Sidebar
 - Interactive chat assistant with real-time awareness of your terminal context: CWD (`pwd`), Git branch & dirty status, and recent command history.
 - Run, insert, or copy code snippets directly from Markdown response blocks.
 
-### 6. 🦙 Auto-Discovery of Local Ollama Models (100% Private & Offline)
+### 8. 🦙 Auto-Discovery of Local Ollama Models (100% Private & Offline)
 - Automatically detects installed Ollama models (`llama3.2`, `deepseek-r1`, `qwen2.5-coder`, `codellama`, `mistral`, etc.).
 - Switch models on the fly from the Settings modal (`Ctrl + ,`).
 - **Zero API keys, zero cloud dependencies, zero data leakage.**
 
-### 7. ⚡ High-Performance PTY & Hardware-Accelerated Canvas Rendering
+### 9. ⚡ High-Performance PTY & Hardware-Accelerated Canvas Rendering
 - Native Rust pseudo-terminal manager (`portable-pty`) with sub-millisecond latency.
 - Accurate real-time directory tracking via Linux `/proc/<pid>/cwd` with smart fast-path Git discovery.
 - Hardware-accelerated 2D Canvas rendering (`@xterm/addon-canvas`) over transparent background, TrueColor (24-bit), and full Nerd Fonts & Powerline glyph support.
 - Synchronous `localStorage` state cache for instant Frame 0 render without IPC delay.
 
-### 8. 🎨 13 Premium Themes & Dynamic UI Color Sync
+### 10. 🎨 13 Premium Themes & Dynamic UI Color Sync
 - **13 Built-in Designer Themes**:
   - **Waddle Cyber (Default)**, **Tokyo Night**, **Catppuccin Mocha**, **Dracula**
   - **Nord (Arctic)**, **Gruvbox Dark**, **One Dark Pro**, **Rosé Pine**
@@ -100,7 +111,7 @@
 - **Full UI Synchronization**: Window titlebar, tabs, borders, status bar, and modal accents dynamically adapt to the selected theme.
 - **Nerd Fonts**: Presets for **JetBrainsMono Nerd Font**, **MesloLGS NF**, **FiraCode Nerd Font**, **Hack Nerd Font**, or custom local fonts with automatic glyph fallback.
 
-### 9. 🌐 Multi-Language Support (English US / UK, 日本語)
+### 11. 🌐 Multi-Language Support (English US / UK, 日本語)
 - **Selectable UI Language**: Switch seamlessly between **English (US)**, **English (GB / UK)**, and **Japanese (日本語)** from Settings (`Ctrl + ,`).
 - **Live Preview & Persistence**: Switching languages instantly updates all dialogs, toolbars, error banners, and copilot prompts, and persists across restarts in `~/.config/waddle/config.json`.
 - **Sensible Default**: Defaults to English (`en-US`) for international Linux users while providing full native Japanese support.
@@ -118,7 +129,13 @@
 | `Ctrl + Shift + K` *(in editor)* | Open **AI Code Edit / Refactor** |
 | `Ctrl + T` | Open new terminal tab |
 | `Ctrl + W` | Close current terminal tab |
-| `Ctrl + ,` | Open **Settings** (Ollama model, wallpaper, themes, fonts) |
+| `Ctrl + Shift + W` | Close active split pane |
+| `Alt + 1` | Switch to **Single Pane** layout |
+| `Alt + 2` | Switch to **2-Split (Side by Side)** layout |
+| `Alt + 3` | Switch to **3-Split (Left Main)** layout |
+| `Alt + 4` | Switch to **4-Split (2×2 Grid)** layout |
+| `Alt + ↑ / ↓ / ← / →` | Move focus between split panes |
+| `Ctrl + ,` | Open **Settings** (Ollama model, wallpaper, themes, fonts, language) |
 | `Enter` *(in AI modal)* | Insert generated command into terminal |
 | `Ctrl + Enter` *(in AI modal)* | Execute generated command immediately |
 | `Esc` | Close active modal / popup |

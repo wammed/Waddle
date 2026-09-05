@@ -22,6 +22,8 @@ export interface Translations {
   titleBar: {
     files: string;
     filesTooltip: string;
+    layout: string;
+    layoutTooltip: string;
     aiPrompt: string;
     aiPromptTooltip: string;
     editor: string;
@@ -32,6 +34,28 @@ export interface Translations {
     settingsTooltip: string;
     newTabTooltip: string;
     closeTabTooltip: string;
+  };
+  panes: {
+    layoutSelectorTitle: string;
+    single: string;
+    split2H: string;
+    split2V: string;
+    split3LeftMain: string;
+    split3TopMain: string;
+    split3H: string;
+    split3V: string;
+    grid4: string;
+    split4LeftMain: string;
+    split4H: string;
+    paneCount1: string;
+    paneCount2: string;
+    paneCount3: string;
+    paneCount4: string;
+    zoomPane: string;
+    restorePane: string;
+    closePane: string;
+    activePaneBadge: string;
+    toggle4Split: string;
   };
   fileTree: {
     title: string;
@@ -175,6 +199,8 @@ export const translations: Record<Language, Translations> = {
     titleBar: {
       files: 'Files',
       filesTooltip: 'Toggle File Tree Sidebar (Ctrl+B)',
+      layout: 'Layout',
+      layoutTooltip: 'Choose Split Layout (Alt+L, Alt+1~4)',
       aiPrompt: 'AI Prompt',
       aiPromptTooltip: 'AI Command Generator (Ctrl+K)',
       editor: 'Editor',
@@ -185,6 +211,28 @@ export const translations: Record<Language, Translations> = {
       settingsTooltip: 'Settings (Ctrl+,)',
       newTabTooltip: 'New Tab (Ctrl+T)',
       closeTabTooltip: 'Close tab',
+    },
+    panes: {
+      layoutSelectorTitle: 'Terminal Layout',
+      single: 'Single Pane (Full)',
+      split2H: 'Side by Side (2 Columns)',
+      split2V: 'Top & Bottom (2 Rows)',
+      split3LeftMain: 'Left Main + 2 Right Stacked',
+      split3TopMain: 'Top Main + 2 Bottom Columns',
+      split3H: '3 Columns Side by Side',
+      split3V: '3 Rows Stacked',
+      grid4: '2×2 Grid (4 Panes)',
+      split4LeftMain: 'Left Main + 3 Right Stacked',
+      split4H: '4 Columns Side by Side',
+      paneCount1: '1 Pane',
+      paneCount2: '2 Panes',
+      paneCount3: '3 Panes',
+      paneCount4: '4 Panes',
+      zoomPane: 'Zoom active pane (Alt+1)',
+      restorePane: 'Restore split layout',
+      closePane: 'Close pane (Ctrl+Shift+W)',
+      activePaneBadge: 'Active',
+      toggle4Split: '4-Way Split Grid (Alt+4)',
     },
     fileTree: {
       title: 'Files',
@@ -328,6 +376,8 @@ export const translations: Record<Language, Translations> = {
     titleBar: {
       files: 'Files',
       filesTooltip: 'Toggle File Tree Sidebar (Ctrl+B)',
+      layout: 'Layout',
+      layoutTooltip: 'Choose Split Layout (Alt+L, Alt+1~4)',
       aiPrompt: 'AI Prompt',
       aiPromptTooltip: 'AI Command Generator (Ctrl+K)',
       editor: 'Editor',
@@ -338,6 +388,28 @@ export const translations: Record<Language, Translations> = {
       settingsTooltip: 'Settings (Ctrl+,)',
       newTabTooltip: 'New Tab (Ctrl+T)',
       closeTabTooltip: 'Close tab',
+    },
+    panes: {
+      layoutSelectorTitle: 'Terminal Layout',
+      single: 'Single Pane (Full)',
+      split2H: 'Side by Side (2 Columns)',
+      split2V: 'Top & Bottom (2 Rows)',
+      split3LeftMain: 'Left Main + 2 Right Stacked',
+      split3TopMain: 'Top Main + 2 Bottom Columns',
+      split3H: '3 Columns Side by Side',
+      split3V: '3 Rows Stacked',
+      grid4: '2×2 Grid (4 Panes)',
+      split4LeftMain: 'Left Main + 3 Right Stacked',
+      split4H: '4 Columns Side by Side',
+      paneCount1: '1 Pane',
+      paneCount2: '2 Panes',
+      paneCount3: '3 Panes',
+      paneCount4: '4 Panes',
+      zoomPane: 'Zoom active pane (Alt+1)',
+      restorePane: 'Restore split layout',
+      closePane: 'Close pane (Ctrl+Shift+W)',
+      activePaneBadge: 'Active',
+      toggle4Split: '4-Way Split Grid (Alt+4)',
     },
     fileTree: {
       title: 'Files',
@@ -481,6 +553,8 @@ export const translations: Record<Language, Translations> = {
     titleBar: {
       files: 'Files',
       filesTooltip: 'ファイルツリーサイドバーの表示切替 (Ctrl+B)',
+      layout: '分割',
+      layoutTooltip: '画面分割レイアウトを選択 (Alt+L, Alt+1~4)',
       aiPrompt: 'AI Prompt',
       aiPromptTooltip: 'AI コマンド生成 (Ctrl+K)',
       editor: 'Editor',
@@ -491,6 +565,28 @@ export const translations: Record<Language, Translations> = {
       settingsTooltip: '設定 (Ctrl+,)',
       newTabTooltip: '新規タブ (Ctrl+T)',
       closeTabTooltip: 'タブを閉じる',
+    },
+    panes: {
+      layoutSelectorTitle: '画面分割レイアウト',
+      single: '単一ペイン (全画面)',
+      split2H: '左右2分割 (2列)',
+      split2V: '上下2分割 (2段)',
+      split3LeftMain: '左メイン ＋ 右2段',
+      split3TopMain: '上メイン ＋ 下2列',
+      split3H: '左右3列並列',
+      split3V: '上下3段並列',
+      grid4: '2×2グリッド (4分割)',
+      split4LeftMain: '左メイン ＋ 右3段',
+      split4H: '左右4列並列',
+      paneCount1: '1ペイン',
+      paneCount2: '2分割',
+      paneCount3: '3分割',
+      paneCount4: '4分割',
+      zoomPane: 'アクティブペインを最大化 (Alt+1)',
+      restorePane: '分割レイアウトに戻す',
+      closePane: 'ペインを閉じる (Ctrl+Shift+W)',
+      activePaneBadge: 'アクティブ',
+      toggle4Split: '4分割グリッド (Alt+4)',
     },
     fileTree: {
       title: 'ファイル',

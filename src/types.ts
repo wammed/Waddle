@@ -91,9 +91,41 @@ export interface SystemInfo {
   user: string;
 }
 
+export type PaneLayout =
+  | 'single'
+  // 2 panes
+  | 'split-2-h'
+  | 'split-2-v'
+  // 3 panes
+  | 'split-3-left-main'
+  | 'split-3-top-main'
+  | 'split-3-h'
+  | 'split-3-v'
+  // 4 panes
+  | 'grid-4'
+  | 'split-4-left-main'
+  | 'split-4-h';
+
+export interface TerminalPaneInfo {
+  id: string;
+  sessionId: string;
+  cwd: string;
+  title: string;
+  gitStatus: GitStatus;
+  lastCommand?: string;
+  lastExitCode?: number;
+  lastOutput?: string;
+}
+
 export interface TerminalTab {
   id: string;
   title: string;
+  layout: PaneLayout;
+  panes: TerminalPaneInfo[];
+  activePaneId: string;
+  isZoomed?: boolean;
+
+  // Active pane mirror properties for backward compatibility
   sessionId: string;
   cwd: string;
   gitStatus: GitStatus;

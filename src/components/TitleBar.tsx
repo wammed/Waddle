@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Plus,
   X,
@@ -7,17 +7,25 @@ import {
   Bot,
   FileCode,
   PanelLeft,
+  Grid2X2,
+  Columns2,
+  Rows2,
+  LayoutGrid,
+  Square,
 } from 'lucide-react';
-import { TerminalTab } from '../types';
+import { PaneLayout, TerminalTab } from '../types';
 import waddleIcon from '../assets/waddle-icon.svg';
 import { useI18n } from '../i18n';
+import { LayoutSelectorPopover } from './LayoutSelectorPopover';
 
 interface TitleBarProps {
   tabs: TerminalTab[];
   activeTabId: string;
+  currentLayout: PaneLayout;
   onSelectTab: (tabId: string) => void;
   onNewTab: () => void;
   onCloseTab: (tabId: string, e: React.MouseEvent) => void;
+  onSelectLayout: (layout: PaneLayout) => void;
   onOpenSettings: () => void;
   onOpenAiCommand: () => void;
   isAiSidebarOpen: boolean;
@@ -31,9 +39,11 @@ interface TitleBarProps {
 export const TitleBar: React.FC<TitleBarProps> = ({
   tabs,
   activeTabId,
+  currentLayout,
   onSelectTab,
   onNewTab,
   onCloseTab,
+  onSelectLayout,
   onOpenSettings,
   onOpenAiCommand,
   isAiSidebarOpen,
@@ -44,6 +54,27 @@ export const TitleBar: React.FC<TitleBarProps> = ({
   onToggleFileTree,
 }) => {
   const { t } = useI18n();
+  const [isLayoutPopoverOpen, setIsLayoutPopoverOpen] = useState(false);
+
+  const getLayoutIcon = (layout: PaneLayout) => {
+    switch (layout) {
+      case 'grid-4':
+        return <Grid2X2 size={14} color="var(--accent)" />;
+      case 'split-2-h':
+      case 'split-3-h':
+      case 'split-4-h':
+        return <Columns2 size={14} color="var(--accent)" />;
+      case 'split-2-v':
+      case 'split-3-v':
+        return <Rows2 size={14} color="var(--accent)" />;
+      case 'split-3-left-main':
+      case 'split-3-top-main':
+      case 'split-4-left-main':
+        return <LayoutGrid size={14} color="var(--accent)" />;
+      default:
+        return <Square size={14} />;
+    }
+  };
 
   return (
     <header className="titlebar-container" data-tauri-drag-region>
@@ -143,6 +174,16 @@ export const TitleBar: React.FC<TitleBarProps> = ({
         </button>
 
         <button
+          id="btn-layout-toggle"
+          className={`action-btn ${currentLayout !== 'single' ? 'active' : ''}`}
+          onClick={() => setIsLayoutPopoverOpen((prev) => !prev)}
+          title={t.titleBar.layoutTooltip}
+        >
+          {getLayoutIcon(currentLayout)}
+          <span>{t.titleBar.layout}</span>
+        </button>
+
+        <button
           id="btn-settings"
           className="action-btn"
           onClick={onOpenSettings}
@@ -150,6 +191,18 @@ export const TitleBar: React.FC<TitleBarProps> = ({
         >
           <Settings size={14} />
         </button>
+
+        {isLayoutPopoverOpen && (
+          <LayoutSelectorPopover
+            isOpen={isLayoutPopoverOpen}
+            onClose={() => setIsLayoutPopoverOpen(false)}
+            currentLayout={currentLayout}
+            onSelectLayout={(layout) => {
+              onSelectLayout(layout);
+              setIsLayoutPopoverOpen(false);
+            }}
+          />
+        )}
       </div>
     </header>
   );
