@@ -129,6 +129,28 @@ fn git_get_diff(repo_path: String, file_path: Option<String>, staged: bool) -> R
 }
 
 #[tauri::command]
+async fn git_push(state: State<'_, AppState>, repo_path: String) -> Result<String, String> {
+    let config = state.config_manager.load();
+    let restrict = config.git.restrict_to_github;
+    tokio::task::spawn_blocking(move || {
+        pty::git_push(&repo_path, restrict)
+    })
+    .await
+    .map_err(|e| format!("Task error: {}", e))?
+}
+
+#[tauri::command]
+async fn git_pull(state: State<'_, AppState>, repo_path: String) -> Result<String, String> {
+    let config = state.config_manager.load();
+    let restrict = config.git.restrict_to_github;
+    tokio::task::spawn_blocking(move || {
+        pty::git_pull(&repo_path, restrict)
+    })
+    .await
+    .map_err(|e| format!("Task error: {}", e))?
+}
+
+#[tauri::command]
 async fn git_generate_commit_message(
     state: State<'_, AppState>,
     repo_path: String,
@@ -640,6 +662,8 @@ pub fn run() {
             git_get_branches,
             git_checkout_branch,
             git_get_diff,
+            git_push,
+            git_pull,
             git_generate_commit_message,
             read_file,
             write_file,
@@ -791,4 +815,35 @@ mod tests {
         assert!(status.is_repo);
         assert!(status.is_github_repo);
     }
+
+    #[test]
+    fn test_git_push_pull_restrictions() {
+        let temp_dir = std::env::temp_dir().join(format!("waddle_git_test_{}", uuid::Uuid::new_v4()));
+        let _ = std::fs::create_dir_all(&temp_dir);
+        let path_str = temp_dir.to_str().unwrap().to_string();
+
+        // Init a temporary git repo
+        let _ = std::process::Command::new("git")
+            .args(["init"])
+            .current_dir(&temp_dir)
+            .output();
+
+        // Add a non-github remote (e.g. gitlab.com)
+        let _ = std::process::Command::new("git")
+            .args(["remote", "add", "origin", "https://gitlab.com/user/fake-repo.git"])
+            .current_dir(&temp_dir)
+            .output();
+
+        // When restrict_to_github is true, push and pull must be blocked
+        let push_res = pty::git_push(&path_str, true);
+        assert!(push_res.is_err(), "Push to GitLab should be blocked when restrict_to_github is true");
+        assert!(push_res.unwrap_err().contains("GitHub限定ポリシー"));
+
+        let pull_res = pty::git_pull(&path_str, true);
+        assert!(pull_res.is_err(), "Pull from GitLab should be blocked when restrict_to_github is true");
+        assert!(pull_res.unwrap_err().contains("GitHub限定ポリシー"));
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
 }
+

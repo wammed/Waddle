@@ -48,6 +48,8 @@ export const GitQuickPopover: React.FC<GitQuickPopoverProps> = ({
   const [commitMessage, setCommitMessage] = useState('');
   const [isGeneratingAiCommit, setIsGeneratingAiCommit] = useState(false);
   const [isCommitting, setIsCommitting] = useState(false);
+  const [isPushing, setIsPushing] = useState(false);
+  const [isPulling, setIsPulling] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -204,6 +206,40 @@ export const GitQuickPopover: React.FC<GitQuickPopoverProps> = ({
     }
   };
 
+  // Push
+  const handlePush = async () => {
+    if (isPushing || isPulling) return;
+    setIsPushing(true);
+    setActionError(null);
+    try {
+      const res = await TauriApi.gitPush(repoPath);
+      setSuccessMessage(res || t.gitPopover.pushSuccess);
+      onRefreshGit();
+      setTimeout(() => setSuccessMessage(null), 4000);
+    } catch (err: any) {
+      setActionError(String(err));
+    } finally {
+      setIsPushing(false);
+    }
+  };
+
+  // Pull
+  const handlePull = async () => {
+    if (isPushing || isPulling) return;
+    setIsPulling(true);
+    setActionError(null);
+    try {
+      const res = await TauriApi.gitPull(repoPath);
+      setSuccessMessage(res || t.gitPopover.pullSuccess);
+      onRefreshGit();
+      setTimeout(() => setSuccessMessage(null), 4000);
+    } catch (err: any) {
+      setActionError(String(err));
+    } finally {
+      setIsPulling(false);
+    }
+  };
+
   if (!isOpen) return null;
 
   const hasAnyChanges = files.length > 0;
@@ -254,28 +290,41 @@ export const GitQuickPopover: React.FC<GitQuickPopoverProps> = ({
 
         {/* Sync & Conflict status */}
         <div className="git-popover-sync">
-          {((gitStatus.ahead ?? 0) > 0 || (gitStatus.behind ?? 0) > 0) && (
-            <span
-              className="git-sync-indicator"
-              title={t.gitPopover.aheadBehind(
-                gitStatus.ahead ?? 0,
-                gitStatus.behind ?? 0
-              )}
+          <div className="git-sync-actions">
+            <button
+              className={`git-sync-btn git-pull-btn ${(gitStatus.behind ?? 0) > 0 ? 'has-updates' : ''}`}
+              onClick={handlePull}
+              disabled={isPulling || isPushing || Boolean(gitStatus.blocked_remote)}
+              title={t.gitPopover.pullTooltip}
             >
-              {(gitStatus.ahead ?? 0) > 0 && (
-                <span className="sync-ahead">
-                  <ArrowUp size={11} />
-                  {gitStatus.ahead}
-                </span>
+              {isPulling ? (
+                <Loader2 size={11} className="animate-spin" />
+              ) : (
+                <ArrowDown size={11} />
               )}
+              <span>{isPulling ? t.gitPopover.pulling : t.gitPopover.pull}</span>
               {(gitStatus.behind ?? 0) > 0 && (
-                <span className="sync-behind">
-                  <ArrowDown size={11} />
-                  {gitStatus.behind}
-                </span>
+                <span className="sync-badge sync-badge-behind">{gitStatus.behind}</span>
               )}
-            </span>
-          )}
+            </button>
+
+            <button
+              className={`git-sync-btn git-push-btn ${(gitStatus.ahead ?? 0) > 0 ? 'has-updates' : ''}`}
+              onClick={handlePush}
+              disabled={isPushing || isPulling || Boolean(gitStatus.blocked_remote)}
+              title={t.gitPopover.pushTooltip}
+            >
+              {isPushing ? (
+                <Loader2 size={11} className="animate-spin" />
+              ) : (
+                <ArrowUp size={11} />
+              )}
+              <span>{isPushing ? t.gitPopover.pushing : t.gitPopover.push}</span>
+              {(gitStatus.ahead ?? 0) > 0 && (
+                <span className="sync-badge sync-badge-ahead">{gitStatus.ahead}</span>
+              )}
+            </button>
+          </div>
 
           <span className="git-policy-pill" title={t.settings.githubRestrictionDesc}>
             <ShieldCheck size={11} color="var(--accent)" />
@@ -286,8 +335,9 @@ export const GitQuickPopover: React.FC<GitQuickPopoverProps> = ({
             className="icon-btn-subtle"
             onClick={onRefreshGit}
             title={t.common.retry}
+            disabled={isPushing || isPulling}
           >
-            <RefreshCw size={12} />
+            <RefreshCw size={12} className={isPushing || isPulling ? 'animate-spin' : ''} />
           </button>
           <button className="icon-btn-subtle" onClick={onClose} title={t.common.close}>
             <X size={12} />

@@ -161,6 +161,14 @@ export interface Translations {
     unstageTooltip: string;
     aheadBehind: (ahead: number, behind: number) => string;
     conflictedFiles: string;
+    pull: string;
+    pulling: string;
+    pullTooltip: string;
+    pullSuccess: string;
+    push: string;
+    pushing: string;
+    pushTooltip: string;
+    pushSuccess: string;
   };
   diffViewer: {
     title: (file: string) => string;
@@ -399,6 +407,14 @@ export const translations: Record<Language, Translations> = {
       unstageTooltip: 'Unstage changes',
       aheadBehind: (ahead, behind) => `${ahead} ahead, ${behind} behind remote`,
       conflictedFiles: 'Merge Conflicts',
+      pull: 'Pull',
+      pulling: 'Pulling...',
+      pullTooltip: 'Pull latest changes from remote (git pull)',
+      pullSuccess: 'Pull completed successfully',
+      push: 'Push',
+      pushing: 'Pushing...',
+      pushTooltip: 'Push local commits to remote (git push)',
+      pushSuccess: 'Push completed successfully',
     },
     diffViewer: {
       title: (file) => `Diff: ${file}`,
@@ -636,6 +652,14 @@ export const translations: Record<Language, Translations> = {
       unstageTooltip: 'Unstage changes',
       aheadBehind: (ahead, behind) => `${ahead} ahead, ${behind} behind remote`,
       conflictedFiles: 'Merge Conflicts',
+      pull: 'Pull',
+      pulling: 'Pulling...',
+      pullTooltip: 'Pull latest changes from remote (git pull)',
+      pullSuccess: 'Pull completed successfully',
+      push: 'Push',
+      pushing: 'Pushing...',
+      pushTooltip: 'Push local commits to remote (git push)',
+      pushSuccess: 'Push completed successfully',
     },
     diffViewer: {
       title: (file) => `Diff: ${file}`,
@@ -873,6 +897,14 @@ export const translations: Record<Language, Translations> = {
       unstageTooltip: 'ステージから除外',
       aheadBehind: (ahead, behind) => `リモート: ↑${ahead}先行 / ↓${behind}遅延`,
       conflictedFiles: 'マージの競合',
+      pull: 'Pull',
+      pulling: 'Pull中...',
+      pullTooltip: 'リモートから最新の変更を取り込む (git pull)',
+      pullSuccess: 'Pullが正常に完了しました',
+      push: 'Push',
+      pushing: 'Push中...',
+      pushTooltip: 'コミットをリモートへ送信 (git push)',
+      pushSuccess: 'Pushが正常に完了しました',
     },
     diffViewer: {
       title: (file) => `差分: ${file}`,

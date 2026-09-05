@@ -149,6 +149,21 @@ export const TauriApi = {
     return await invoke<string>('git_generate_commit_message', { repoPath });
   },
 
+  async gitPush(repoPath: string): Promise<string> {
+    if (!isTauri()) {
+      return 'Push completed successfully';
+    }
+    return await invoke<string>('git_push', { repoPath });
+  },
+
+  async gitPull(repoPath: string): Promise<string> {
+    if (!isTauri()) {
+      return 'Pull completed successfully';
+    }
+    return await invoke<string>('git_pull', { repoPath });
+  },
+
+
   // Event Listeners
   async onPtyOutput(
     sessionId: string,

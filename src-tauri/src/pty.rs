@@ -733,3 +733,90 @@ pub fn git_get_diff(path_str: &str, file_path: Option<&str>, staged: bool) -> Re
         Err(String::from_utf8_lossy(&output.stderr).to_string())
     }
 }
+
+pub fn git_push(path_str: &str, restrict_to_github: bool) -> Result<String, String> {
+    let repo_dir = get_effective_repo_dir(path_str);
+    if restrict_to_github {
+        let (_, blocked) = inspect_github_remotes(&repo_dir);
+        if let Some(blocked_url) = blocked {
+            return Err(format!(
+                "GitHub限定ポリシーにより、非GitHubリモート ({}) への push は遮断されています。",
+                blocked_url
+            ));
+        }
+    }
+
+    let output = std::process::Command::new("git")
+        .args(["push"])
+        .env("GIT_TERMINAL_PROMPT", "0")
+        .current_dir(&repo_dir)
+        .output()
+        .map_err(|e| format!("Failed to execute git push: {}", e))?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+
+    if output.status.success() {
+        let msg = if !stdout.is_empty() {
+            stdout
+        } else if !stderr.is_empty() {
+            stderr
+        } else {
+            "Push completed successfully".to_string()
+        };
+        Ok(msg)
+    } else {
+        let err = if !stderr.is_empty() {
+            stderr
+        } else if !stdout.is_empty() {
+            stdout
+        } else {
+            "git push failed".to_string()
+        };
+        Err(err)
+    }
+}
+
+pub fn git_pull(path_str: &str, restrict_to_github: bool) -> Result<String, String> {
+    let repo_dir = get_effective_repo_dir(path_str);
+    if restrict_to_github {
+        let (_, blocked) = inspect_github_remotes(&repo_dir);
+        if let Some(blocked_url) = blocked {
+            return Err(format!(
+                "GitHub限定ポリシーにより、非GitHubリモート ({}) への pull は遮断されています。",
+                blocked_url
+            ));
+        }
+    }
+
+    let output = std::process::Command::new("git")
+        .args(["pull"])
+        .env("GIT_TERMINAL_PROMPT", "0")
+        .current_dir(&repo_dir)
+        .output()
+        .map_err(|e| format!("Failed to execute git pull: {}", e))?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+
+    if output.status.success() {
+        let msg = if !stdout.is_empty() {
+            stdout
+        } else if !stderr.is_empty() {
+            stderr
+        } else {
+            "Pull completed successfully".to_string()
+        };
+        Ok(msg)
+    } else {
+        let err = if !stderr.is_empty() {
+            stderr
+        } else if !stdout.is_empty() {
+            stdout
+        } else {
+            "git pull failed".to_string()
+        };
+        Err(err)
+    }
+}
+

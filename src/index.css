@@ -1801,6 +1801,86 @@ input::placeholder {
   gap: 6px;
 }
 
+.git-sync-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.git-sync-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--fg-muted);
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.git-sync-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--fg-main);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.git-sync-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.git-pull-btn.has-updates {
+  background: rgba(245, 158, 11, 0.15);
+  border-color: rgba(245, 158, 11, 0.4);
+  color: #fbbf24;
+}
+
+.git-pull-btn.has-updates:hover:not(:disabled) {
+  background: rgba(245, 158, 11, 0.25);
+  border-color: #f59e0b;
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.2);
+}
+
+.git-push-btn.has-updates {
+  background: rgba(56, 189, 248, 0.15);
+  border-color: rgba(56, 189, 248, 0.4);
+  color: #38bdf8;
+}
+
+.git-push-btn.has-updates:hover:not(:disabled) {
+  background: rgba(56, 189, 248, 0.25);
+  border-color: #38bdf8;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.25);
+}
+
+.sync-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 4px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.sync-badge-behind {
+  background: #f59e0b;
+  color: #000;
+}
+
+.sync-badge-ahead {
+  background: #38bdf8;
+  color: #000;
+}
+
 .git-sync-indicator {
   display: flex;
   align-items: center;
