@@ -21,9 +21,10 @@ pub struct PtySessionInfo {
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct GitFileEntry {
     pub path: String,
-    pub status_x: String,
-    pub status_y: String,
-    pub is_staged: bool,
+    pub status_code: String,
+    pub staged: bool,
+    pub unstaged: bool,
+    pub is_untracked: bool,
     pub is_conflicted: bool,
 }
 
@@ -37,6 +38,8 @@ pub struct GitStatus {
     pub conflicted_count: usize,
     pub ahead: usize,
     pub behind: usize,
+    pub is_github_repo: bool,
+    pub blocked_remote: Option<String>,
     pub files: Vec<GitFileEntry>,
 }
 
@@ -314,56 +317,91 @@ impl PtyManager {
     }
 }
 
-pub fn check_git_status(path_str: &str) -> GitStatus {
-    let path = std::path::Path::new(path_str);
-    if !path.exists() {
-        return GitStatus {
-            is_repo: false,
-            branch: None,
-            modified_count: 0,
-            untracked_count: 0,
-            staged_count: 0,
-            conflicted_count: 0,
-            ahead: 0,
-            behind: 0,
-            files: Vec::new(),
-        };
+pub fn resolve_repo_root(path_str: &str) -> Option<std::path::PathBuf> {
+    use std::path::Path;
+    let p = Path::new(path_str);
+    if !p.exists() {
+        return None;
     }
-
-    // Fast check: only run git if .git exists in path or an immediate parent
-    let mut has_git = false;
-    let mut cur = Some(path);
-    let mut depth = 0;
-    while let Some(p) = cur {
-        if p.join(".git").exists() {
-            has_git = true;
-            break;
+    let output = std::process::Command::new("git")
+        .args(["rev-parse", "--show-toplevel"])
+        .current_dir(path_str)
+        .output();
+    if let Ok(out) = output {
+        if out.status.success() {
+            let root = String::from_utf8_lossy(&out.stdout).trim().to_string();
+            if !root.is_empty() {
+                return Some(std::path::PathBuf::from(root));
+            }
         }
-        depth += 1;
-        if depth > 4 {
-            break;
-        }
-        cur = p.parent();
     }
+    None
+}
 
-    if !has_git {
-        return GitStatus {
-            is_repo: false,
-            branch: None,
-            modified_count: 0,
-            untracked_count: 0,
-            staged_count: 0,
-            conflicted_count: 0,
-            ahead: 0,
-            behind: 0,
-            files: Vec::new(),
-        };
+pub fn inspect_github_remotes(repo_root: &std::path::Path) -> (bool, Option<String>) {
+    let output = std::process::Command::new("git")
+        .args(["remote", "-v"])
+        .current_dir(repo_root)
+        .output();
+    if let Ok(out) = output {
+        if out.status.success() {
+            let text = String::from_utf8_lossy(&out.stdout);
+            let mut has_remote = false;
+            let mut is_all_github = true;
+            let mut non_github_url = None;
+
+            for line in text.lines() {
+                let parts: Vec<&str> = line.split_whitespace().collect();
+                if parts.len() >= 2 {
+                    has_remote = true;
+                    let url = parts[1];
+                    let is_gh = url.contains("github.com") || url.contains("github.io");
+                    if !is_gh {
+                        is_all_github = false;
+                        if non_github_url.is_none() {
+                            non_github_url = Some(url.to_string());
+                        }
+                    }
+                }
+            }
+
+            if !has_remote {
+                // Local only repository without remotes is considered safe
+                return (true, None);
+            }
+
+            return (is_all_github, non_github_url);
+        }
     }
+    (true, None)
+}
+
+pub fn check_git_status(path: &str) -> GitStatus {
+    let repo_root = match resolve_repo_root(path) {
+        Some(r) => r,
+        None => {
+            return GitStatus {
+                is_repo: false,
+                branch: None,
+                modified_count: 0,
+                untracked_count: 0,
+                staged_count: 0,
+                conflicted_count: 0,
+                ahead: 0,
+                behind: 0,
+                is_github_repo: true,
+                blocked_remote: None,
+                files: Vec::new(),
+            };
+        }
+    };
+
+    let (is_github_repo, blocked_remote) = inspect_github_remotes(&repo_root);
 
     let output = std::process::Command::new("git")
-        .args(["--no-optional-locks", "status", "--porcelain", "-b"])
+        .args(["--no-optional-locks", "status", "--porcelain=v1", "-b"])
         .env("GIT_OPTIONAL_LOCKS", "0")
-        .current_dir(path)
+        .current_dir(&repo_root)
         .output();
 
     match output {
@@ -411,6 +449,7 @@ pub fn check_git_status(path_str: &str) -> GitStatus {
                         }
                     }
                 } else if line.len() >= 3 {
+                    let status_code = line[..2].to_string();
                     let status_x = line.chars().next().unwrap_or(' ');
                     let status_y = line.chars().nth(1).unwrap_or(' ');
                     let file_path = if line.len() >= 4 {
@@ -428,27 +467,28 @@ pub fn check_git_status(path_str: &str) -> GitStatus {
                         || (status_x == 'D' && status_y == 'D');
 
                     let is_untracked = status_x == '?' && status_y == '?';
-                    let is_staged = !is_untracked && !is_conflicted && status_x != ' ' && status_x != '?';
-                    let is_modified = !is_untracked && !is_conflicted && status_y != ' ';
+                    let staged = !is_untracked && !is_conflicted && status_x != ' ' && status_x != '?';
+                    let unstaged = is_untracked || (!is_conflicted && status_y != ' ');
 
                     if is_conflicted {
                         conflicted_count += 1;
                     } else if is_untracked {
                         untracked_count += 1;
                     } else {
-                        if is_staged {
+                        if staged {
                             staged_count += 1;
                         }
-                        if is_modified {
+                        if status_y != ' ' {
                             modified_count += 1;
                         }
                     }
 
                     files.push(GitFileEntry {
                         path: file_path,
-                        status_x: status_x.to_string(),
-                        status_y: status_y.to_string(),
-                        is_staged,
+                        status_code,
+                        staged,
+                        unstaged,
+                        is_untracked,
                         is_conflicted,
                     });
                 }
@@ -463,6 +503,8 @@ pub fn check_git_status(path_str: &str) -> GitStatus {
                 conflicted_count,
                 ahead,
                 behind,
+                is_github_repo,
+                blocked_remote,
                 files,
             }
         }
@@ -475,15 +517,22 @@ pub fn check_git_status(path_str: &str) -> GitStatus {
             conflicted_count: 0,
             ahead: 0,
             behind: 0,
+            is_github_repo: true,
+            blocked_remote: None,
             files: Vec::new(),
         },
     }
 }
 
+fn get_effective_repo_dir(path_str: &str) -> std::path::PathBuf {
+    resolve_repo_root(path_str).unwrap_or_else(|| std::path::PathBuf::from(path_str))
+}
+
 pub fn git_stage_file(path_str: &str, file_path: &str) -> Result<(), String> {
+    let repo_dir = get_effective_repo_dir(path_str);
     let output = std::process::Command::new("git")
         .args(["add", "--", file_path])
-        .current_dir(path_str)
+        .current_dir(&repo_dir)
         .output()
         .map_err(|e| format!("Failed to run git add: {}", e))?;
     if output.status.success() {
@@ -494,22 +543,33 @@ pub fn git_stage_file(path_str: &str, file_path: &str) -> Result<(), String> {
 }
 
 pub fn git_unstage_file(path_str: &str, file_path: &str) -> Result<(), String> {
+    let repo_dir = get_effective_repo_dir(path_str);
     let output = std::process::Command::new("git")
         .args(["restore", "--staged", "--", file_path])
-        .current_dir(path_str)
+        .current_dir(&repo_dir)
         .output()
         .map_err(|e| format!("Failed to run git restore --staged: {}", e))?;
     if output.status.success() {
         Ok(())
     } else {
-        Err(String::from_utf8_lossy(&output.stderr).to_string())
+        let fallback = std::process::Command::new("git")
+            .args(["reset", "HEAD", "--", file_path])
+            .current_dir(&repo_dir)
+            .output()
+            .map_err(|e| format!("Failed to run git reset: {}", e))?;
+        if fallback.status.success() {
+            Ok(())
+        } else {
+            Err(String::from_utf8_lossy(&output.stderr).to_string())
+        }
     }
 }
 
 pub fn git_stage_all(path_str: &str) -> Result<(), String> {
+    let repo_dir = get_effective_repo_dir(path_str);
     let output = std::process::Command::new("git")
         .args(["add", "-A"])
-        .current_dir(path_str)
+        .current_dir(&repo_dir)
         .output()
         .map_err(|e| format!("Failed to run git add -A: {}", e))?;
     if output.status.success() {
@@ -520,27 +580,38 @@ pub fn git_stage_all(path_str: &str) -> Result<(), String> {
 }
 
 pub fn git_unstage_all(path_str: &str) -> Result<(), String> {
+    let repo_dir = get_effective_repo_dir(path_str);
     let output = std::process::Command::new("git")
         .args(["restore", "--staged", "."])
-        .current_dir(path_str)
+        .current_dir(&repo_dir)
         .output()
         .map_err(|e| format!("Failed to run git restore --staged: {}", e))?;
     if output.status.success() {
         Ok(())
     } else {
-        Err(String::from_utf8_lossy(&output.stderr).to_string())
+        let fallback = std::process::Command::new("git")
+            .args(["reset", "HEAD"])
+            .current_dir(&repo_dir)
+            .output()
+            .map_err(|e| format!("Failed to run git reset: {}", e))?;
+        if fallback.status.success() {
+            Ok(())
+        } else {
+            Err(String::from_utf8_lossy(&output.stderr).to_string())
+        }
     }
 }
 
 pub fn git_discard_file(path_str: &str, file_path: &str) -> Result<(), String> {
+    let repo_dir = get_effective_repo_dir(path_str);
     let status = std::process::Command::new("git")
         .args(["status", "--porcelain", "--", file_path])
-        .current_dir(path_str)
+        .current_dir(&repo_dir)
         .output();
     if let Ok(st) = status {
         let out = String::from_utf8_lossy(&st.stdout);
         if out.starts_with("??") {
-            let p = std::path::Path::new(path_str).join(file_path);
+            let p = repo_dir.join(file_path);
             if p.is_dir() {
                 let _ = std::fs::remove_dir_all(&p);
             } else if p.is_file() {
@@ -551,14 +622,18 @@ pub fn git_discard_file(path_str: &str, file_path: &str) -> Result<(), String> {
     }
 
     let output = std::process::Command::new("git")
-        .args(["restore", "--", file_path])
-        .current_dir(path_str)
+        .args(["restore", "--worktree", "--staged", "--", file_path])
+        .current_dir(&repo_dir)
         .output()
         .map_err(|e| format!("Failed to run git restore: {}", e))?;
     if output.status.success() {
         Ok(())
     } else {
-        Err(String::from_utf8_lossy(&output.stderr).to_string())
+        let _ = std::process::Command::new("git")
+            .args(["checkout", "HEAD", "--", file_path])
+            .current_dir(&repo_dir)
+            .output();
+        Ok(())
     }
 }
 
@@ -566,9 +641,10 @@ pub fn git_commit(path_str: &str, message: &str) -> Result<String, String> {
     if message.trim().is_empty() {
         return Err("Commit message cannot be empty".to_string());
     }
+    let repo_dir = get_effective_repo_dir(path_str);
     let output = std::process::Command::new("git")
         .args(["commit", "-m", message])
-        .current_dir(path_str)
+        .current_dir(&repo_dir)
         .output()
         .map_err(|e| format!("Failed to run git commit: {}", e))?;
     if output.status.success() {
@@ -579,9 +655,10 @@ pub fn git_commit(path_str: &str, message: &str) -> Result<String, String> {
 }
 
 pub fn git_get_branches(path_str: &str) -> Result<Vec<String>, String> {
+    let repo_dir = get_effective_repo_dir(path_str);
     let output = std::process::Command::new("git")
         .args(["branch", "--list", "--format=%(refname:short)"])
-        .current_dir(path_str)
+        .current_dir(&repo_dir)
         .output()
         .map_err(|e| format!("Failed to run git branch: {}", e))?;
     if output.status.success() {
@@ -597,40 +674,43 @@ pub fn git_get_branches(path_str: &str) -> Result<Vec<String>, String> {
     }
 }
 
-pub fn git_checkout_branch(path_str: &str, branch: &str) -> Result<(), String> {
+pub fn git_checkout_branch(path_str: &str, branch: &str) -> Result<String, String> {
+    let repo_dir = get_effective_repo_dir(path_str);
     let output = std::process::Command::new("git")
         .args(["checkout", branch])
-        .current_dir(path_str)
+        .current_dir(&repo_dir)
         .output()
         .map_err(|e| format!("Failed to run git checkout: {}", e))?;
     if output.status.success() {
-        Ok(())
+        let out = String::from_utf8_lossy(&output.stdout).to_string();
+        let err = String::from_utf8_lossy(&output.stderr).to_string();
+        Ok(if !out.trim().is_empty() { out } else { err })
     } else {
         Err(String::from_utf8_lossy(&output.stderr).to_string())
     }
 }
 
-pub fn git_get_diff(path_str: &str, file_path: Option<String>, staged: bool) -> Result<String, String> {
+pub fn git_get_diff(path_str: &str, file_path: Option<&str>, staged: bool) -> Result<String, String> {
+    let repo_dir = get_effective_repo_dir(path_str);
     let mut args = vec!["diff", "--no-color"];
     if staged {
         args.push("--cached");
     }
-    if let Some(ref fp) = file_path {
+    if let Some(fp) = file_path {
         args.push("--");
-        args.push(fp.as_str());
+        args.push(fp);
     }
 
     let output = std::process::Command::new("git")
         .args(&args)
-        .current_dir(path_str)
+        .current_dir(&repo_dir)
         .output()
         .map_err(|e| format!("Failed to run git diff: {}", e))?;
     if output.status.success() {
         let diff_str = String::from_utf8_lossy(&output.stdout).to_string();
         if diff_str.is_empty() {
-            // If it's an untracked file, generate a clean synthetic addition diff
-            if let Some(ref fp) = file_path {
-                let full_p = std::path::Path::new(path_str).join(fp);
+            if let Some(fp) = file_path {
+                let full_p = repo_dir.join(fp);
                 if full_p.is_file() {
                     if let Ok(content) = std::fs::read_to_string(&full_p) {
                         let mut synthetic = format!(

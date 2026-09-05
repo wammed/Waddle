@@ -14,6 +14,8 @@ import {
   FolderOpen,
   Globe,
   AlertTriangle,
+  GitBranch,
+  ShieldCheck,
 } from 'lucide-react';
 import { AppConfig, Language, OllamaStatus } from '../types';
 import { THEMES } from '../theme';
@@ -684,6 +686,126 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+
+          {/* Git & GitHub Integration Section */}
+          <div className="settings-section">
+            <div className="section-title">
+              <GitBranch size={14} style={{ display: 'inline', marginRight: 6 }} />
+              {t.settings.gitSectionTitle}
+            </div>
+
+            {/* Git Integration Toggle */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              justifyContent: 'space-between',
+              padding: '12px 14px',
+              background: 'rgba(255, 255, 255, 0.02)',
+              border: '1px solid rgba(255, 255, 255, 0.06)',
+              borderRadius: '8px',
+              marginBottom: '10px',
+            }}>
+              <div style={{ paddingRight: '16px' }}>
+                <div style={{ fontSize: '13px', fontWeight: 600, color: '#f8fafc', marginBottom: '4px' }}>
+                  {t.settings.gitEnabledLabel}
+                </div>
+                <div style={{ fontSize: '12px', color: '#94a3b8', lineHeight: 1.5 }}>
+                  {t.settings.gitEnabledDesc}
+                </div>
+              </div>
+              <label className="toggle-switch" style={{ position: 'relative', display: 'inline-block', width: '44px', height: '24px', flexShrink: 0 }}>
+                <input
+                  type="checkbox"
+                  checked={formData.git?.enabled ?? true}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      git: {
+                        enabled: e.target.checked,
+                        restrict_to_github: formData.git?.restrict_to_github ?? true,
+                      },
+                    })
+                  }
+                  style={{ opacity: 0, width: 0, height: 0 }}
+                />
+                <span style={{
+                  position: 'absolute',
+                  cursor: 'pointer',
+                  top: 0, left: 0, right: 0, bottom: 0,
+                  backgroundColor: (formData.git?.enabled ?? true) ? 'var(--accent)' : 'rgba(255, 255, 255, 0.2)',
+                  borderRadius: '24px',
+                  transition: '0.2s',
+                }}>
+                  <span style={{
+                    position: 'absolute',
+                    height: '18px',
+                    width: '18px',
+                    left: (formData.git?.enabled ?? true) ? '23px' : '3px',
+                    bottom: '3px',
+                    backgroundColor: '#fff',
+                    borderRadius: '50%',
+                    transition: '0.2s',
+                  }} />
+                </span>
+              </label>
+            </div>
+
+            {/* GitHub Only Policy Toggle */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              justifyContent: 'space-between',
+              padding: '12px 14px',
+              background: 'rgba(255, 255, 255, 0.02)',
+              border: '1px solid rgba(255, 255, 255, 0.06)',
+              borderRadius: '8px',
+            }}>
+              <div style={{ paddingRight: '16px' }}>
+                <div style={{ fontSize: '13px', fontWeight: 600, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                  <ShieldCheck size={14} color="#38bdf8" />
+                  <span>{t.settings.githubRestrictionLabel}</span>
+                </div>
+                <div style={{ fontSize: '12px', color: '#94a3b8', lineHeight: 1.5 }}>
+                  {t.settings.githubRestrictionDesc}
+                </div>
+              </div>
+              <label className="toggle-switch" style={{ position: 'relative', display: 'inline-block', width: '44px', height: '24px', flexShrink: 0 }}>
+                <input
+                  type="checkbox"
+                  checked={formData.git?.restrict_to_github ?? true}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      git: {
+                        enabled: formData.git?.enabled ?? true,
+                        restrict_to_github: e.target.checked,
+                      },
+                    })
+                  }
+                  style={{ opacity: 0, width: 0, height: 0 }}
+                />
+                <span style={{
+                  position: 'absolute',
+                  cursor: 'pointer',
+                  top: 0, left: 0, right: 0, bottom: 0,
+                  backgroundColor: (formData.git?.restrict_to_github ?? true) ? 'var(--accent)' : 'rgba(255, 255, 255, 0.2)',
+                  borderRadius: '24px',
+                  transition: '0.2s',
+                }}>
+                  <span style={{
+                    position: 'absolute',
+                    height: '18px',
+                    width: '18px',
+                    left: (formData.git?.restrict_to_github ?? true) ? '23px' : '3px',
+                    bottom: '3px',
+                    backgroundColor: '#fff',
+                    borderRadius: '50%',
+                    transition: '0.2s',
+                  }} />
+                </span>
+              </label>
             </div>
           </div>
         </div>

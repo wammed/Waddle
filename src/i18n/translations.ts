@@ -208,6 +208,12 @@ export interface Translations {
     cancelBtn: string;
     saveBtn: string;
     savedBtn: string;
+    gitSectionTitle: string;
+    gitEnabledLabel: string;
+    gitEnabledDesc: string;
+    githubRestrictionLabel: string;
+    githubRestrictionDesc: string;
+    nonGithubRemoteWarning: (remote: string) => string;
   };
   errorBoundary: {
     fallbackTitle: string;
@@ -440,6 +446,12 @@ export const translations: Record<Language, Translations> = {
       cancelBtn: 'Cancel',
       saveBtn: 'Save Settings',
       savedBtn: 'Saved!',
+      gitSectionTitle: 'Git & GitHub Integration',
+      gitEnabledLabel: 'Enable Git Integration',
+      gitEnabledDesc: 'Monitors local repository status, enables branch switching, staging, AI commit generator, and diff viewer. When disabled, git background processes are stopped.',
+      githubRestrictionLabel: 'Restrict to GitHub Only (Policy)',
+      githubRestrictionDesc: 'Strictly restricts Git remote connections to GitHub (github.com). Connections to non-GitHub remotes such as GitLab or custom servers are blocked to protect privacy.',
+      nonGithubRemoteWarning: (remote) => `Non-GitHub remote detected (${remote}). Connections are restricted by security policy.`,
     },
     errorBoundary: {
       fallbackTitle: 'An error occurred in the component',
@@ -671,6 +683,12 @@ export const translations: Record<Language, Translations> = {
       cancelBtn: 'Cancel',
       saveBtn: 'Save Settings',
       savedBtn: 'Saved!',
+      gitSectionTitle: 'Git & GitHub Integration',
+      gitEnabledLabel: 'Enable Git Integration',
+      gitEnabledDesc: 'Monitors local repository status, enables branch switching, staging, AI commit generator, and diff viewer. When disabled, git background processes are stopped.',
+      githubRestrictionLabel: 'Restrict to GitHub Only (Policy)',
+      githubRestrictionDesc: 'Strictly restricts Git remote connections to GitHub (github.com). Connections to non-GitHub remotes such as GitLab or custom servers are blocked to protect privacy.',
+      nonGithubRemoteWarning: (remote) => `Non-GitHub remote detected (${remote}). Connections are restricted by security policy.`,
     },
     errorBoundary: {
       fallbackTitle: 'An error occurred in the component',
@@ -902,6 +920,12 @@ export const translations: Record<Language, Translations> = {
       cancelBtn: 'キャンセル',
       saveBtn: '設定を保存',
       savedBtn: '保存完了！',
+      gitSectionTitle: 'Git & GitHub 連携設定',
+      gitEnabledLabel: 'Git 連携機能の有効化',
+      gitEnabledDesc: 'ローカル Git リポジトリのステータス監視、ブランチ切替、ステージング、AI コミット生成、Diff ビューワーを有効にします。無効にすると Git 監視プロセスを完全停止し、純粋なターミナルとして動作します。',
+      githubRestrictionLabel: 'GitHub 接続限定ポリシー (推奨)',
+      githubRestrictionDesc: 'ローカル完結・GitHub特化ポリシーに基づき、Gitリモート接続先を GitHub (github.com) のみに限定します。GitLab や外部独自サーバー等の他サイトへの接続を遮断し、機密情報の流出を防止します。',
+      nonGithubRemoteWarning: (remote) => `非GitHubリモートが検出されました (${remote})。セキュリティポリシーにより外部接続が遮断されています。`,
     },
     errorBoundary: {
       fallbackTitle: 'コンポーネントでエラーが発生しました',

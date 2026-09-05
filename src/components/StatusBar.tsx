@@ -6,6 +6,7 @@ import {
   Copy,
   Sparkles,
   Layers,
+  ShieldAlert,
 } from 'lucide-react';
 import { AppConfig, GitStatus, SystemInfo } from '../types';
 import { useI18n } from '../i18n';
@@ -46,6 +47,8 @@ export const StatusBar: React.FC<StatusBarProps> = ({
     return `Ollama (${config.ai.ollama_model || 'llama3.2'})`;
   };
 
+  const isGitEnabled = config.git?.enabled !== false;
+
   return (
     <footer className="statusbar-container">
       <div className="statusbar-left">
@@ -63,7 +66,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({
           )}
         </div>
 
-        {gitStatus.is_repo && (
+        {isGitEnabled && gitStatus.is_repo && (
           <div
             className={`status-item git-badge ${isGitPopoverOpen ? 'active' : ''}`}
             onClick={onToggleGitPopover}
@@ -72,6 +75,17 @@ export const StatusBar: React.FC<StatusBarProps> = ({
           >
             <GitBranch size={13} />
             <span>{gitStatus.branch || 'HEAD'}</span>
+
+            {/* Non-GitHub Remote Restriction Badge */}
+            {config.git?.restrict_to_github !== false && gitStatus.blocked_remote && (
+              <span
+                className="git-blocked-badge"
+                title={`${t.settings.githubRestrictionDesc} (${gitStatus.blocked_remote})`}
+              >
+                <ShieldAlert size={11} />
+                <span>Blocked</span>
+              </span>
+            )}
 
             {/* Ahead / Behind Remote */}
             {((gitStatus.ahead ?? 0) > 0 || (gitStatus.behind ?? 0) > 0) && (

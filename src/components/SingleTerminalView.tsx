@@ -6,7 +6,7 @@ import { CanvasAddon } from '@xterm/addon-canvas';
 import { SearchAddon } from '@xterm/addon-search';
 import { Maximize2, Minimize2, X, GitBranch, Search, ChevronUp, ChevronDown } from 'lucide-react';
 import { THEMES } from '../theme';
-import { AppConfig, TerminalPaneInfo } from '../types';
+import { AppConfig, TerminalPaneInfo, GitStatus } from '../types';
 import { TauriApi } from '../services/tauriApi';
 import { useI18n } from '../i18n';
 
@@ -259,7 +259,19 @@ export const SingleTerminalView: React.FC<SingleTerminalViewProps> = ({
       try {
         const cwd = await TauriApi.getSessionCwd(pane.sessionId);
         if (cwd) {
-          const gitStatus = await TauriApi.getGitStatus(cwd);
+          let gitStatus: GitStatus = {
+            is_repo: false,
+            modified_count: 0,
+            untracked_count: 0,
+            staged_count: 0,
+            conflicted_count: 0,
+            ahead: 0,
+            behind: 0,
+            files: [],
+          };
+          if (config.git?.enabled !== false) {
+            gitStatus = await TauriApi.getGitStatus(cwd);
+          }
           const parts = cwd.split('/').filter(Boolean);
           const folderName = parts[parts.length - 1] || '/';
           onUpdatePaneRef.current({

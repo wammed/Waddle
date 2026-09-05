@@ -13,6 +13,8 @@ import {
   RefreshCw,
   X,
   ChevronDown,
+  ShieldAlert,
+  ShieldCheck,
 } from 'lucide-react';
 import { GitStatus } from '../types';
 import { TauriApi } from '../services/tauriApi';
@@ -275,6 +277,11 @@ export const GitQuickPopover: React.FC<GitQuickPopoverProps> = ({
             </span>
           )}
 
+          <span className="git-policy-pill" title={t.settings.githubRestrictionDesc}>
+            <ShieldCheck size={11} color="var(--accent)" />
+            <span>GitHub</span>
+          </span>
+
           <button
             className="icon-btn-subtle"
             onClick={onRefreshGit}
@@ -287,6 +294,16 @@ export const GitQuickPopover: React.FC<GitQuickPopoverProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Non-GitHub Remote Restriction Warning */}
+      {gitStatus.blocked_remote && (
+        <div className="git-popover-alert-conflict">
+          <ShieldAlert size={14} color="#f43f5e" />
+          <span>
+            {t.settings.nonGithubRemoteWarning(gitStatus.blocked_remote)}
+          </span>
+        </div>
+      )}
 
       {/* Merge Conflict Banner */}
       {(gitStatus.conflicted_count ?? 0) > 0 && (

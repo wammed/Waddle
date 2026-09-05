@@ -26,10 +26,16 @@ export interface GeneralConfig {
   language: Language;
 }
 
+export interface GitConfig {
+  enabled: boolean;
+  restrict_to_github: boolean;
+}
+
 export interface AppConfig {
   general?: GeneralConfig;
   ai: AiConfig;
   terminal: TerminalConfig;
+  git?: GitConfig;
 }
 
 export interface OllamaStatus {
@@ -64,6 +70,8 @@ export interface GitStatus {
   untracked_count: number;
   staged_count?: number;
   conflicted_count?: number;
+  is_github_repo?: boolean;
+  blocked_remote?: string;
   files?: GitFileEntry[];
 }
 

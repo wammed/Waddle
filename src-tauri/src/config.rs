@@ -87,12 +87,39 @@ impl Default for GeneralConfig {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct GitIntegrationConfig {
+    #[serde(default = "default_git_enabled")]
+    pub enabled: bool,
+    #[serde(default = "default_restrict_to_github")]
+    pub restrict_to_github: bool,
+}
+
+fn default_git_enabled() -> bool {
+    true
+}
+
+fn default_restrict_to_github() -> bool {
+    true
+}
+
+impl Default for GitIntegrationConfig {
+    fn default() -> Self {
+        Self {
+            enabled: default_git_enabled(),
+            restrict_to_github: default_restrict_to_github(),
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct AppConfig {
     #[serde(default)]
     pub general: GeneralConfig,
     pub ai: AiConfig,
     pub terminal: TerminalConfig,
+    #[serde(default)]
+    pub git: GitIntegrationConfig,
 }
 
 pub struct ConfigManager {
@@ -321,5 +348,36 @@ mod tests {
 
         let cfg: AppConfig = serde_json::from_str(json_without_general).unwrap();
         assert_eq!(cfg.general.language, "en-US");
+        assert!(cfg.git.enabled);
+        assert!(cfg.git.restrict_to_github);
+    }
+
+    #[test]
+    fn test_git_config_custom() {
+        let json_custom_git = r#"{
+            "ai": {
+                "provider": "ollama",
+                "ollama_endpoint": "http://localhost:11434",
+                "ollama_model": "llama3.2",
+                "temperature": 0.2
+            },
+            "terminal": {
+                "font_family": "monospace",
+                "font_size": 14,
+                "theme": "waddle_dark",
+                "cursor_style": "block",
+                "cursor_blink": true,
+                "opacity": 0.95,
+                "scrollback": 10000
+            },
+            "git": {
+                "enabled": false,
+                "restrict_to_github": false
+            }
+        }"#;
+
+        let cfg: AppConfig = serde_json::from_str(json_custom_git).unwrap();
+        assert!(!cfg.git.enabled);
+        assert!(!cfg.git.restrict_to_github);
     }
 }

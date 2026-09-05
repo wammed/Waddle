@@ -42,6 +42,10 @@ const DEFAULT_CONFIG: AppConfig = {
     background_opacity: 0.85,
     background_blur: 0,
   },
+  git: {
+    enabled: true,
+    restrict_to_github: true,
+  },
 };
 
 const getCachedConfig = (): AppConfig => {
@@ -120,6 +124,7 @@ export function App() {
 
   // Git status refresh handler
   const handleRefreshGitStatus = useCallback(async () => {
+    if (config.git?.enabled === false) return;
     const targetPane = activePane || activeTab?.panes[0];
     const cwd = targetPane?.cwd || activeTab?.cwd;
     if (!cwd || !targetPane || !activeTabId) return;
@@ -129,7 +134,7 @@ export function App() {
     } catch {
       // ignore
     }
-  }, [activePane, activeTab, activeTabId, updatePane]);
+  }, [activePane, activeTab, activeTabId, updatePane, config.git?.enabled]);
 
   // Global Keyboard Shortcuts hook
   useGlobalShortcuts({
@@ -264,7 +269,11 @@ export function App() {
             isOpen={isFileTreeOpen}
             onClose={() => setIsFileTreeOpen(false)}
             cwd={activePane?.cwd || activeTab?.cwd || '/'}
-            gitStatus={activePane?.gitStatus || activeTab?.gitStatus}
+            gitStatus={
+              config.git?.enabled !== false
+                ? activePane?.gitStatus || activeTab?.gitStatus
+                : undefined
+            }
             onOpenFile={(filePath) => {
               setTargetEditorFile(filePath);
               setIsEditorOpen(true);
@@ -410,7 +419,7 @@ export function App() {
       />
 
       {/* Git Quick Popover */}
-      {isGitPopoverOpen && (
+      {isGitPopoverOpen && config.git?.enabled !== false && (
         <GitQuickPopover
           isOpen={isGitPopoverOpen}
           onClose={() => setIsGitPopoverOpen(false)}

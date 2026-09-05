@@ -84,58 +84,58 @@ fn get_git_status(path: String) -> GitStatus {
 }
 
 #[tauri::command]
-fn git_stage_file(path: String, file_path: String) -> Result<(), String> {
-    pty::git_stage_file(&path, &file_path)
+fn git_stage_file(repo_path: String, file_path: String) -> Result<(), String> {
+    pty::git_stage_file(&repo_path, &file_path)
 }
 
 #[tauri::command]
-fn git_unstage_file(path: String, file_path: String) -> Result<(), String> {
-    pty::git_unstage_file(&path, &file_path)
+fn git_unstage_file(repo_path: String, file_path: String) -> Result<(), String> {
+    pty::git_unstage_file(&repo_path, &file_path)
 }
 
 #[tauri::command]
-fn git_stage_all(path: String) -> Result<(), String> {
-    pty::git_stage_all(&path)
+fn git_stage_all(repo_path: String) -> Result<(), String> {
+    pty::git_stage_all(&repo_path)
 }
 
 #[tauri::command]
-fn git_unstage_all(path: String) -> Result<(), String> {
-    pty::git_unstage_all(&path)
+fn git_unstage_all(repo_path: String) -> Result<(), String> {
+    pty::git_unstage_all(&repo_path)
 }
 
 #[tauri::command]
-fn git_discard_file(path: String, file_path: String) -> Result<(), String> {
-    pty::git_discard_file(&path, &file_path)
+fn git_discard_file(repo_path: String, file_path: String) -> Result<(), String> {
+    pty::git_discard_file(&repo_path, &file_path)
 }
 
 #[tauri::command]
-fn git_commit(path: String, message: String) -> Result<String, String> {
-    pty::git_commit(&path, &message)
+fn git_commit(repo_path: String, message: String) -> Result<String, String> {
+    pty::git_commit(&repo_path, &message)
 }
 
 #[tauri::command]
-fn git_get_branches(path: String) -> Result<Vec<String>, String> {
-    pty::git_get_branches(&path)
+fn git_get_branches(repo_path: String) -> Result<Vec<String>, String> {
+    pty::git_get_branches(&repo_path)
 }
 
 #[tauri::command]
-fn git_checkout_branch(path: String, branch: String) -> Result<(), String> {
-    pty::git_checkout_branch(&path, &branch)
+fn git_checkout_branch(repo_path: String, branch: String) -> Result<String, String> {
+    pty::git_checkout_branch(&repo_path, &branch)
 }
 
 #[tauri::command]
-fn git_get_diff(path: String, file_path: Option<String>, staged: bool) -> Result<String, String> {
-    pty::git_get_diff(&path, file_path, staged)
+fn git_get_diff(repo_path: String, file_path: Option<String>, staged: bool) -> Result<String, String> {
+    pty::git_get_diff(&repo_path, file_path.as_deref(), staged)
 }
 
 #[tauri::command]
 async fn git_generate_commit_message(
     state: State<'_, AppState>,
-    path: String,
+    repo_path: String,
 ) -> Result<String, String> {
-    let diff = pty::git_get_diff(&path, None, true)?;
+    let diff = pty::git_get_diff(&repo_path, None, true)?;
     let target_diff = if diff.trim().is_empty() {
-        pty::git_get_diff(&path, None, false)?
+        pty::git_get_diff(&repo_path, None, false)?
     } else {
         diff
     };
@@ -772,5 +772,23 @@ mod tests {
 
         // Normal files should be allowed
         assert!(validate_safe_read(Path::new("/tmp/some_script.py")).is_ok());
+    }
+
+    #[test]
+    fn test_git_repo_root_and_github_remotes() {
+        // The current working directory is inside a git repo (Waddle)
+        let curr_dir = std::env::current_dir().unwrap();
+        let root = pty::resolve_repo_root(&curr_dir.to_string_lossy());
+        assert!(root.is_some(), "Current dir should be inside a git repo");
+
+        let repo_root = root.unwrap();
+        let (is_gh, blocked) = pty::inspect_github_remotes(&repo_root);
+        // In Waddle repository, remote points to GitHub (https://github.com/wammed/Waddle.git)
+        assert!(is_gh, "Waddle remote should be recognized as GitHub");
+        assert!(blocked.is_none(), "No non-GitHub remote should be blocked in Waddle");
+
+        let status = pty::check_git_status(&curr_dir.to_string_lossy());
+        assert!(status.is_repo);
+        assert!(status.is_github_repo);
     }
 }
