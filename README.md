@@ -57,8 +57,9 @@
 - Press `Enter` to insert into the terminal, or `Ctrl + Enter` to execute immediately.
 
 ### 2. 🖼️ Custom Background Wallpapers & Native File Picker (`Ctrl + ,`)
-- **Native OS File Dialog**: Browse and pick any local image (PNG, JPG, SVG, WebP, GIF, BMP) directly using the Linux native file chooser (`zenity` / `kdialog`).
-- **Optimized Asset Protocol & Dedicated Storage**: Images are saved and loaded directly from `~/.config/waddle/wallpapers/` using Tauri v2's secure `protocol-asset`, keeping `config.json` featherlight (~480 bytes).
+- **Native OS File Dialog**: Browse and pick any local image (PNG, JPG, SVG, WebP, GIF, BMP) directly from your pictures or filesystem using the Linux native file chooser (`zenity` / `kdialog`).
+- **Binary Header & Magic Byte Validation**: Uploaded wallpapers are strictly verified against image magic bytes (PNG, JPEG, WebP, GIF, BMP, SVG) and allowed extensions, blocking disguised scripts or malicious binaries.
+- **Optimized Asset Protocol & Dedicated Storage**: Images are saved and loaded directly from `~/.config/waddle/wallpapers/` using Tauri v2's secure `protocol-asset`, keeping `config.json` featherlight (~480 bytes) with automatic migration from legacy Base64.
 - **Sub-Millisecond 0ms Startup**: Asynchronous image decoding (`decoding="async"`) off the main thread with GPU hardware isolation (`contain: strict`) ensures instantaneous terminal launch even with 4K wallpapers.
 - **Opacity & Blur Controls**: Real-time slider adjustments for image opacity (10%–100%) and frosted glass blur (0–20px) with automatic contrast overlay for crystal-clear terminal text readability.
 
@@ -70,7 +71,7 @@
 ### 4. 📝 Embedded Lightweight Editor & AI Code Assistant (`Ctrl + E`)
 - Seamlessly toggle a side-by-side code editor right inside your terminal.
 - **Quick Open & Save**: Browse files in the current working directory, open by path, and save changes (`Ctrl + S`).
-- **Run in Terminal**: Send scripts (Python, Bash, JS/TS, Rust, etc.) directly into the active shell with one click.
+- **Run in Terminal with Safety Interception**: Send scripts (Python, Bash, JS/TS, Rust, or raw buffer) directly into the active shell with one click. If the script contains dangerous operations, it is intercepted by `DangerousCommandModal` before execution.
 - **AI Edit (`Ctrl + Shift + K`)**: Instruct Ollama to refactor, add error handling, or generate code directly inside the editor.
 
 ### 5. 🪟 Flexible Multi-Pane Split (2, 3, 4 Panes & 10 Selectable Layouts)
@@ -116,11 +117,29 @@
 - **Live Preview & Persistence**: Switching languages instantly updates all dialogs, toolbars, error banners, and copilot prompts, and persists across restarts in `~/.config/waddle/config.json`.
 - **Sensible Default**: Defaults to English (`en-US`) for international Linux users while providing full native Japanese support.
 
-### 12. 🛡️ Hardened Security & AI Safety Guardrails
-- **Tauri Strict CSP & Asset Isolation**: Strict Content Security Policy blocks unauthorized external network calls and script injection. The custom asset protocol is scoped strictly to wallpapers, pictures, and downloads, completely blocking renderer access to sensitive files (`~/.ssh`, `~/.gnupg`, etc.).
-- **Prompt Injection Defense**: Terminal output passed to AI is length-capped and isolated inside `<untrusted_terminal_output>` delimiters, accompanied by explicit system prompt guardrails that prevent LLMs from following embedded prompt injection payloads.
-- **Dangerous Command Interception (`DangerousCommandModal`)**: Deterministic Rust & React keyword detection flags destructive commands (`rm`, `dd`, `mkfs`, `sudo`, `> /dev/`, `chmod -R`, `curl | sh`, etc.) and presents a warning modal with safe terminal insertion rather than blind execution.
-- **Protected File Operations**: Rust file handlers strictly prevent accidental or malicious deletion of root (`/`), the user's home directory (`$HOME`), or critical system paths (`/etc`, `/usr`, `/bin`).
+### 12. 🛡️ Hardened Multi-Layer Security & AI Safety Guardrails
+- **Protected File Operations & Guardrails**:
+  - **Prefix-Matched System Deletion Guard**: System directory protection (`/etc`, `/usr`, `/bin`, `/sbin`, `/boot`, `/lib`, `/sys`, `/proc`, `/dev`, `/root`, `/run`) uses prefix matching (`canonical.starts_with(sys_path)`), blocking deletion of subdirectories and files like `/etc/nginx` or `/usr/bin/local`.
+  - **Sensitive User Credential Protection**: Completely blocks reading, writing, and deletion of user secrets, including SSH private keys (`id_rsa`, `id_ed25519`, `id_ecdsa`, `id_dsa`), GPG private keys (`~/.gnupg/private-keys-v1.d`), and system keyrings (`~/.local/share/keyrings`). Prevents deletion of `~/.config` root directory.
+  - **Safe Write Validation**: `create_file` and `write_file` enforce canonical path validation before writing, preventing system file overwrite or persistence exploits.
+  - **Advance Path Verification**: Performs path validation before existence checks to eliminate file probing and information leakage.
+- **AI Indirect Prompt Injection Defense**:
+  - Delimiter escaping: XML tags (`<untrusted_terminal_output>` and `</untrusted_terminal_output>`) within terminal output are sanitized and escaped, neutralizing tag breakout attacks.
+  - Context sanitization: Git branch names, recent commands, and CWD inputs are sanitized to strip control characters and prompt breakout delimiters.
+- **Comprehensive Dangerous Command Interception (`DangerousCommandModal`)**:
+  - Synchronized deterministic keyword matching across Rust backend and React frontend.
+  - Detects destructive operations:
+    - Filesystem deletion: `rm`, `rmdir`, `find -delete`, `find -exec rm`, `truncate -s 0`, `shutil.rmtree`
+    - Destructive Git operations: `git clean -f`, `git clean -fdx`, `git reset --hard`, `git push --force`
+    - Process substitution & dynamic eval: `bash <(`, `sh <(`, `zsh <(`, `eval "$(`
+    - Partition & disk tools: `mkfs`, `dd if=`, `fdisk`, `parted`, `gdisk`, `wipefs`, `shred`
+    - Dangerous redirections & permissions: `> /dev/`, `> /etc/`, `> /boot/`, `chmod -R`, `chmod 777`, `chown -R`
+    - System halt & fork bombs: `reboot`, `shutdown`, `poweroff`, `init 0`, `init 6`, `:(){ :|:& };:`
+  - Prompts users with an interactive modal: "Confirm and Execute", "Safe Insert into Terminal (without Enter)", or "Cancel".
+- **Editor Execution Protection**: Running scripts from the embedded editor (`Ctrl + E` -> Run) checks for dangerous commands, preventing blind execution of untrusted scripts.
+- **Scoped Asset Protocol**: Tauri `assetProtocol.scope` is restricted to `$CONFIG/waddle/**/*`, `$PICTURE/**/*`, and `$DOWNLOAD/**/*`. Broad `$CONFIG/**/*` access is completely removed, protecting browser cookies, Slack/GitHub tokens, and application secrets in `~/.config`.
+- **Wallpaper Binary Header Verification**: Uploaded images are validated against magic header bytes (PNG, JPEG, WebP, GIF, BMP, SVG), preventing disguised scripts or binary uploads.
+- **Remote Ollama Warning Banner**: Real-time warning badge in Settings alerts users when an external/remote Ollama endpoint is configured, advising on network data transmission risks.
 - **Subprocess Hardening**: Background Git status polling executes with `--no-optional-locks` and `GIT_OPTIONAL_LOCKS=0` to prevent repository lock collisions, and native file pickers prioritize trusted `/usr/bin/` paths.
 
 ---
@@ -154,25 +173,25 @@
 
 ```mermaid
 graph TD
-    subgraph UI_Layer [Frontend: Tauri 2.0 Webview / React 19 + TypeScript]
-        TermView[Terminal View: xterm.js + WebLinks + Fit + Transparency]
-        WallLayer[Wallpaper Layer: Custom Image + Blur + Opacity Overlay]
-        Editor[Embedded Editor: Quick Open + Run in Terminal]
-        AIOverlay[AI Command Modal Ctrl+K / Smart Error Banner]
-        Copilot[AI Copilot Sidebar: Context-Aware Chat]
-        Settings[Settings Modal: Ollama Model & Wallpaper & Fonts]
+    subgraph UI_Layer ["Frontend: Tauri 2.0 Webview / React 19 + TypeScript"]
+        TermView["Terminal View: xterm.js + WebLinks + Fit + Transparency"]
+        WallLayer["Wallpaper Layer: Custom Image + Blur + Opacity Overlay"]
+        Editor["Embedded Editor: Quick Open + Run in Terminal"]
+        AIOverlay["AI Command Modal Ctrl+K / Smart Error Banner"]
+        Copilot["AI Copilot Sidebar: Context-Aware Chat"]
+        Settings["Settings Modal: Ollama Model & Wallpaper & Fonts"]
     end
 
-    subgraph Rust_Backend [Backend: Rust + Tauri Core]
-        PtyMgr[PTY Manager: portable-pty + /proc/PID/cwd]
-        AiCore[Ollama Client: Streaming / Tags / Generate]
-        FileIO[File System: Read / Write / List]
-        ConfigMgr[Config Manager: ~/.config/waddle/config.json]
+    subgraph Rust_Backend ["Backend: Rust + Tauri Core"]
+        PtyMgr["PTY Manager: portable-pty + /proc/PID/cwd"]
+        AiCore["Ollama Client: Streaming / Tags / Generate"]
+        FileIO["File System: Read / Write / List"]
+        ConfigMgr["Config Manager: ~/.config/waddle/config.json"]
     end
 
-    subgraph System_Layer [Local Linux Environment]
-        Shell[Linux Shell: /bin/bash, zsh, fish]
-        Ollama[Local Ollama: http://localhost:11434]
+    subgraph System_Layer ["Local Linux Environment"]
+        Shell["Linux Shell: /bin/bash, zsh, fish"]
+        Ollama["Local Ollama: http://localhost:11434"]
     end
 
     TermView <-->|Tauri IPC Events| PtyMgr
@@ -238,7 +257,7 @@ sudo pacman -U src-tauri/target/release/bundle/pacman/waddle-0.1.0-1-x86_64.pkg.
 ```
 
 ### Output Artifacts:
-- **Arch Linux Pacman Package (~6.9 MB)**: `src-tauri/target/release/bundle/pacman/waddle-0.1.0-1-x86_64.pkg.tar.zst`
+- **Arch Linux Pacman Package (~7.9 MB)**: `src-tauri/target/release/bundle/pacman/waddle-0.1.0-1-x86_64.pkg.tar.zst`
 - **Standalone Binary (~18 MB)**: `src-tauri/target/release/waddle`
 - **PKGBUILD**: Included at repository root for `makepkg -si` support
 
@@ -262,12 +281,14 @@ sudo pacman -U src-tauri/target/release/bundle/pacman/waddle-0.1.0-1-x86_64.pkg.
 
 - **100% Offline & Local**: No telemetry, no third-party cloud API keys, and no command/log transmissions over the internet.
 - **Complete Data Sovereignty**: Safe to use in enterprise, air-gapped, or sensitive internal networks.
-- **Hardened Defense-in-Depth Architecture**:
+- **Multi-Layer Defense-in-Depth Architecture**:
   - **Strict Content Security Policy (CSP)**: Blocks unauthorized external network calls and arbitrary script injections into the Webview.
-  - **Scoped Asset Protocol**: Confines custom asset loading to wallpaper and picture folders, strictly denying access to sensitive user files (`~/.ssh`, `~/.gnupg`, etc.).
-  - **Indirect Prompt Injection Shield**: Isolates terminal output into untrusted blocks with token limits to neutralize malicious log payloads.
-  - **Dangerous Command Interception**: Intercepts destructive actions (`rm -rf`, disk wipes, partition changes, elevated scripts) with interactive confirmation modals.
-  - **Filesystem Deletion Protection**: Core Rust handlers block deletion of root (`/`), `$HOME`, and essential system paths.
+  - **Scoped Asset Protocol**: Confines custom asset loading to `$CONFIG/waddle/**/*` and user pictures/downloads, shielding sensitive configuration files and cookies in `~/.config`.
+  - **Protected File Operations**: Rust handlers enforce prefix matching to protect all system directories (`/etc`, `/usr`, `/bin`, etc.) and block reading/writing/deletion of credential stores (`~/.ssh`, `~/.gnupg`, keyrings).
+  - **Indirect Prompt Injection Shield**: Delimiter escaping (`</untrusted_terminal_output>`) and system prompt guardrails neutralize malicious log payloads.
+  - **Dangerous Command Interception**: Intercepts destructive actions (`rm -rf`, `git clean -fdx`, `git reset --hard`, process substitutions, disk tools) across both terminal and editor.
+  - **Wallpaper Integrity Validation**: Magic byte checks ensure only genuine image files are stored.
+  - **Remote Endpoint Warning**: Alerts users when a non-localhost Ollama endpoint is configured.
 
 ---
 

@@ -58,7 +58,8 @@
 
 ### 2. 🖼️ 背景画像・壁紙の自由なカスタマイズ & ネイティブピッカー (`Ctrl + ,`)
 - **OS ネイティブファイル選択**: 「📁 参照...」ボタンから Linux デスクトップ標準のファイル選択ダイアログ（`zenity` / `kdialog`）が直接起動し、PC 内の任意の画像（PNG, JPG, SVG, WebP, GIF, BMP）を迷わず選択・適用可能。
-- **軽量ストレージ & アセットプロトコル**: 画像は Base64 ではなく `~/.config/waddle/wallpapers/` へ独立保存され、Tauri v2 のセキュアな `protocol-asset` 経由で直接ロード。設定ファイル `config.json` は常に数十〜数百バイトの超軽量を維持します。
+- **画像マジックバイト & 拡張子検証**: アップロードされた画像は先頭ヘッダーバイト（PNG, JPEG, WebP, GIF, BMP, SVG）とホワイトリスト拡張子を厳格に検証し、悪意あるシェルスクリプトやバイナリの偽装保存を遮断。
+- **軽量ストレージ & アセットプロトコル**: 画像は Base64 ではなく `~/.config/waddle/wallpapers/` へ独立保存され、Tauri v2 のセキュアな `protocol-asset` 経由で直接ロード（旧バージョンの Base64 形式からの自動移行機能付き）。設定ファイル `config.json` は常に数十〜数百バイトの超軽量を維持します。
 - **起動遅延ゼロ（非同期デコード & GPU 隔離）**: 画像デコードをバックグラウンドスレッドで非同期処理（`decoding="async"`）し、CSS の GPU レイヤー分離（`contain: strict`）を行うことで、高解像度 4K 壁紙を設定していてもターミナルが **0ms で即座に起動** します。
 - **透過度 & すりガラスぼかし調整**: 画像不透明度（10%〜100%）とぼかし（0〜20px）をスライダーで直感的に調整。ターミナル文字のコントラストを維持するダークオーバーレイも完備。
 
@@ -70,7 +71,7 @@
 ### 4. 📝 簡易内蔵エディタ & AI コード支援 (`Ctrl + E`)
 - ターミナルとシームレスに切り替えられるスライドイン型コードエディタを内蔵。
 - **クイックオープン & 保存**: カレントディレクトリのファイル一覧表示、ファイル名での直接オープン、`Ctrl + S` による保存。
-- **Run in Terminal**: ワンクリックで開いているスクリプト（Python, Bash, JS/TS, Rust 等）をアクティブなターミナルで実行。
+- **安全確認付き Run in Terminal**: ワンクリックで開いているスクリプト（Python, Bash, JS/TS, Rust 等）やバッファ内容をアクティブなターミナルで実行。破壊的コマンドが含まれる場合は、実行前に `DangerousCommandModal` が自動でインターセプトし、誤爆を防止。
 - **AI リファクタリング (`Ctrl + Shift + K`)**: エディタ内のコードに対して、ローカル AI に修正・機能追加・エラーハンドリングの挿入を直接指示可能。
 
 ### 5. 🪟 柔軟なマルチペイン分割（2・3・4分割 & 10種類の選択可能レイアウト）
@@ -126,11 +127,28 @@
 - **リアルタイム反映 & 設定の永続化**: 言語を選択すると設定画面を含め、タイトルバー、ファイルツリー、エディタ、AIモーダル、エラーバナーが即座に切り替わり、`~/.config/waddle/config.json` に安全に保存されます。
 - **世界水準の英語デフォルト**: 初回起動時や新規インストール時は国際標準の英語（`en-US`）がデフォルト設定として適用され、英語圏・日本国内のどちらの開発者にも最適化されています。
 
-### 12. 🛡️ 包括的なセキュリティ堅牢化 & AI ガードレール
-- **厳格な Tauri CSP とアセット分離**: 厳格な Content Security Policy により Webview からの不正な外部通信やスクリプト注入を遮断。またカスタムアセットプロトコル（`assetProtocol`）のスコープを壁紙・画像ディレクトリ等に限定し、`~/.ssh` や `~/.gnupg` などの機密ファイルへのアクセスを完全に防止。
-- **間接的プロンプトインジェクション対策**: AI に渡す端末出力をサニタイズ・文字数制限（1,500〜2,000文字）し、`<untrusted_terminal_output>` タグで隔離。タグ内の指示やロール変更に従わないプロンプトガードレールを明記。
-- **危険コマンドの事前検知 & 確認モーダル (`DangerousCommandModal`)**: 破壊的・高権限コマンド（`rm`, `dd`, `mkfs`, `sudo`, `> /dev/`, `chmod -R`, `curl | sh` 等）をバックエンドとフロントエンドで確実に検出し、ワンクリックでの誤実行を防止。安全な「端末に入力のみ行う（Enterは手動）」または「確認して実行」を選択可能。
-- **重要ファイル削除の保護ガード**: Rust 側のファイル操作処理に安全バリデーションを実装し、ルートディレクトリ（`/`）、ユーザーホームディレクトリ（`$HOME`）、システム主要パス（`/etc`, `/usr`, `/bin` 等）の削除要求を確実に拒否。
+### 12. 🛡️ 包括的な多層防御セキュリティ & AI ガードレール
+- **ファイルシステム操作の保護ガードレール**:
+  - **前方一致によるシステム領域保護**: `/etc`, `/usr`, `/bin`, `/sbin`, `/boot`, `/lib`, `/sys`, `/proc`, `/dev`, `/root`, `/run` などのシステム重要領域配下の全ファイル・サブディレクトリの削除および書き込みを前方一致（`starts_with`）で確実に遮断。
+  - **ユーザー重要資格情報の保護**: SSH 秘密鍵（`id_rsa`, `id_ed25519`, `id_ecdsa`, `id_dsa`）の読み出しを遮断し、`~/.ssh`, `~/.gnupg`, `~/.local/share/keyrings` への直接書き込み・削除を禁止。設定ルート（`~/.config` 自体）の削除も防止。
+  - **先行バリデーション**: ファイルの存在確認を行う前にセキュリティ検証を実施し、ファイル探索や情報漏洩を防御。
+- **間接的プロンプトインジェクション対策**:
+  - タグ文字エスケープ: AI に渡す端末出力内の `<untrusted_terminal_output>` および `</untrusted_terminal_output>` を無害化置換し、プロンプト脱出攻撃を完全に遮断。
+  - メタデータのサニタイズ: Git ブランチ名、直前のコマンド、CWD に含まれる制御文字やタグ文字を自動サニタイズ。
+- **危険コマンドの事前検知 & 確認モーダル (`DangerousCommandModal`)**:
+  - Rust バックエンドと React フロントエンドで判定パターンを完全同期。
+  - 検知対象:
+    - ファイル削除・切り詰め: `rm`, `rmdir`, `find -delete`, `find -exec rm`, `truncate -s 0`, `shutil.rmtree`
+    - 破壊的 Git 操作: `git clean -f`, `git clean -fdx`, `git reset --hard`, `git push --force`
+    - プロセス置換・eval: `bash <(`, `sh <(`, `zsh <(`, `eval "$(`
+    - ディスク・パーティション操作: `mkfs`, `dd if=`, `fdisk`, `parted`, `gdisk`, `wipefs`, `shred`
+    - 危険なリダイレクト・権限変更: `> /dev/`, `> /etc/`, `> /boot/`, `chmod -R`, `chmod 777`, `chown -R`
+    - システム停止・フォークボム: `reboot`, `shutdown`, `poweroff`, `init 0`, `init 6`, `:(){ :|:& };:`
+  - 警告モーダルから「確認して実行」「安全に入力のみ（Enterは手動）」「キャンセル」を選択可能。
+- **エディタ実行保護**: 内蔵エディタからの実行時にも同一の危険コマンド検知が働き、不用意な破壊的操作を防止。
+- **アセットプロトコルの最小権限化**: Tauri の `assetProtocol.scope` を `$CONFIG/waddle/**/*`、`$PICTURE/**/*`、`$DOWNLOAD/**/*` に厳密限定。`$CONFIG/**/*` への広大なアクセス権を撤廃し、ブラウザのクッキーや各社 CLI トークン（`gh` 等）へのアクセスを遮断。
+- **壁紙バイナリヘッダー検証**: 先頭マジックバイトを検査し、画像形式（PNG, JPEG, WebP, GIF, BMP, SVG）以外の実行ファイルやスクリプトの保存を拒否。
+- **リモート Ollama 警告バナー**: 設定画面で `localhost` 以外の外部エンドポイントが指定された際、外部ネットワークへのデータ送信リスクを促すアンバー警告バナーを即時表示。
 - **バックグラウンドプロセスの安全化**: Git 状態取得時に `--no-optional-locks` および `GIT_OPTIONAL_LOCKS=0` を指定してリポジトリのインデックスロック競合を防ぎ、ファイルダイアログ起動では `/usr/bin/` の絶対パスを優先検証。
 
 ---
@@ -164,25 +182,25 @@
 
 ```mermaid
 graph TD
-    subgraph UI_Layer [フロントエンド: Tauri 2.0 Webview / React 19 + TypeScript]
-        TermView[ターミナル画面: xterm.js + WebLinks + Fit + 透過レンダリング]
-        WallLayer[壁紙レイヤー: カスタム画像 + ぼかし + 透過度オーバーレイ]
-        Editor[内蔵エディタ: ファイルオープン + ターミナル実行]
-        AIOverlay[AI コマンドモーダル Ctrl+K / スマートエラーバナー]
-        Copilot[AI Copilot サイドバー: コンテキスト認識チャット]
-        Settings[設定モーダル: Ollama モデル自動検出 & 壁紙 & フォント]
+    subgraph UI_Layer ["フロントエンド: Tauri 2.0 Webview / React 19 + TypeScript"]
+        TermView["ターミナル画面: xterm.js + WebLinks + Fit + 透過レンダリング"]
+        WallLayer["壁紙レイヤー: カスタム画像 + ぼかし + 透過度オーバーレイ"]
+        Editor["内蔵エディタ: ファイルオープン + ターミナル実行"]
+        AIOverlay["AI コマンドモーダル Ctrl+K / スマートエラーバナー"]
+        Copilot["AI Copilot サイドバー: コンテキスト認識チャット"]
+        Settings["設定モーダル: Ollama モデル自動検出 & 壁紙 & フォント"]
     end
 
-    subgraph Rust_Backend [バックエンド: Rust + Tauri Core]
-        PtyMgr[PTY マネージャー: portable-pty + /proc/PID/cwd]
-        AiCore[Ollama クライアント: ストリーミング / モデル取得 / 生成]
-        FileIO[ファイルシステム: 読込 / 保存 / 一覧]
-        ConfigMgr[設定管理: ~/.config/waddle/config.json]
+    subgraph Rust_Backend ["バックエンド: Rust + Tauri Core"]
+        PtyMgr["PTY マネージャー: portable-pty + /proc/PID/cwd"]
+        AiCore["Ollama クライアント: ストリーミング / モデル取得 / 生成"]
+        FileIO["ファイルシステム: 読込 / 保存 / 一覧"]
+        ConfigMgr["設定管理: ~/.config/waddle/config.json"]
     end
 
-    subgraph System_Layer [ローカル Linux 環境]
-        Shell[Linux シェル: /bin/bash, zsh, fish]
-        Ollama[ローカル Ollama: http://localhost:11434]
+    subgraph System_Layer ["ローカル Linux 環境"]
+        Shell["Linux シェル: /bin/bash, zsh, fish"]
+        Ollama["ローカル Ollama: http://localhost:11434"]
     end
 
     TermView <-->|Tauri IPC イベント| PtyMgr
@@ -248,7 +266,7 @@ sudo pacman -U src-tauri/target/release/bundle/pacman/waddle-0.1.0-1-x86_64.pkg.
 ```
 
 ### 生成される成果物:
-- **Arch Linux Pacman パッケージ (~6.9 MB)**: `src-tauri/target/release/bundle/pacman/waddle-0.1.0-1-x86_64.pkg.tar.zst`
+- **Arch Linux Pacman パッケージ (~7.9 MB)**: `src-tauri/target/release/bundle/pacman/waddle-0.1.0-1-x86_64.pkg.tar.zst`
 - **スタンドアロン実行ファイル (~18 MB)**: `src-tauri/target/release/waddle`
 - **PKGBUILD**: リポジトリ直下に配置済み（`makepkg -si` によるビルド・AUR対応）
 
@@ -274,10 +292,12 @@ sudo pacman -U src-tauri/target/release/bundle/pacman/waddle-0.1.0-1-x86_64.pkg.
 - **データ主権の保証**: 機密データを扱う企業環境や、エアギャップ（閉域網）環境でも安心してご利用いただけます。
 - **多層防御（Defense-in-Depth）アーキテクチャ**:
   - **厳格な CSP 設定**: Webview からの不正な外部接続やスクリプトインジェクション攻撃を遮断。
-  - **最小特権のアセットプロトコル**: 壁紙ディレクトリ等に読み込みを限定し、機密ドットファイル（`~/.ssh`, `~/.gnupg`）の漏洩を防止。
-  - **プロンプトインジェクション遮断**: 端末出力を隔離・制限し、悪意あるログ出力による AI 誘導を無力化。
-  - **破壊的コマンドの事前検知 & 確認モーダル**: `rm -rf` やディスク操作等の危険コマンド実行前に警告を表示。
-  - **ファイルシステム削除保護**: ルートディレクトリ（`/`）やホームディレクトリ自体の削除要求を Rust 層でブロック。
+  - **最小特権のアセットプロトコル**: 壁紙ディレクトリ（`$CONFIG/waddle/**/*`）等に読み込みを厳密限定し、`~/.config` 配下のブラウザセッションや機密トークンの漏洩を防止。
+  - **ファイルシステム操作の保護**: システム全域の前方一致削除防止、SSH秘密鍵読み出し拒絶、機密ディレクトリ（`~/.ssh`, `~/.gnupg`）への書き込み制限。
+  - **プロンプトインジェクション遮断**: タグエスケープと境界隔離により、悪意ある端末ログによる AI 脱出を無力化。
+  - **破壊的コマンドの事前検知 & 確認モーダル**: ターミナルおよびエディタからの `rm -rf`、Git破壊操作、プロセス置換等の実行前に警告を表示。
+  - **壁紙バイナリ整合性検証**: マジックバイト検査によりスクリプト等の不正ファイル保存を防御。
+  - **リモートエンドポイント警告**: 外部 Ollama サーバー利用時の通信リスクを可視化。
 
 ---
 
