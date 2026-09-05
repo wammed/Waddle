@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { TerminalTab } from '../types';
 import waddleIcon from '../assets/waddle-icon.svg';
+import { useI18n } from '../i18n';
 
 interface TitleBarProps {
   tabs: TerminalTab[];
@@ -42,6 +43,8 @@ export const TitleBar: React.FC<TitleBarProps> = ({
   isFileTreeOpen,
   onToggleFileTree,
 }) => {
+  const { t } = useI18n();
+
   return (
     <header className="titlebar-container" data-tauri-drag-region>
       <div className="titlebar-left">
@@ -64,11 +67,11 @@ export const TitleBar: React.FC<TitleBarProps> = ({
           id="btn-filetree-toggle"
           className={`action-btn ${isFileTreeOpen ? 'active' : ''}`}
           onClick={onToggleFileTree}
-          title="Toggle File Tree Sidebar (Ctrl+B)"
+          title={t.titleBar.filesTooltip}
           style={{ height: '28px', padding: '0 8px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '5px' }}
         >
           <PanelLeft size={14} />
-          <span>Files</span>
+          <span>{t.titleBar.files}</span>
         </button>
 
         <nav className="tabs-list" aria-label="Terminal Tabs">
@@ -87,7 +90,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({
                   <span
                     className="tab-close"
                     onClick={(e) => onCloseTab(tab.id, e)}
-                    title="Close tab"
+                    title={t.titleBar.closeTabTooltip}
                   >
                     <X size={12} />
                   </span>
@@ -100,7 +103,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({
             id="btn-new-tab"
             className="new-tab-btn"
             onClick={onNewTab}
-            title="New Tab (Ctrl+T)"
+            title={t.titleBar.newTabTooltip}
           >
             <Plus size={16} />
           </button>
@@ -112,10 +115,10 @@ export const TitleBar: React.FC<TitleBarProps> = ({
           id="btn-ai-command"
           className="action-btn"
           onClick={onOpenAiCommand}
-          title="AI Command Generator (Ctrl+K)"
+          title={t.titleBar.aiPromptTooltip}
         >
           <Sparkles size={14} color="#38bdf8" />
-          <span>AI Prompt</span>
+          <span>{t.titleBar.aiPrompt}</span>
           <span className="kbd-badge">Ctrl+K</span>
         </button>
 
@@ -123,27 +126,27 @@ export const TitleBar: React.FC<TitleBarProps> = ({
           id="btn-editor-toggle"
           className={`action-btn ${isEditorOpen ? 'active' : ''}`}
           onClick={onToggleEditor}
-          title="Toggle Embedded Editor (Ctrl+E)"
+          title={t.titleBar.editorTooltip}
         >
           <FileCode size={14} />
-          <span>Editor</span>
+          <span>{t.titleBar.editor}</span>
         </button>
 
         <button
           id="btn-ai-sidebar"
           className={`action-btn ${isAiSidebarOpen ? 'active' : ''}`}
           onClick={onToggleAiSidebar}
-          title="Toggle AI Copilot Sidebar"
+          title={t.titleBar.copilotTooltip}
         >
           <Bot size={14} />
-          <span>Copilot</span>
+          <span>{t.titleBar.copilot}</span>
         </button>
 
         <button
           id="btn-settings"
           className="action-btn"
           onClick={onOpenSettings}
-          title="Settings"
+          title={t.titleBar.settingsTooltip}
         >
           <Settings size={14} />
         </button>

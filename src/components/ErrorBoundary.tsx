@@ -1,5 +1,6 @@
-import { Component, ErrorInfo, ReactNode } from 'react';
+import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
+import { I18nContext } from '../i18n';
 
 interface Props {
   children: ReactNode;
@@ -12,6 +13,9 @@ interface State {
 }
 
 export class ErrorBoundary extends Component<Props, State> {
+  static contextType = I18nContext;
+  declare context: React.ContextType<typeof I18nContext>;
+
   public state: State = {
     hasError: false,
     error: null,
@@ -27,6 +31,13 @@ export class ErrorBoundary extends Component<Props, State> {
 
   public render() {
     if (this.state.hasError) {
+      const t = this.context?.t;
+      const fallbackTitle =
+        this.props.fallbackTitle ||
+        t?.errorBoundary?.fallbackTitle ||
+        'An error occurred in component';
+      const retryText = t?.common?.retry || 'Retry';
+
       return (
         <div
           style={{
@@ -43,7 +54,7 @@ export class ErrorBoundary extends Component<Props, State> {
         >
           <AlertTriangle size={32} color="#f43f5e" />
           <div style={{ fontSize: '15px', fontWeight: 600 }}>
-            {this.props.fallbackTitle || 'コンポーネントでエラーが発生しました'}
+            {fallbackTitle}
           </div>
           <div
             style={{
@@ -64,7 +75,7 @@ export class ErrorBoundary extends Component<Props, State> {
             style={{ marginTop: '8px' }}
           >
             <RefreshCw size={14} />
-            <span>再試行</span>
+            <span>{retryText}</span>
           </button>
         </div>
       );

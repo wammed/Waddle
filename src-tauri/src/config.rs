@@ -65,8 +65,28 @@ impl Default for TerminalConfig {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct GeneralConfig {
+    #[serde(default = "default_language")]
+    pub language: String,
+}
+
+fn default_language() -> String {
+    "en-US".to_string()
+}
+
+impl Default for GeneralConfig {
+    fn default() -> Self {
+        Self {
+            language: default_language(),
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct AppConfig {
+    #[serde(default)]
+    pub general: GeneralConfig,
     pub ai: AiConfig,
     pub terminal: TerminalConfig,
 }
@@ -205,5 +225,29 @@ mod tests {
         assert!(saved_json.contains("migrated_wallpaper.png"));
 
         let _ = fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_general_config_default() {
+        let json_without_general = r#"{
+            "ai": {
+                "provider": "ollama",
+                "ollama_endpoint": "http://localhost:11434",
+                "ollama_model": "llama3.2",
+                "temperature": 0.2
+            },
+            "terminal": {
+                "font_family": "monospace",
+                "font_size": 14,
+                "theme": "waddle_dark",
+                "cursor_style": "block",
+                "cursor_blink": true,
+                "opacity": 0.95,
+                "scrollback": 10000
+            }
+        }"#;
+
+        let cfg: AppConfig = serde_json::from_str(json_without_general).unwrap();
+        assert_eq!(cfg.general.language, "en-US");
     }
 }

@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { AppConfig, TerminalContext } from '../types';
 import { TauriApi } from '../services/tauriApi';
+import { useI18n } from '../i18n';
 
 interface EditorPaneProps {
   isOpen: boolean;
@@ -32,6 +33,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
   onExecuteInTerminal,
   targetFilePath,
 }) => {
+  const { t } = useI18n();
   const [filePath, setFilePath] = useState('');
   const [content, setContent] = useState('');
   const [isDirty, setIsDirty] = useState(false);
@@ -82,7 +84,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
       setContent(text);
       setIsDirty(false);
     } catch (err) {
-      alert(`ファイルを開けませんでした: ${err}`);
+      alert(`${t.editor.openFailed}: ${err}`);
     } finally {
       setIsLoadingFile(false);
     }
@@ -212,7 +214,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0 }}>
           <FileCode size={16} color="#38bdf8" />
           <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--fg-main)' }}>
-            Editor
+            {t.editor.title}
           </span>
           {isDirty && (
             <span style={{ color: 'var(--warning)', fontWeight: 700 }}>*</span>
@@ -224,33 +226,33 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
             className="action-btn"
             style={{ padding: '3px 8px', fontSize: '11px' }}
             onClick={() => setIsAiModalOpen(true)}
-            title="AI Code Assistant (Ctrl+Shift+K)"
+            title={t.editor.aiEditTooltip}
           >
             <Sparkles size={13} color="#38bdf8" />
-            <span>AI Edit</span>
+            <span>{t.editor.aiEdit}</span>
           </button>
 
           <button
             className="action-btn"
             style={{ padding: '3px 8px', fontSize: '11px' }}
             onClick={handleRun}
-            title="Run in Terminal"
+            title={t.editor.runTooltip}
           >
             <Play size={13} color="#34d399" />
-            <span>Run</span>
+            <span>{t.common.run}</span>
           </button>
 
           <button
             className="btn-primary"
             style={{ padding: '3px 10px', fontSize: '11px' }}
             onClick={handleSave}
-            title="Save file (Ctrl+S)"
+            title={t.editor.saveTooltip}
           >
             {saveSuccess ? <Check size={13} /> : <Save size={13} />}
-            <span>{saveSuccess ? 'Saved' : 'Save'}</span>
+            <span>{saveSuccess ? t.common.saved : t.common.save}</span>
           </button>
 
-          <button className="action-btn" onClick={onClose} title="Close Editor">
+          <button className="action-btn" onClick={onClose} title={t.editor.closeTooltip}>
             <X size={14} />
           </button>
         </div>
@@ -270,7 +272,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
         <FolderOpen size={14} color="#94a3b8" />
         <input
           type="text"
-          placeholder="ファイルパス (例: script.sh または /path/to/file)"
+          placeholder={t.editor.pathPlaceholder}
           value={filePath}
           onChange={(e) => {
             setFilePath(e.target.value);
@@ -298,7 +300,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
           className="action-btn"
           style={{ padding: '3px 6px' }}
           onClick={loadDirectoryFiles}
-          title="Reload directory files"
+          title={t.editor.reloadFilesTooltip}
         >
           <RefreshCw size={11} className={isLoadingFile ? 'animate-spin' : ''} />
         </button>
@@ -323,7 +325,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
             defaultValue=""
           >
             <option value="" disabled style={{ background: '#181e2e', color: '#94a3b8' }}>
-              ファイル選択...
+              {t.editor.selectPlaceholder}
             </option>
             {dirFiles.map((f) => (
               <option key={f} value={f} style={{ background: '#181e2e', color: '#f8fafc' }}>
@@ -393,7 +395,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
             overflowWrap: 'normal',
             overflowX: 'auto',
           }}
-          placeholder="# スクリプトやコードをここに入力... (Ctrl+Sで保存, Ctrl+Shift+KでAI編集)"
+          placeholder={t.editor.textareaPlaceholder}
         />
       </div>
 
@@ -434,7 +436,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--accent)', fontWeight: 600, fontSize: '13px' }}>
                 <Sparkles size={15} />
-                <span>Ollama AI Code Assistant</span>
+                <span>{t.editor.aiModalTitle}</span>
               </div>
               <button
                 className="action-btn"
@@ -459,7 +461,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
                 outline: 'none',
                 resize: 'none',
               }}
-              placeholder="コードへの指示を入力 (例: エラーハンドリングを追加して, 非同期処理にリファクタリングして, コメントを追加して)"
+              placeholder={t.editor.aiPromptPlaceholder}
               value={aiInstruction}
               onChange={(e) => setAiInstruction(e.target.value)}
               onKeyDown={(e) => {
@@ -478,7 +480,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
                 className="btn-secondary"
                 onClick={() => setIsAiModalOpen(false)}
               >
-                キャンセル
+                {t.common.cancel}
               </button>
               <button
                 className="btn-primary"
@@ -490,7 +492,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
                 ) : (
                   <Sparkles size={13} />
                 )}
-                <span>AIで編集を適用</span>
+                <span>{t.editor.applyAiEdit}</span>
               </button>
             </div>
           </div>

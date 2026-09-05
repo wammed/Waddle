@@ -180,7 +180,7 @@ export const TauriApi = {
     if (!isTauri()) {
       return {
         command: `find . -name "*${prompt}*" -type f`,
-        explanation: 'ローカル Ollama モデルによる検索コマンド提案です。',
+        explanation: 'Search command suggested by local Ollama model.',
         is_dangerous: false,
         alternatives: [`locate ${prompt}`, `fd ${prompt}`],
       };
@@ -199,10 +199,10 @@ export const TauriApi = {
   ): Promise<ErrorExplanation> {
     if (!isTauri()) {
       return {
-        summary: `コマンド '${command}' が終了コード ${exitCode} で失敗しました`,
-        cause: '指定されたファイルまたはディレクトリが存在しないか、パーミッションが不足しています。',
+        summary: `Command '${command}' failed with exit code ${exitCode}`,
+        cause: 'The specified file or directory does not exist, or permissions are insufficient.',
         fix_command: `sudo ${command}`,
-        explanation: '権限を昇格して再実行するか、パスの綴りを確認してください。',
+        explanation: 'Try elevating permissions or check the file path spelling.',
       };
     }
     return await invoke<ErrorExplanation>('explain_error', {
@@ -221,7 +221,7 @@ export const TauriApi = {
     onDone: () => void
   ): Promise<() => void> {
     if (!isTauri()) {
-      const mockText = `Waddle (ローカル Ollama) アシスタントです！\n現在のディレクトリ: \`${context.cwd}\`\n\n\`\`\`bash\nls -la\n\`\`\``;
+      const mockText = `Waddle (Local Ollama) Assistant!\nCurrent directory: \`${context.cwd}\`\n\n\`\`\`bash\nls -la\n\`\`\``;
       let i = 0;
       const interval = setInterval(() => {
         if (i < mockText.length) {
@@ -253,7 +253,7 @@ export const TauriApi = {
       });
     } catch (err) {
       console.error('stream_ai_chat error:', err);
-      onChunk(`\n\n**Ollama接続エラー:** ${err}\n\n💡 \`ollama serve\` でOllamaを起動してください。`);
+      onChunk(`\n\n**Ollama Connection Error:** ${err}\n\n💡 Please start Ollama with \`ollama serve\`.`);
       onDone();
       unlistenChunk();
       unlistenDone();

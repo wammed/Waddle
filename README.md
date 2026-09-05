@@ -100,6 +100,11 @@
 - **Full UI Synchronization**: Window titlebar, tabs, borders, status bar, and modal accents dynamically adapt to the selected theme.
 - **Nerd Fonts**: Presets for **JetBrainsMono Nerd Font**, **MesloLGS NF**, **FiraCode Nerd Font**, **Hack Nerd Font**, or custom local fonts with automatic glyph fallback.
 
+### 9. 🌐 Multi-Language Support (English US / UK, 日本語)
+- **Selectable UI Language**: Switch seamlessly between **English (US)**, **English (GB / UK)**, and **Japanese (日本語)** from Settings (`Ctrl + ,`).
+- **Live Preview & Persistence**: Switching languages instantly updates all dialogs, toolbars, error banners, and copilot prompts, and persists across restarts in `~/.config/waddle/config.json`.
+- **Sensible Default**: Defaults to English (`en-US`) for international Linux users while providing full native Japanese support.
+
 ---
 
 ## ⌨️ Keybindings

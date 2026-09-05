@@ -14,6 +14,7 @@ import { TauriApi } from './services/tauriApi';
 import { THEMES } from './theme';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import waddleWallpaper from './assets/waddle-wallpaper.png';
+import { I18nProvider } from './i18n';
 
 const generateTabId = () => {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -23,6 +24,9 @@ const generateTabId = () => {
 };
 
 const DEFAULT_CONFIG: AppConfig = {
+  general: {
+    language: 'en-US',
+  },
   ai: {
     provider: 'ollama',
     ollama_endpoint: 'http://localhost:11434',
@@ -268,7 +272,8 @@ export function App() {
   }, [config.terminal.background_image]);
 
   return (
-    <div className="app-container">
+    <I18nProvider language={config.general?.language || 'en-US'}>
+      <div className="app-container">
       {/* Title Bar & Tabs */}
       <TitleBar
         tabs={tabs}
@@ -370,7 +375,7 @@ export function App() {
 
           {/* Terminal Tabs */}
           {tabs.map((tab) => (
-            <ErrorBoundary key={tab.id} fallbackTitle="ターミナルの初期化でエラーが発生しました">
+            <ErrorBoundary key={tab.id}>
               <TerminalPane
                 tab={tab}
                 config={config}
@@ -438,7 +443,8 @@ export function App() {
         config={config}
         onSaveConfig={handleUpdateConfig}
       />
-    </div>
+      </div>
+    </I18nProvider>
   );
 }
 

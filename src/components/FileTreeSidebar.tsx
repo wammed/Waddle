@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { FileEntry } from '../types';
 import { TauriApi } from '../services/tauriApi';
+import { useI18n } from '../i18n';
 
 interface FileTreeSidebarProps {
   isOpen: boolean;
@@ -39,6 +40,7 @@ export const FileTreeSidebar: React.FC<FileTreeSidebarProps> = ({
   onOpenFile,
   onInsertToTerminal,
 }) => {
+  const { t } = useI18n();
   const [rootPath, setRootPath] = useState<string>(cwd);
   const [showHidden, setShowHidden] = useState(false);
   const [searchFilter, setSearchFilter] = useState('');
@@ -147,7 +149,7 @@ export const FileTreeSidebar: React.FC<FileTreeSidebarProps> = ({
       await loadDirectory(newEntryTarget.parentPath);
       setExpandedPaths((prev) => new Set(prev).add(newEntryTarget.parentPath));
     } catch (err) {
-      alert(`作成に失敗しました: ${err}`);
+      alert(`${t.fileTree.createFailed}: ${err}`);
     } finally {
       setNewEntryTarget(null);
       setNewEntryName('');
@@ -157,15 +159,15 @@ export const FileTreeSidebar: React.FC<FileTreeSidebarProps> = ({
   // Delete file or folder
   const handleDelete = async (entry: FileEntry, e: React.MouseEvent) => {
     e.stopPropagation();
-    const typeStr = entry.is_dir ? 'フォルダ' : 'ファイル';
-    if (confirm(`本当にこの${typeStr}「${entry.name}」を削除しますか？`)) {
+    const typeStr = entry.is_dir ? t.fileTree.folderType : t.fileTree.fileType;
+    if (confirm(t.fileTree.deleteConfirm(typeStr, entry.name))) {
       try {
         await TauriApi.deleteEntry(entry.path);
         // Reload parent directory
         const parentPath = entry.path.substring(0, entry.path.lastIndexOf('/')) || rootPath;
         await loadDirectory(parentPath);
       } catch (err) {
-        alert(`削除に失敗しました: ${err}`);
+        alert(`${t.fileTree.deleteFailed}: ${err}`);
       }
     }
   };
@@ -268,7 +270,7 @@ export const FileTreeSidebar: React.FC<FileTreeSidebarProps> = ({
           }}
         >
           <Loader2 size={12} className="animate-spin" />
-          <span>読み込み中...</span>
+          <span>{t.common.loading}...</span>
         </div>
       );
     }
@@ -296,7 +298,7 @@ export const FileTreeSidebar: React.FC<FileTreeSidebarProps> = ({
                     onOpenFile(entry.path);
                   }
                 }}
-                title={`${entry.name} (${isDir ? 'フォルダ' : formatSize(entry.size)})\n${entry.path}`}
+                title={`${entry.name} (${isDir ? t.fileTree.folderType : formatSize(entry.size)})\n${entry.path}`}
               >
                 {/* Arrow / Folder Icon */}
                 <div className="node-icon-wrapper">
@@ -342,7 +344,7 @@ export const FileTreeSidebar: React.FC<FileTreeSidebarProps> = ({
                         e.stopPropagation();
                         onOpenFile(entry.path);
                       }}
-                      title="内蔵エディタで開く"
+                      title={t.fileTree.openInEditor}
                     >
                       <FileCode size={12} />
                     </button>
@@ -350,14 +352,14 @@ export const FileTreeSidebar: React.FC<FileTreeSidebarProps> = ({
                   <button
                     className="node-action-btn"
                     onClick={(e) => handleInsert(entry, e)}
-                    title="ターミナルにパスを挿入"
+                    title={t.fileTree.insertPath}
                   >
                     <Terminal size={12} />
                   </button>
                   <button
                     className="node-action-btn delete-btn"
                     onClick={(e) => handleDelete(entry, e)}
-                    title="削除"
+                    title={t.common.delete}
                   >
                     <Trash2 size={12} />
                   </button>
@@ -380,7 +382,7 @@ export const FileTreeSidebar: React.FC<FileTreeSidebarProps> = ({
               fontStyle: 'italic',
             }}
           >
-            {searchFilter ? '該当ファイルなし' : '(空のフォルダ)'}
+            {searchFilter ? t.fileTree.noMatchingFiles : t.fileTree.emptyFolder}
           </div>
         )}
       </div>
@@ -402,42 +404,42 @@ export const FileTreeSidebar: React.FC<FileTreeSidebarProps> = ({
           <button
             className="filetree-tool-btn"
             onClick={() => setNewEntryTarget({ parentPath: rootPath, type: 'file' })}
-            title="新規ファイル作成"
+            title={t.fileTree.newFile}
           >
             <FilePlus size={13} />
           </button>
           <button
             className="filetree-tool-btn"
             onClick={() => setNewEntryTarget({ parentPath: rootPath, type: 'folder' })}
-            title="新規フォルダ作成"
+            title={t.fileTree.newFolder}
           >
             <FolderPlus size={13} />
           </button>
           <button
             className={`filetree-tool-btn ${showHidden ? 'active' : ''}`}
             onClick={() => setShowHidden(!showHidden)}
-            title={showHidden ? '隠しファイルを非表示' : '隠しファイルを表示'}
+            title={showHidden ? t.fileTree.hideHidden : t.fileTree.showHidden}
           >
             {showHidden ? <Eye size={13} color="var(--accent)" /> : <EyeOff size={13} />}
           </button>
           <button
             className="filetree-tool-btn"
             onClick={refreshAll}
-            title="ツリー再読込"
+            title={t.fileTree.refresh}
           >
             <RefreshCw size={13} />
           </button>
           <button
             className="filetree-tool-btn"
             onClick={collapseAll}
-            title="すべて折りたたむ"
+            title={t.fileTree.collapseAll}
           >
             <ChevronRight size={13} />
           </button>
           <button
             className="filetree-tool-btn"
             onClick={onClose}
-            title="サイドバーを閉じる (Ctrl+B)"
+            title={`${t.fileTree.closeSidebar} (Ctrl+B)`}
           >
             <PanelLeftClose size={13} />
           </button>
@@ -449,7 +451,7 @@ export const FileTreeSidebar: React.FC<FileTreeSidebarProps> = ({
         <Search size={12} color="var(--fg-dim)" />
         <input
           type="text"
-          placeholder="ファイルを検索..."
+          placeholder={t.fileTree.searchPlaceholder}
           value={searchFilter}
           onChange={(e) => setSearchFilter(e.target.value)}
           className="filetree-search-input"
@@ -458,7 +460,7 @@ export const FileTreeSidebar: React.FC<FileTreeSidebarProps> = ({
           <button
             className="search-clear-btn"
             onClick={() => setSearchFilter('')}
-            title="クリア"
+            title={t.common.clear}
           >
             <X size={11} />
           </button>
@@ -477,7 +479,7 @@ export const FileTreeSidebar: React.FC<FileTreeSidebarProps> = ({
             type="text"
             autoFocus
             placeholder={
-              newEntryTarget.type === 'file' ? '新しいファイル名...' : '新しいフォルダ名...'
+              newEntryTarget.type === 'file' ? t.fileTree.newFilePlaceholder : t.fileTree.newFolderPlaceholder
             }
             value={newEntryName}
             onChange={(e) => setNewEntryName(e.target.value)}
@@ -490,14 +492,14 @@ export const FileTreeSidebar: React.FC<FileTreeSidebarProps> = ({
           <button
             className="btn-create-submit"
             onClick={handleConfirmCreate}
-            title="作成 (Enter)"
+            title={`${t.common.create} (Enter)`}
           >
-            作成
+            {t.common.create}
           </button>
           <button
             className="btn-create-cancel"
             onClick={() => setNewEntryTarget(null)}
-            title="キャンセル (Esc)"
+            title={`${t.common.cancel} (Esc)`}
           >
             <X size={12} />
           </button>
@@ -509,7 +511,7 @@ export const FileTreeSidebar: React.FC<FileTreeSidebarProps> = ({
         {rootPath ? (
           renderTree(rootPath, 0)
         ) : (
-          <div className="filetree-empty">ディレクトリ情報がありません</div>
+          <div className="filetree-empty">{t.fileTree.noDirectory}</div>
         )}
       </div>
     </aside>

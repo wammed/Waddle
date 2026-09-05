@@ -20,7 +20,14 @@ export interface TerminalConfig {
   background_blur?: number;
 }
 
+export type Language = 'en-US' | 'en-GB' | 'ja';
+
+export interface GeneralConfig {
+  language: Language;
+}
+
 export interface AppConfig {
+  general?: GeneralConfig;
   ai: AiConfig;
   terminal: TerminalConfig;
 }

@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { CommandSuggestion, TerminalContext } from '../types';
 import { TauriApi } from '../services/tauriApi';
+import { useI18n } from '../i18n';
 
 interface AiCommandModalProps {
   isOpen: boolean;
@@ -27,6 +28,7 @@ export const AiCommandModal: React.FC<AiCommandModalProps> = ({
   onInsertCommand,
   onExecuteCommand,
 }) => {
+  const { t } = useI18n();
   const [prompt, setPrompt] = useState('');
   const [loading, setLoading] = useState(false);
   const [suggestion, setSuggestion] = useState<CommandSuggestion | null>(null);
@@ -102,7 +104,7 @@ export const AiCommandModal: React.FC<AiCommandModalProps> = ({
         <div className="ai-modal-header">
           <div className="ai-modal-title">
             <Sparkles size={16} />
-            <span>AI Command Assistant</span>
+            <span>{t.aiCommand.title}</span>
           </div>
           <button
             onClick={onClose}
@@ -120,7 +122,7 @@ export const AiCommandModal: React.FC<AiCommandModalProps> = ({
             id="ai-prompt-input"
             type="text"
             className="ai-input-field"
-            placeholder="やりたいことを自然言語で入力 (例: 直近のコミットを取り消したい, 8080番ポートを使っているプロセスを終了)"
+            placeholder={t.aiCommand.promptPlaceholder}
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             disabled={loading}
@@ -136,7 +138,7 @@ export const AiCommandModal: React.FC<AiCommandModalProps> = ({
             ) : (
               <CornerDownLeft size={14} />
             )}
-            <span>生成</span>
+            <span>{t.aiCommand.generate}</span>
           </button>
         </div>
 
@@ -156,15 +158,15 @@ export const AiCommandModal: React.FC<AiCommandModalProps> = ({
               <code>{suggestion.command}</code>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 {suggestion.is_dangerous && (
-                  <span className="danger-tag" title="Caution: Destructive command">
+                  <span className="danger-tag" title={t.aiCommand.dangerousTooltip}>
                     <AlertTriangle size={12} style={{ display: 'inline', marginRight: 4 }} />
-                    DANGEROUS
+                    {t.aiCommand.dangerous}
                   </span>
                 )}
                 <button
                   className="action-btn"
                   onClick={handleCopy}
-                  title="Copy command"
+                  title={t.common.copy}
                 >
                   {copied ? <Check size={13} color="#10b981" /> : <Copy size={13} />}
                 </button>
@@ -175,7 +177,7 @@ export const AiCommandModal: React.FC<AiCommandModalProps> = ({
 
             {suggestion.alternatives && suggestion.alternatives.length > 0 && (
               <div style={{ fontSize: '12px', color: 'var(--fg-dim)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <span>代替案:</span>
+                <span>{t.aiCommand.alternatives}:</span>
                 {suggestion.alternatives.map((alt, idx) => (
                   <div
                     key={idx}
@@ -201,13 +203,7 @@ export const AiCommandModal: React.FC<AiCommandModalProps> = ({
 
         <div className="modal-footer">
           <div>
-            <span>Press </span>
-            <span className="kbd-badge">Enter</span>
-            <span> to Insert, </span>
-            <span className="kbd-badge">Ctrl+Enter</span>
-            <span> to Run immediately, </span>
-            <span className="kbd-badge">Esc</span>
-            <span> to Cancel</span>
+            <span>{t.aiCommand.footerTip}</span>
           </div>
 
           {suggestion && (
@@ -220,7 +216,7 @@ export const AiCommandModal: React.FC<AiCommandModalProps> = ({
                 }}
               >
                 <CornerDownLeft size={13} />
-                <span>ターミナルに挿入</span>
+                <span>{t.aiCommand.insertBtn}</span>
               </button>
               <button
                 className="btn-primary"
@@ -230,7 +226,7 @@ export const AiCommandModal: React.FC<AiCommandModalProps> = ({
                 }}
               >
                 <Play size={13} />
-                <span>実行</span>
+                <span>{t.aiCommand.runBtn}</span>
               </button>
             </div>
           )}

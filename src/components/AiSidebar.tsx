@@ -14,6 +14,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { ChatMessage, TerminalContext } from '../types';
 import { TauriApi } from '../services/tauriApi';
+import { useI18n } from '../i18n';
 
 interface AiSidebarProps {
   isOpen: boolean;
@@ -30,12 +31,12 @@ export const AiSidebar: React.FC<AiSidebarProps> = ({
   onInsertCommand,
   onExecuteCommand,
 }) => {
+  const { t } = useI18n();
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: 'welcome',
       role: 'assistant',
-      content:
-        'こんにちは！Waddle AI アシスタントです。\nターミナルでの作業やトラブルシューティング、コマンドの生成など何でもご相談ください。\n\n例:\n- `カレントディレクトリ内の重複ファイルを探すコマンドは？`\n- `直前のエラー出力を解説して`\n- `このプロジェクトのビルド手順を教えて`',
+      content: t.copilot.welcomeMessage,
     },
   ]);
   const [input, setInput] = useState('');
@@ -100,7 +101,7 @@ export const AiSidebar: React.FC<AiSidebarProps> = ({
       {
         id: 'welcome',
         role: 'assistant',
-        content: 'チャット履歴をクリアしました。何かお手伝いできることはありますか？',
+        content: t.copilot.welcomeMessage,
       },
     ]);
     setIsStreaming(false);
@@ -119,17 +120,17 @@ export const AiSidebar: React.FC<AiSidebarProps> = ({
       <div className="sidebar-header">
         <div className="sidebar-title">
           <Bot size={16} />
-          <span>Waddle Copilot</span>
+          <span>{t.copilot.title}</span>
         </div>
         <div style={{ display: 'flex', gap: '4px' }}>
           <button
             className="action-btn"
             onClick={handleClearHistory}
-            title="Clear Chat History"
+            title={t.common.clear}
           >
             <Trash2 size={13} />
           </button>
-          <button className="action-btn" onClick={onClose} title="Close Sidebar">
+          <button className="action-btn" onClick={onClose} title={t.common.close}>
             <X size={14} />
           </button>
         </div>
@@ -162,32 +163,32 @@ export const AiSidebar: React.FC<AiSidebarProps> = ({
                               className="action-btn"
                               style={{ padding: '3px 8px', fontSize: '11px' }}
                               onClick={() => handleCopy(codeContent)}
-                              title="Copy code"
+                              title={t.common.copy}
                             >
                               {copiedCode === codeContent ? (
                                 <Check size={12} color="#10b981" />
                               ) : (
                                 <Copy size={12} />
                               )}
-                              <span>Copy</span>
+                              <span>{copiedCode === codeContent ? t.common.copied : t.common.copy}</span>
                             </button>
                             <button
                               className="action-btn"
                               style={{ padding: '3px 8px', fontSize: '11px' }}
                               onClick={() => onInsertCommand(codeContent)}
-                              title="Insert to terminal"
+                              title={t.common.insert}
                             >
                               <CornerDownLeft size={12} />
-                              <span>Insert</span>
+                              <span>{t.common.insert}</span>
                             </button>
                             <button
                               className="btn-primary"
                               style={{ padding: '3px 8px', fontSize: '11px' }}
                               onClick={() => onExecuteCommand(codeContent)}
-                              title="Run immediately"
+                              title={t.common.run}
                             >
                               <Play size={12} />
-                              <span>Run</span>
+                              <span>{t.common.run}</span>
                             </button>
                           </div>
                         </div>
@@ -195,7 +196,7 @@ export const AiSidebar: React.FC<AiSidebarProps> = ({
                     },
                   }}
                 >
-                  {msg.content || (isStreaming ? 'Thinking...' : '')}
+                  {msg.content || (isStreaming ? `${t.common.loading}...` : '')}
                 </ReactMarkdown>
               </div>
             ) : (
@@ -210,7 +211,7 @@ export const AiSidebar: React.FC<AiSidebarProps> = ({
         <div className="chat-input-box">
           <textarea
             className="chat-textarea"
-            placeholder="AIに質問する (Shift+Enterで改行)"
+            placeholder={t.copilot.promptPlaceholder}
             rows={1}
             value={input}
             onChange={(e) => setInput(e.target.value)}

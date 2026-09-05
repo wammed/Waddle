@@ -12,10 +12,12 @@ import {
   Type,
   Image as ImageIcon,
   FolderOpen,
+  Globe,
 } from 'lucide-react';
-import { AppConfig, OllamaStatus } from '../types';
+import { AppConfig, Language, OllamaStatus } from '../types';
 import { THEMES } from '../theme';
 import { TauriApi } from '../services/tauriApi';
+import { useI18n, translations } from '../i18n';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -36,16 +38,43 @@ const inputStyle: React.CSSProperties = {
   colorScheme: 'dark',
 };
 
-const FONT_OPTIONS = [
-  { label: 'JetBrainsMono Nerd Font (推奨)', value: "'JetBrainsMono Nerd Font', 'JetBrains Mono', 'Symbols Nerd Font Mono', monospace" },
-  { label: 'MesloLGS NF (Powerlevel10k / Oh My Posh)', value: "'MesloLGS NF', 'MesloLGS Nerd Font', 'Symbols Nerd Font Mono', monospace" },
-  { label: 'FiraCode Nerd Font (リガチャ対応)', value: "'FiraCode Nerd Font', 'Fira Code', 'Symbols Nerd Font Mono', monospace" },
-  { label: 'Hack Nerd Font', value: "'Hack Nerd Font', 'Hack', 'Symbols Nerd Font Mono', monospace" },
-  { label: 'CaskaydiaCove Nerd Font (Cascadia Code)', value: "'CaskaydiaCove Nerd Font', 'Cascadia Code', 'Symbols Nerd Font Mono', monospace" },
-  { label: 'SauceCodePro Nerd Font (Source Code Pro)', value: "'SauceCodePro Nerd Font', 'Source Code Pro', 'Symbols Nerd Font Mono', monospace" },
-  { label: 'Symbols Nerd Font Only (記号フォールバック)', value: "'Symbols Nerd Font Mono', 'JetBrains Mono', monospace" },
-  { label: 'システム等幅 (monospace)', value: 'monospace' },
-  { label: 'カスタムフォント...', value: 'custom' },
+const getFontOptions = (lang: string) => [
+  {
+    label: lang === 'ja' ? 'JetBrainsMono Nerd Font (推奨)' : 'JetBrainsMono Nerd Font (Recommended)',
+    value: "'JetBrainsMono Nerd Font', 'JetBrains Mono', 'Symbols Nerd Font Mono', monospace",
+  },
+  {
+    label: 'MesloLGS NF (Powerlevel10k / Oh My Posh)',
+    value: "'MesloLGS NF', 'MesloLGS Nerd Font', 'Symbols Nerd Font Mono', monospace",
+  },
+  {
+    label: lang === 'ja' ? 'FiraCode Nerd Font (リガチャ対応)' : 'FiraCode Nerd Font (Ligatures)',
+    value: "'FiraCode Nerd Font', 'Fira Code', 'Symbols Nerd Font Mono', monospace",
+  },
+  {
+    label: 'Hack Nerd Font',
+    value: "'Hack Nerd Font', 'Hack', 'Symbols Nerd Font Mono', monospace",
+  },
+  {
+    label: 'CaskaydiaCove Nerd Font (Cascadia Code)',
+    value: "'CaskaydiaCove Nerd Font', 'Cascadia Code', 'Symbols Nerd Font Mono', monospace",
+  },
+  {
+    label: 'SauceCodePro Nerd Font (Source Code Pro)',
+    value: "'SauceCodePro Nerd Font', 'Source Code Pro', 'Symbols Nerd Font Mono', monospace",
+  },
+  {
+    label: lang === 'ja' ? 'Symbols Nerd Font Only (記号フォールバック)' : 'Symbols Nerd Font Only (Symbol Fallback)',
+    value: "'Symbols Nerd Font Mono', 'JetBrains Mono', monospace",
+  },
+  {
+    label: lang === 'ja' ? 'システム等幅 (monospace)' : 'System Monospace (monospace)',
+    value: 'monospace',
+  },
+  {
+    label: lang === 'ja' ? 'カスタムフォント...' : 'Custom Font...',
+    value: 'custom',
+  },
 ];
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -54,7 +83,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   config,
   onSaveConfig,
 }) => {
+  const { t: globalT } = useI18n();
   const [formData, setFormData] = useState<AppConfig>({ ...config });
+  const selectedLang = formData.general?.language || 'en-US';
+  const t = translations[selectedLang] || globalT;
   const [ollamaStatus, setOllamaStatus] = useState<OllamaStatus | null>(null);
   const [isCheckingOllama, setIsCheckingOllama] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
@@ -87,7 +119,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     if (isOpen) {
       setFormData({ ...config });
       fetchOllamaStatus(config.ai.ollama_endpoint);
-      const isKnownPreset = FONT_OPTIONS.some((f) => f.value === config.terminal.font_family);
+      const isKnownPreset = getFontOptions(selectedLang).some((f) => f.value === config.terminal.font_family);
       setIsCustomFont(!isKnownPreset && config.terminal.font_family !== 'custom');
 
       // Initialize background image state
@@ -194,7 +226,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         <div className="ai-modal-header" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
           <div className="ai-modal-title" style={{ color: 'var(--fg-main)' }}>
             <Settings size={16} />
-            <span>Waddle 設定 (Ollama Local AI & Appearance)</span>
+            <span>{t.settings.modalTitle}</span>
           </div>
           <button
             onClick={onClose}
@@ -206,11 +238,49 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         </div>
 
         <div className="settings-content">
+          {/* Language Selection Section */}
+          <div className="settings-section">
+            <div className="section-title">
+              <Globe size={14} style={{ display: 'inline', marginRight: 6 }} />
+              {t.settings.languageSectionTitle}
+            </div>
+
+            <div className="form-group">
+              <label className="form-label" style={{ color: '#94a3b8' }}>
+                {t.settings.languageLabel}
+              </label>
+              <select
+                className="form-select"
+                style={inputStyle}
+                value={selectedLang}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    general: {
+                      ...formData.general,
+                      language: e.target.value as Language,
+                    },
+                  })
+                }
+              >
+                <option value="en-US" style={{ background: '#181e2e', color: '#f8fafc' }}>
+                  {t.settings.languages.enUS}
+                </option>
+                <option value="en-GB" style={{ background: '#181e2e', color: '#f8fafc' }}>
+                  {t.settings.languages.enGB}
+                </option>
+                <option value="ja" style={{ background: '#181e2e', color: '#f8fafc' }}>
+                  {t.settings.languages.ja}
+                </option>
+              </select>
+            </div>
+          </div>
+
           {/* Ollama Local AI Section */}
           <div className="settings-section">
             <div className="section-title">
               <HardDrive size={14} style={{ display: 'inline', marginRight: 6 }} />
-              ローカル AI エンジン (Ollama)
+              {t.settings.aiSectionTitle}
             </div>
 
             {/* Status Card */}
@@ -235,11 +305,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <div>
                   {ollamaStatus?.available ? (
                     <span style={{ color: '#34d399', fontWeight: 600 }}>
-                      Ollama 接続完了 (v{ollamaStatus.version || '0.x'}) - {ollamaStatus.models.length}個のモデル利用可能
+                      {t.settings.ollamaConnected(ollamaStatus.version || '0.x', ollamaStatus.models.length)}
                     </span>
                   ) : (
                     <span style={{ color: '#fda4af', fontWeight: 600 }}>
-                      Ollama 未起動または未接続
+                      {t.settings.ollamaDisconnected}
                     </span>
                   )}
                 </div>
@@ -252,7 +322,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 disabled={isCheckingOllama}
               >
                 <RefreshCw size={12} className={isCheckingOllama ? 'animate-spin' : ''} />
-                <span>モデル再取得</span>
+                <span>{t.settings.ollamaRefetch}</span>
               </button>
             </div>
 
@@ -267,12 +337,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   lineHeight: 1.6,
                 }}
               >
-                💡 <strong>Ollamaの起動方法:</strong> 別のターミナルで <code>ollama serve</code> を実行し、<code>ollama pull llama3.2</code> または <code>ollama pull deepseek-r1</code> を実行してください。
+                {t.settings.ollamaHint}
               </div>
             )}
 
             <div className="form-group">
-              <label className="form-label" style={{ color: '#94a3b8' }}>Ollama エンドポイント URL</label>
+              <label className="form-label" style={{ color: '#94a3b8' }}>{t.settings.ollamaEndpointLabel}</label>
               <input
                 type="text"
                 className="form-input"
@@ -289,7 +359,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
 
             <div className="form-group">
-              <label className="form-label" style={{ color: '#94a3b8' }}>使用するローカルモデル</label>
+              <label className="form-label" style={{ color: '#94a3b8' }}>{t.settings.ollamaModelLabel}</label>
               {ollamaStatus?.available && ollamaStatus.models.length > 0 ? (
                 <select
                   className="form-select"
@@ -326,7 +396,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
 
             <div className="form-group">
-              <label className="form-label" style={{ color: '#94a3b8' }}>生成 Temperature ({formData.ai.temperature})</label>
+              <label className="form-label" style={{ color: '#94a3b8' }}>{t.settings.temperatureLabel(formData.ai.temperature)}</label>
               <input
                 type="range"
                 min="0.0"
@@ -347,11 +417,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           <div className="settings-section">
             <div className="section-title">
               <TermIcon size={14} style={{ display: 'inline', marginRight: 6 }} />
-              ターミナル外観
+              {t.settings.terminalSectionTitle}
             </div>
 
             <div className="form-group">
-              <label className="form-label" style={{ color: '#94a3b8' }}>カラーテーマ</label>
+              <label className="form-label" style={{ color: '#94a3b8' }}>{t.settings.themeLabel}</label>
               <select
                 className="form-select"
                 style={inputStyle}
@@ -375,7 +445,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <div className="form-group">
               <label className="form-label" style={{ color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <Type size={13} />
-                <span>フォント (Font Family)</span>
+                <span>{t.settings.fontLabel}</span>
               </label>
 
               <select
@@ -394,7 +464,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   }
                 }}
               >
-                {FONT_OPTIONS.map((f) => (
+                {getFontOptions(selectedLang).map((f) => (
                   <option key={f.value} value={f.value} style={{ background: '#181e2e', color: '#f8fafc' }}>
                     {f.label}
                   </option>
@@ -406,7 +476,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   type="text"
                   className="form-input"
                   style={{ ...inputStyle, marginTop: '6px' }}
-                  placeholder="例: 'Hack', 'MesloLGS NF', monospace"
+                  placeholder={t.settings.customFontPlaceholder}
                   value={formData.terminal.font_family}
                   onChange={(e) =>
                     setFormData({
@@ -440,7 +510,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
               <div className="form-group">
-                <label className="form-label" style={{ color: '#94a3b8' }}>フォントサイズ (px)</label>
+                <label className="form-label" style={{ color: '#94a3b8' }}>{t.settings.fontSizeLabel}</label>
                 <input
                   type="number"
                   className="form-input"
@@ -461,7 +531,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
 
               <div className="form-group">
-                <label className="form-label" style={{ color: '#94a3b8' }}>カーソルスタイル</label>
+                <label className="form-label" style={{ color: '#94a3b8' }}>{t.settings.cursorStyleLabel}</label>
                 <select
                   className="form-select"
                   style={inputStyle}
@@ -476,9 +546,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     })
                   }
                 >
-                  <option value="block" style={{ background: '#181e2e', color: '#f8fafc' }}>Block</option>
-                  <option value="underline" style={{ background: '#181e2e', color: '#f8fafc' }}>Underline</option>
-                  <option value="bar" style={{ background: '#181e2e', color: '#f8fafc' }}>Bar</option>
+                  <option value="block" style={{ background: '#181e2e', color: '#f8fafc' }}>{t.settings.cursorBlock}</option>
+                  <option value="underline" style={{ background: '#181e2e', color: '#f8fafc' }}>{t.settings.cursorUnderline}</option>
+                  <option value="bar" style={{ background: '#181e2e', color: '#f8fafc' }}>{t.settings.cursorBar}</option>
                 </select>
               </div>
             </div>
@@ -487,7 +557,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <div className="form-group" style={{ marginTop: '10px' }}>
               <label className="form-label" style={{ color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <ImageIcon size={13} />
-                <span>背景画像・壁紙 (Background Wallpaper)</span>
+                <span>{t.settings.wallpaperLabel}</span>
               </label>
 
               <select
@@ -496,9 +566,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 value={bgMode}
                 onChange={(e) => handleBgModeChange(e.target.value as any)}
               >
-                <option value="none" style={{ background: '#181e2e', color: '#f8fafc' }}>なし (デフォルトダーク背景)</option>
-                <option value="preset_cyberpunk" style={{ background: '#181e2e', color: '#f8fafc' }}>Waddle Official (公式壁紙)</option>
-                <option value="custom" style={{ background: '#181e2e', color: '#f8fafc' }}>カスタム画像 (ファイル選択 / パス指定)...</option>
+                <option value="none" style={{ background: '#181e2e', color: '#f8fafc' }}>{t.settings.wallpaperNone}</option>
+                <option value="preset_cyberpunk" style={{ background: '#181e2e', color: '#f8fafc' }}>{t.settings.wallpaperOfficial}</option>
+                <option value="custom" style={{ background: '#181e2e', color: '#f8fafc' }}>{t.settings.wallpaperCustom}</option>
               </select>
 
               {bgMode === 'custom' && (
@@ -507,7 +577,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     type="text"
                     className="form-input"
                     style={{ ...inputStyle, flex: 1 }}
-                    placeholder="例: /home/user/Pictures/wallpaper.jpg または https://..."
+                    placeholder={t.settings.wallpaperCustomPlaceholder}
                     value={customBgPath}
                     onChange={(e) => handleCustomPathChange(e.target.value)}
                   />
@@ -523,10 +593,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     className="btn-secondary"
                     style={{ background: '#1b2234', color: '#f8fafc', whiteSpace: 'nowrap' }}
                     onClick={handleBrowseClick}
-                    title="ローカル画像ファイルを参照"
+                    title={t.common.browse}
                   >
                     <FolderOpen size={14} />
-                    <span>参照...</span>
+                    <span>{t.common.browse}</span>
                   </button>
                 </div>
               )}
@@ -535,7 +605,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '8px' }}>
                   <div className="form-group">
                     <label className="form-label" style={{ color: '#94a3b8' }}>
-                      画像不透明度 ({Math.round((formData.terminal.background_opacity ?? 0.85) * 100)}%)
+                      {t.settings.wallpaperOpacityLabel(Math.round((formData.terminal.background_opacity ?? 0.85) * 100))}
                     </label>
                     <input
                       type="range"
@@ -557,7 +627,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
                   <div className="form-group">
                     <label className="form-label" style={{ color: '#94a3b8' }}>
-                      背景ぼかし ({formData.terminal.background_blur ?? 0}px)
+                      {t.settings.wallpaperBlurLabel(formData.terminal.background_blur ?? 0)}
                     </label>
                     <input
                       type="range"
@@ -584,11 +654,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
         <div className="modal-footer" style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
           <button className="btn-secondary" style={{ background: '#1b2234', color: '#f8fafc' }} onClick={onClose}>
-            キャンセル
+            {t.settings.cancelBtn}
           </button>
           <button id="btn-save-settings" className="btn-primary" onClick={handleSave}>
             {savedSuccess ? <Check size={14} /> : <Save size={14} />}
-            <span>{savedSuccess ? '保存完了！' : '設定を保存'}</span>
+            <span>{savedSuccess ? t.settings.savedBtn : t.settings.saveBtn}</span>
           </button>
         </div>
       </div>

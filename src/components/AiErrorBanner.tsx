@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { ErrorExplanation, TerminalContext } from '../types';
 import { TauriApi } from '../services/tauriApi';
+import { useI18n } from '../i18n';
 
 interface AiErrorBannerProps {
   command: string;
@@ -31,6 +32,7 @@ export const AiErrorBanner: React.FC<AiErrorBannerProps> = ({
   onInsertCommand,
   onExecuteCommand,
 }) => {
+  const { t } = useI18n();
   const [loading, setLoading] = useState(false);
   const [explanation, setExplanation] = useState<ErrorExplanation | null>(null);
   const [expanded, setExpanded] = useState(false);
@@ -43,9 +45,9 @@ export const AiErrorBanner: React.FC<AiErrorBannerProps> = ({
       setExpanded(true);
     } catch (err) {
       setExplanation({
-        summary: 'エラー解析に失敗しました',
+        summary: t.errorBanner.analysisFailed,
         cause: String(err),
-        explanation: 'API設定またはネットワーク接続を確認してください。',
+        explanation: t.errorBanner.checkConnection,
       });
       setExpanded(true);
     } finally {
@@ -57,9 +59,7 @@ export const AiErrorBanner: React.FC<AiErrorBannerProps> = ({
     <div className="error-banner">
       <div className="error-banner-content">
         <AlertCircle size={16} color="#f43f5e" />
-        <span>
-          コマンド <code style={{ color: '#fff', fontWeight: 600 }}>{command}</code> でエラーが検出されました
-        </span>
+        <span>{t.errorBanner.detected(command)}</span>
       </div>
 
       {!explanation ? (
@@ -79,7 +79,7 @@ export const AiErrorBanner: React.FC<AiErrorBannerProps> = ({
           ) : (
             <Sparkles size={13} />
           )}
-          <span>AIで原因を調査 & 修正</span>
+          <span>{t.errorBanner.investigateBtn}</span>
         </button>
       ) : (
         <button
@@ -88,7 +88,7 @@ export const AiErrorBanner: React.FC<AiErrorBannerProps> = ({
           onClick={() => setExpanded(!expanded)}
         >
           {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-          <span>{expanded ? '閉じる' : '詳細'}</span>
+          <span>{expanded ? t.common.close : t.errorBanner.details}</span>
         </button>
       )}
 
@@ -131,7 +131,7 @@ export const AiErrorBanner: React.FC<AiErrorBannerProps> = ({
           </div>
 
           <div style={{ color: '#cbd5e1' }}>
-            <strong>原因:</strong> {explanation.cause}
+            <strong>{t.errorBanner.cause}:</strong> {explanation.cause}
           </div>
 
           <div style={{ color: '#94a3b8', fontSize: '12px', lineHeight: 1.5 }}>
@@ -162,10 +162,10 @@ export const AiErrorBanner: React.FC<AiErrorBannerProps> = ({
                     onInsertCommand(explanation.fix_command!);
                     onDismiss();
                   }}
-                  title="Insert to terminal"
+                  title={t.errorBanner.insertFix}
                 >
                   <CornerDownLeft size={12} />
-                  <span>挿入</span>
+                  <span>{t.errorBanner.insertFix}</span>
                 </button>
                 <button
                   className="btn-primary"
@@ -179,10 +179,10 @@ export const AiErrorBanner: React.FC<AiErrorBannerProps> = ({
                     onExecuteCommand(explanation.fix_command!);
                     onDismiss();
                   }}
-                  title="Run fix command now"
+                  title={t.errorBanner.runFix}
                 >
                   <Play size={12} />
-                  <span>修正を実行</span>
+                  <span>{t.errorBanner.runFix}</span>
                 </button>
               </div>
             </div>

@@ -8,6 +8,7 @@ import {
   Layers,
 } from 'lucide-react';
 import { AppConfig, GitStatus, SystemInfo } from '../types';
+import { useI18n } from '../i18n';
 
 interface StatusBarProps {
   cwd: string;
@@ -26,6 +27,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({
   onOpenAiCommand,
   onOpenSettings,
 }) => {
+  const { t } = useI18n();
   const [copied, setCopied] = useState(false);
 
   const handleCopyCwd = () => {
@@ -46,7 +48,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({
         <div
           className="status-item"
           onClick={handleCopyCwd}
-          title="Click to copy path"
+          title={t.statusBar.copyPathTooltip}
         >
           <Folder size={13} />
           <span>{cwd || '~'}</span>
@@ -58,13 +60,13 @@ export const StatusBar: React.FC<StatusBarProps> = ({
         </div>
 
         {gitStatus.is_repo && (
-          <div className="status-item git-badge" title="Git repository">
+          <div className="status-item git-badge" title={t.statusBar.gitRepoTooltip}>
             <GitBranch size={13} />
             <span>{gitStatus.branch || 'HEAD'}</span>
             {gitStatus.modified_count > 0 && (
               <span
                 className="git-modified"
-                title={`${gitStatus.modified_count} modified files`}
+                title={`${gitStatus.modified_count} ${t.statusBar.gitModified}`}
               >
                 *{gitStatus.modified_count}
               </span>
@@ -72,7 +74,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({
             {gitStatus.untracked_count > 0 && (
               <span
                 className="git-untracked"
-                title={`${gitStatus.untracked_count} untracked files`}
+                title={`${gitStatus.untracked_count} ${t.statusBar.gitUntracked}`}
               >
                 ?{gitStatus.untracked_count}
               </span>
@@ -85,7 +87,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({
         <div
           className="status-item"
           onClick={onOpenAiCommand}
-          title="Open AI Command Generator (Ctrl+K)"
+          title={t.statusBar.aiPromptTooltip}
           style={{ gap: '4px' }}
         >
           <Sparkles size={12} color="#38bdf8" />
@@ -104,7 +106,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({
         <div
           className="status-item ai-status-indicator"
           onClick={onOpenSettings}
-          title="Click to change AI settings"
+          title={t.statusBar.aiSettingsTooltip}
         >
           <span className="pulse-dot" />
           <span>{getProviderName()}</span>
