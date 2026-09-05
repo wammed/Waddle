@@ -152,6 +152,17 @@
 - **Remote Ollama Warning Banner**: Real-time warning badge in Settings alerts users when an external/remote Ollama endpoint is configured, advising on network data transmission risks.
 - **Subprocess Hardening**: Background Git status polling executes with `--no-optional-locks` and `GIT_OPTIONAL_LOCKS=0` to prevent repository lock collisions, and native file pickers prioritize trusted `/usr/bin/` paths.
 
+### 14. 🐙 Git & GitHub Integration, Local AI Commits & Push/Pull Policy
+- **Quick Git Popover**: Click the Git branch badge in the status bar to open an interactive floating panel with branch checkout, ahead/behind tracking, staged/unstaged/untracked file grouping, and instant diff viewing.
+- **One-Click Push & Pull (`git push` / `git pull`)**: Push local commits or pull remote updates directly from the popover. Features animated count badges (`↑ahead` / `↓behind`), progress spinners, and background non-blocking execution (`spawn_blocking`) with `GIT_TERMINAL_PROMPT=0` to prevent UI freezing.
+- **Local AI Conventional Commit Generator**: One-click generation of semantic commit messages (`feat: ...`, `fix: ...`, `refactor: ...`) powered completely by your local Ollama instance—no code or diffs ever leave your machine.
+- **Built-in Syntax-Highlighted Diff Viewer**: Inspect unified diffs within Waddle, view side-by-side additions and deletions, review untracked files as synthetic diffs, and stage or discard changes directly.
+- **File Tree Git Status Badges**: Visual state decorations (`M` for Modified, `U` for Untracked, `S` for Staged, `C` for Conflicted) and folder indicator dots showing where changes reside in your project tree.
+- **Settings Toggle & GitHub Privacy Shield**:
+  - **Git Integration Toggle**: Toggle Git integration completely ON/OFF in Settings (`Ctrl + ,`) for a pure lightweight terminal experience with zero Git subprocess polling.
+  - **GitHub Restriction Policy**: Automatically inspects `git remote -v` and blocks push/pull operations to non-GitHub remotes (e.g. GitLab, Bitbucket, custom servers), alerting users in the UI.
+  - **Content Security Policy (CSP)**: Strictly confines Webview network connections to `localhost:11434` (Ollama) and `github.com`.
+
 ---
 
 ## ⌨️ Keybindings
@@ -173,7 +184,9 @@
 | `Alt + 4` | Switch to **4-Split (2×2 Grid)** layout |
 | `Alt + Z` | Toggle **Zoom / Maximize active pane** |
 | `Alt + ↑ / ↓ / ← / →` | Move focus between split panes |
-| `Ctrl + ,` | Open **Settings** (Ollama model, wallpaper, themes, fonts, language) |
+| `Ctrl + ,` | Open **Settings** (Ollama model, wallpaper, themes, fonts, language, Git toggle) |
+| `Status Bar Git Badge` | Open **Git Quick Popover** (Branch, Stage, Commit, Push, Pull, Diff) |
+| `Ctrl + Enter` *(in Git commit)* | Commit staged changes |
 | `Enter` *(in AI modal)* | Insert generated command into terminal |
 | `Ctrl + Enter` *(in AI modal)* | Execute generated command immediately |
 | `Enter` / `Shift + Enter` *(in search)* | Find next / previous match in terminal |
@@ -191,12 +204,14 @@ graph TD
         Editor["Embedded Editor: Quick Open + Run in Terminal"]
         AIOverlay["AI Command Modal Ctrl+K / Smart Error Banner"]
         Copilot["AI Copilot Sidebar: Context-Aware Chat + Export"]
-        Settings["Settings Modal: Ollama Model & Wallpaper & Fonts"]
+        GitUI["Git Quick Popover & Diff Viewer: Push / Pull / Staging / Commits"]
+        Settings["Settings Modal: Ollama Model & Wallpaper & Git Config"]
         Hooks["Custom Hooks: useTerminalTabs + useGlobalShortcuts"]
     end
 
     subgraph Rust_Backend ["Backend: Rust + Tauri Core"]
         PtyMgr["PTY Manager: portable-pty + UTF-8 buffer + Process Group Kill"]
+        GitCore["Git Engine: Status / Stage / Commit / Push / Pull / Diff / Policy"]
         AiCore["Ollama Client: Line-Buffered Streaming / Tags / Generate"]
         FileIO["File System: Read / Write / List with Guardrails"]
         ConfigMgr["Config Manager: ~/.config/waddle/config.json"]
@@ -204,13 +219,16 @@ graph TD
 
     subgraph System_Layer ["Local Linux Environment"]
         Shell["Linux Shell: /bin/bash, zsh, fish"]
+        GitRepo["Git Repository & GitHub Remotes"]
         Ollama["Local Ollama: http://localhost:11434"]
     end
 
     TermView <-->|Tauri IPC Events| PtyMgr
     PtyMgr <--> Shell
+    GitUI <-->|Git Commands| GitCore
+    GitCore <--> GitRepo
     Editor <-->|File Commands| FileIO
-    AIOverlay & Copilot & Editor <-->|AI Commands| AiCore
+    AIOverlay & Copilot & Editor & GitUI <-->|AI Commands| AiCore
     AiCore <-->|REST / SSE Stream| Ollama
     Hooks --> TermView
     Hooks --> AIOverlay
@@ -304,6 +322,7 @@ sudo pacman -U src-tauri/target/release/bundle/pacman/waddle-0.1.0-1-x86_64.pkg.
   - **Word-Boundary Dangerous Command Interception**: Intercepts destructive actions (`rm -rf`, `git clean -fdx`, `git reset --hard`, process substitutions, disk tools) with precision word boundaries.
   - **Wallpaper Integrity Validation**: Magic byte checks ensure only genuine image files are stored.
   - **Remote Endpoint Warning**: Alerts users when a non-localhost Ollama endpoint is configured.
+  - **Git Privacy & GitHub-Only Policy**: Git integration can be toggled off at will in Settings to completely disable background Git subprocess polling. When enabled, Waddle inspects remotes and prevents push/pull data transmission to non-GitHub destinations, locked down by Webview CSP.
 
 ---
 

@@ -1,14 +1,14 @@
 # Waddle 開発引き継ぎサマリー (Session Handover & Continuation Guide)
 
-本ドキュメントは、これまでの開発・改修内容の全履歴、技術的決定事項、アーキテクチャの変更点、および今後の開発再開時にスムーズに作業を継続できるようにまとめた引き継ぎ資料です。
+本ドキュメントは、これまでの開発・改修内容の全履歴、技術的決定事項、アーキテクチャの変更点、および今後の開発再開時にスムーズに作業を継続できるようにまとめた包括的な引き継ぎ資料です。
 
 ---
 
 ## 1. プロジェクト概要 & 技術構成
 
-- **アプリケーション名**: Waddle (AI-Powered Native Terminal Emulator)
+- **アプリケーション名**: Waddle (AI-Integrated Next-Generation Linux Terminal Emulator)
 - **リポジトリパス**: `/home/susie/GitHUB/wammed/Waddle`
-- **フレームワーク**: Tauri v2 + Vite + React 18 + TypeScript + Rust
+- **フレームワーク**: Tauri v2 + Vite + React 19 + TypeScript + Rust
 - **主要ライブラリ**:
   - フロントエンド: `@xterm/xterm` (v5), `@xterm/addon-canvas`, `@xterm/addon-fit`, `@xterm/addon-web-links`, `@xterm/addon-search`, `lucide-react`
   - バックエンド (Rust): `portable_pty`, `tokio`, `serde`, `libc`, `reqwest` (Ollama AI API)
@@ -32,6 +32,18 @@
    - PTY レースコンディションを `start_pty` 同期ハンドシェイクで解消し、Frame 0 から常にプロンプトを瞬時描画。
    - ドラッグ中の Canvas 再生成・クリアを抑止し、フリッカーフリーのリサイズを実現。
    - 3分割（4種）、4分割（3種）を含む全10レイアウトに 16px 広域当たり判定ディバイダーを実装。
+7. **会話履歴のまとめ書き出し**:
+   - ここまでの経緯・アーキテクチャ・検証結果を `SESSION_HANDOVER.md` に集約。
+8. **Git 連携強化の提案と全項目実装**:
+   - ステータスバー連動 Git Quick Popover、ローカル Ollama による Conventional Commit 自動生成、GUI Diff ビューワー、ファイルツリーの Git 状態装飾、Ahead/Behind 同期追跡を実装。
+9. **Git アクション不具合解消 & 設定画面 ON/OFF & GitHub 特化接続制限**:
+   - Tauri コマンド引数名の不一致（`path` vs `repoPath`）、`GitFileEntry` 構造体フィールドの乖離、カレントディレクトリの解決（`resolve_repo_root`）を修正。
+   - 設定画面に「Git 連携の有効化」トグルを新設し、OFF 時はバックグラウンド Git ポーリングを全停止するローカル完結モードを実装。
+   - GitHub 限定セキュリティポリシー（`restrict_to_github`）を新設。非 GitHub リモートの検知・警告、CSP `connect-src` の厳格制限（Ollama + GitHub のみに限定）を実装。
+10. **Git ポップオーバー内での `git push` / `git pull` 実装**:
+    - クイックポップオーバー内にインタラクティブな Pull（↓）/ Push（↑）ボタンを配置。
+    - Ahead / Behind のコミット件数バッジ発光、プログレススピナー、完了トースト、エラーバナー、多言語表示を完備。
+    - GitHub 限定ポリシーに基づき非 GitHub リモートへの push/pull を事前遮断するガードレールを組み込み。
 
 ---
 
@@ -42,8 +54,8 @@
 - **対応内容**:
   - **全レイアウト網羅**: 単一 (`single`)、2分割 (`split-2-h`, `split-2-v`)、3分割 (`split-3-left-main`, `split-3-top-main`, `split-3-h`, `split-3-v`)、4分割 (`grid-4`, `split-4-left-main`, `split-4-h`) の全レイアウトにインタラクティブなディバイダーを配置。
   - **センタリング & 16px ヒット領域**: `.pane-divider-x` に `margin-left: -8px;`、`.pane-divider-y` に `margin-top: -8px;` を適用し、境界線を中心とする ±8px の余裕あるグラブ領域を確保。
-  - **2×2 グリッド交差点の 4方向リサイズハンドル**: `grid-4` では水平線を左右独立分割し垂直線との干渉を排除。中央交差点に 20×20px の [`.pane-divider-corner`](file:///home/susie/GitHUB/wammed/Waddle/src/index.css) を配置し、斜めドラッグで縦横を同時に伸縮可能に。
-  - **動的 CSS グリッド計算**: 各レイアウトのギャップ（4px / 8px / 12px）を考慮した正確な `gridTemplateColumns` / `gridTemplateRows` スタイルを生成。
+  - **2×2 グリッド交差点の 4方向リサイズハンドル**: `grid-4` では水平線を左右独立分割し垂直線との干渉を排除。中央交差点に 20×20px の `.pane-divider-corner` を配置し、斜めドラッグで縦横を同時に伸縮可能に。
+  - **動的 CSS グリッド計算**: 各レイアウトのギャップを考慮した正確な `gridTemplateColumns` / `gridTemplateRows` スタイルを生成。
 
 ### B. ペインリサイズ時のフリッカー（ちらつき）完全解消
 - **対象ファイル**: [`src/components/TerminalPane.tsx`](file:///home/susie/GitHUB/wammed/Waddle/src/components/TerminalPane.tsx), [`src/components/SingleTerminalView.tsx`](file:///home/susie/GitHUB/wammed/Waddle/src/components/SingleTerminalView.tsx)
@@ -58,21 +70,27 @@
 - **対応内容**:
   - **`start_pty` 同期ハンドシェイク**: Rust の PTY リーダースレッドに `recv_timeout` 同期チャンネルを新設。
   - フロントエンドがマウントされ、`onPtyOutput` イベントリスナーの登録が完了した瞬間に `TauriApi.startPty(sessionId)` をコールしてストリームを開始。
-  - シェル起動直後のプロンプト（Linux カーネルの PTY バッファに保持）がリスナー登録後に 100% 確実にフロントエンドへ届くよう保証。起動時の黒画面待機（速い時と遅い時のばらつき）を解消。
+  - シェル起動直後のプロンプト（Linux カーネルの PTY バッファに保持）がリスナー登録後に 100% 確実にフロントエンドへ届くよう保証。起動時の黒画面待機を解消。
 
-### D. 壁紙（背景画像）のデフォルト統一とレイヤー復元
-- **対象ファイル**: [`src-tauri/src/config.rs`](file:///home/susie/GitHUB/wammed/Waddle/src-tauri/src/config.rs), [`src/App.tsx`](file:///home/susie/GitHUB/wammed/Waddle/src/App.tsx)
+### D. Git & GitHub 連携の統合 (Quick Popover, Conventional Commits, Diff, Push/Pull)
+- **対象ファイル**:
+  - [`src/components/GitQuickPopover.tsx`](file:///home/susie/GitHUB/wammed/Waddle/src/components/GitQuickPopover.tsx), [`src/components/GitDiffModal.tsx`](file:///home/susie/GitHUB/wammed/Waddle/src/components/GitDiffModal.tsx), [`src/components/FileTreeSidebar.tsx`](file:///home/susie/GitHUB/wammed/Waddle/src/components/FileTreeSidebar.tsx)
+  - [`src-tauri/src/pty.rs`](file:///home/susie/GitHUB/wammed/Waddle/src-tauri/src/pty.rs), [`src-tauri/src/lib.rs`](file:///home/susie/GitHUB/wammed/Waddle/src-tauri/src/lib.rs), [`src/services/tauriApi.ts`](file:///home/susie/GitHUB/wammed/Waddle/src/services/tauriApi.ts)
 - **対応内容**:
-  - Rust 側の設定デフォルト値を `Some("preset_cyberpunk".to_string())` に統一。
-  - `<section className="terminal-area">` 直下に壁紙レイヤーを配置し、透過ターミナルの背面に美しく表示。
+  - **Quick Git Popover**: ステータスバーの Git バッジをクリックして展開。ブランチ切替、ステージ/アンステージ（ファイル単体および一括）、変更破棄、コミット入力欄。
+  - **1クリック Pull & Push**: ヘッダー同期エリアから直接 `git pull` / `git push` を実行。遅延（Behind）はアンバー、先行（Ahead）はシアンのバッジで件数を強調表示。非同期実行（`spawn_blocking`）と `GIT_TERMINAL_PROMPT=0` により UI フリーズを防止。
+  - **ローカル Ollama AI による Conventional Commit 自動生成**: ステージ済みの差分からコミットメッセージ（`feat:`, `fix:` 等）を完全ローカルで自動生成。
+  - **内蔵 GUI Diff ビューワー**: unified diff を色分け表示。新規未追跡ファイルにも対応し、差分画面から直接ステージングや破棄が可能。
+  - **ファイルツリー Git 状態装飾**: M（変更）、U（未追跡）、S（ステージ済）、C（競合）バッジ、および親フォルダへの点灯インジケータードット。
 
-### E. その他の実装済み改善（13項目抜粋）
-- **ターミナル内ログ検索機能 (`Ctrl+Shift+F`)**: `@xterm/addon-search` によるインクリメンタル検索、ハイライト、大文字小文字/正規表現切り替え。
-- **AI チャット履歴エクスポート**: Copilot サイドバーから Markdown / JSON で保存可能。
-- **プロセスグループ終了**: タブ/ペイン終了時に `-pid` へ `SIGHUP` / `SIGKILL` を送りゾンビプロセスを防止。
-- **PTY UTF-8 境界保護**: マルチバイト文字がバッファ境界で分断された場合の文字化けを解消。
-- **Ollama AI ストリーミング行バッファリング**: ネットワークパケット途切れ時の JSON パースエラーを防止。
-- **App.tsx のリファクタリング**: `useTerminalTabs.ts` および `useGlobalShortcuts.ts` へ責務を分離。
+### E. ローカル完結ポリシー & GitHub 限定セキュリティ保護
+- **対象ファイル**:
+  - [`src-tauri/src/config.rs`](file:///home/susie/GitHUB/wammed/Waddle/src-tauri/src/config.rs), [`src/components/SettingsModal.tsx`](file:///home/susie/GitHUB/wammed/Waddle/src/components/SettingsModal.tsx), [`src-tauri/tauri.conf.json`](file:///home/susie/GitHUB/wammed/Waddle/src-tauri/tauri.conf.json)
+- **対応内容**:
+  - **Git 連携 ON/OFF 設定**: 設定画面から Git 連携を無効化可能。無効時は `git status` ポーリングが一切走らず、ステータスバーやファイルツリーの Git UI が非表示化され、純粋な超軽量ローカルターミナルとして動作。
+  - **GitHub 特化リモート検証 (`inspect_github_remotes`)**: リポジトリのリモートが `github.com`（または `github.io`）以外（GitLab, Bitbucket, 独自外部サーバー等）である場合に遮断・警告。
+  - **Push / Pull 実行時のポリシー強制**: 非 GitHub リモートに対する push/pull は Rust 側で事前に拒否。
+  - **厳格な CSP 設定**: Webview の `connect-src` を `localhost:11434` (Ollama) および `https://api.github.com https://github.com` のみに制限し、外部への不用意な通信を物理遮断。
 
 ---
 
@@ -80,31 +98,34 @@
 
 | ファイルパス | 主な役割・変更内容 |
 |---|---|
+| `src-tauri/src/pty.rs` | PTY 管理、`start_pty` 受信チャンネル、Git 操作（`git_status`, `git_push`, `git_pull`, `git_commit`, `git_get_diff` 等）、`resolve_repo_root`、`inspect_github_remotes` |
+| `src-tauri/src/lib.rs` | Tauri コマンド公開（`repo_path` 統一、`git_push`, `git_pull`）、非同期タスク管理、セキュリティユニットテスト |
+| `src-tauri/src/config.rs` | `GitIntegrationConfig`（`enabled`, `restrict_to_github`）、壁紙設定、設定永続化 |
+| `src-tauri/tauri.conf.json` | CSP `connect-src` の GitHub & Ollama 限定化 |
+| `src/services/tauriApi.ts` | フロントエンド Tauri API ラッパー（`gitPush`, `gitPull`, `gitCommit`, `gitGetDiff` 等） |
+| `src/components/GitQuickPopover.tsx` | Git フローティングパネル（ブランチ切替、ステージング、AIコミット、Pull/Push アクション、Ahead/Behind バッジ、警告バナー） |
+| `src/components/GitDiffModal.tsx` | シンタックスハイライト付き内蔵差分ビューワー |
+| `src/components/SettingsModal.tsx` | Git & GitHub 連携設定セクション（有効化トグル、GitHub限定ポリシートグル） |
+| `src/components/StatusBar.tsx` | Git ステータスバッジ（Ahead/Behind、競合警告、非GitHub遮断バッジ）、GitPopver トリガー |
+| `src/components/FileTreeSidebar.tsx` | ファイルツリーの Git ステータス装飾（M, U, S, C）およびフォルダ変更ドット |
 | `src/components/TerminalPane.tsx` | 全10レイアウトのディバイダー描画、ドラッグ座標計算、`isResizing` の伝達 |
-| `src/components/SingleTerminalView.tsx` | `isResizing` ガード（Canvasクリア抑止）、`startPty` ハンドシェイク、ログ検索統合 |
-| `src/index.css` | ディバイダーの 16px ヒット領域（`margin: -8px`）、交差点ハンドル、Containment |
-| `src-tauri/src/pty.rs` | `start_pty` 受信チャンネル、UTF-8境界バッファリング、プロセスグループ完全クリーンアップ |
-| `src-tauri/src/config.rs` | 壁紙デフォルト（`preset_cyberpunk`）の恒久補完、画像バリデーション |
-| `src-tauri/src/lib.rs` | `start_pty` コマンドの公開・ハンドラー登録 |
-| `src/services/tauriApi.ts` | `TauriApi.startPty(sessionId)` のフロントエンドラッパー |
-| `src/App.tsx` | 壁紙レイヤー配置、設定同一性チェック |
-| `src/hooks/useTerminalTabs.ts` | タブ・ペイン・セッション管理のカスタムフック |
-| `src/hooks/useGlobalShortcuts.ts` | キーボードショートカット管理のカスタムフック |
+| `src/components/SingleTerminalView.tsx` | `isResizing` ガード（Canvasクリア抑止）、`startPty` ハンドシェイク、Git ポーリング制御 |
+| `src/i18n/translations.ts` | 日英多言語辞書（Git 設定、Git ポップオーバー、Diff ビューワー、Pull/Push メッセージ） |
+| `src/index.css` | ディバイダー、Git ポップオーバー、Pull/Push ボタンスタイル、Diff ビューワー、テーマ定義 |
+| `src/types.ts` | `GitConfig`, `GitStatus`, `GitFileEntry` 型定義 |
 
 ---
 
 ## 5. ビルド・検証コマンド
 
-次回再開時の動作確認には、以下のコマンドを使用します：
-
 ```bash
-# フロントエンドの型検査 & 本番ビルド
+# フロントエンドの型検査 & 本番ビルド (Vite + TypeScript)
 npm run build
 
-# Rust バックエンドの単体テスト
+# Rust バックエンドの単体テスト (全12件)
 cargo test --manifest-path src-tauri/Cargo.toml
 
-# Rust の Clippy 静的解析
+# Rust の Clippy 静的解析 (警告0件)
 cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets
 
 # デスクトップアプリの開発起動
@@ -115,7 +136,7 @@ npm run tauri dev
 
 ## 6. 次回再開時の検討・作業候補（Next Steps）
 
-現時点でユーザー様から「よくなったよ」と動作改善の確認をいただいており、既知の重大なバグ・不具合はありません。今後さらに拡張・改善を進める場合の推奨テーマ：
+現時点でユーザー様からご指示いただいた改善・拡張要望（パフォーマンス、描画ちらつき、ドラッグ境界、Git連携、設定画面、セキュリティ接続制限、Push/Pull）はすべて正常に実装・検証済みです。今後さらに拡張・改善を進める場合の推奨テーマ：
 
 1. **ペイン比率の永続化**:
    - 現在はレイアウト切り替え時にデフォルト比率にリセットされるため、ユーザーがドラッグ調整した比率をタブ状態やローカルストレージに保存・復元する機能。
@@ -123,5 +144,5 @@ npm run tauri dev
    - キーボードのみ（例: `Ctrl+Alt+Left/Right/Up/Down`）でアクティブペインを伸縮できる機能の追加。
 3. **ペインのスワップ・並び替え（ドラッグ＆ドロップ）**:
    - ペインヘッダーをドラッグして、分割されたスロット間でターミナルセッションを入れ替える操作の拡充。
-4. **Git 連携の強化**:
-   - ステータスバーのブランチ表示から、簡易的な git diff や commit ポップオーバーを開く機能。
+4. **GitHub Issue / PR 参照連携**:
+   - ローカル完結かつ GitHub 限定ポリシーの枠組みの中で、GitHub CLI (`gh`) または GitHub API 経由でカレントブランチに関連する Issue や PR の簡易ステータスを表示する拡張。

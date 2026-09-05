@@ -163,6 +163,17 @@
 - **リモート Ollama 警告バナー**: 設定画面で `localhost` 以外の外部エンドポイントが指定された際、外部ネットワークへのデータ送信リスクを促すアンバー警告バナーを即時表示。
 - **バックグラウンドプロセスの安全化**: Git 状態取得時に `--no-optional-locks` および `GIT_OPTIONAL_LOCKS=0` を指定してリポジトリのインデックスロック競合を防ぎ、ファイルダイアログ起動では `/usr/bin/` の絶対パスを優先検証。
 
+### 14. 🐙 Git & GitHub 連携、ローカル AI コミット生成 & Push/Pull ポリシー
+- **ステータスバー連動 Quick Git Popover**: ステータスバーの Git バッジをクリックして展開。ブランチのワンクリック切り替え、ステージ/アンステージ（ファイル単体・一括）、変更の破棄（Discard）、コミットメッセージ入力を提供。
+- **1クリック Pull & Push (`git pull` / `git push`)**: ポップオーバーのヘッダーから直接リモートへ push または最新の変更を pull。遅延（Behind）はアンバー、先行（Ahead）はシアンのバッジで件数が発光表示。非同期実行（`spawn_blocking`）と `GIT_TERMINAL_PROMPT=0` により、GUI やターミナル入力を一切フリーズさせません。
+- **ローカル Ollama による Conventional Commit 自動生成**: ステージされた差分（Diff）をもとに、標準的な Conventional Commits 形式（`feat: ...`, `fix: ...` 等）のコミットメッセージをローカル AI が瞬時に自動生成。コードや差分は外部クラウドへ一切送信されません。
+- **内蔵 GUI Diff ビューワー**: アプリ内で unified diff をシンタックスハイライト付きで視覚的に確認。未追跡ファイルにも対応し、差分確認画面から直接「ステージに追加」「変更を破棄」が可能。
+- **ファイルツリー Git 状態装飾**: 変更（M）、未追跡（U）、ステージ済（S）、競合（C）の各バッジをファイルツリーにリアルタイム表示。変更を含む親フォルダには点灯インジケータードットが表示され、変更箇所が一目瞭然。
+- **設定画面での ON/OFF 切り替え & GitHub 特化接続制限**:
+  - **Git 連携の有効化トグル**: 設定画面（`Ctrl + ,`）から Git 連携を OFF に切り替えることで、バックグラウンドの Git ポーリングを全停止し、超軽量なローカルターミナルとして動作可能。
+  - **GitHub 限定セキュリティポリシー**: `git remote -v` を検査し、GitLab や独自サーバーなど GitHub 以外のリモートに対する push/pull 操作を事前遮断し、ステータスバーとポップオーバーで警告。
+  - **厳格な CSP 制限**: Webview のネットワーク接続先を `localhost:11434` (Ollama) および `github.com` のみに厳格制限。
+
 ---
 
 ## ⌨️ ショートカットキー一覧
@@ -184,7 +195,9 @@
 | `Alt + 4` | **4分割（2×2グリッド）** レイアウトへ切り替え |
 | `Alt + Z` | **アクティブペインのズーム（最大化 / 元に戻す）** |
 | `Alt + ↑ / ↓ / ← / →` | 分割ペイン間のフォーカス移動 |
-| `Ctrl + ,` | **設定画面**（Ollama モデル、壁紙、テーマ、フォント、言語）を開く |
+| `Ctrl + ,` | **設定画面**（Ollama モデル、壁紙、テーマ、フォント、言語、Git連携ON/OFF）を開く |
+| `ステータスバーの Git バッジ` | **Git クイックポップオーバー**（ブランチ切替、ステージ、コミット、Push、Pull、Diff）を開く |
+| `Ctrl + Enter` *(Git コミット入力)* | ステージされた変更をコミット |
 | `Enter` *(AIモーダル内)* | 生成されたコマンドをターミナルに入力挿入 |
 | `Ctrl + Enter` *(AIモーダル内)* | 生成されたコマンドをターミナルで即時実行 |
 | `Enter` / `Shift + Enter` *(検索内)* | ターミナル内の次の一致 / 前の一致へ移動 |
@@ -202,12 +215,14 @@ graph TD
         Editor["内蔵エディタ: ファイルオープン + ターミナル実行"]
         AIOverlay["AI コマンドモーダル Ctrl+K / スマートエラーバナー"]
         Copilot["AI Copilot サイドバー: コンテキスト認識チャット + エクスポート"]
-        Settings["設定モーダル: Ollama モデル自動検出 & 壁紙 & フォント"]
+        GitUI["Git Quick Popover & Diff Viewer: Push / Pull / ステージング / コミット"]
+        Settings["設定モーダル: Ollama モデル自動検出 & 壁紙 & Git 設定"]
         Hooks["カスタムフック: useTerminalTabs + useGlobalShortcuts"]
     end
 
     subgraph Rust_Backend ["バックエンド: Rust + Tauri Core"]
         PtyMgr["PTY マネージャー: portable-pty + UTF-8 境界バッファ + プロセスグループ終了"]
+        GitCore["Git エンジン: Status / Stage / Commit / Push / Pull / Diff / ポリシー検証"]
         AiCore["Ollama クライアント: 行バッファリングストリーミング / タグ取得 / 生成"]
         FileIO["ファイルシステム: 読込 / 保存 / 一覧 (多層保護ガードレール付き)"]
         ConfigMgr["設定管理: ~/.config/waddle/config.json"]
@@ -215,13 +230,16 @@ graph TD
 
     subgraph System_Layer ["ローカル Linux 環境"]
         Shell["Linux シェル: /bin/bash, zsh, fish"]
+        GitRepo["Git リポジトリ & GitHub リモート"]
         Ollama["ローカル Ollama: http://localhost:11434"]
     end
 
     TermView <-->|Tauri IPC イベント| PtyMgr
     PtyMgr <--> Shell
+    GitUI <-->|Git 操作 IPC| GitCore
+    GitCore <--> GitRepo
     Editor <-->|ファイル操作 IPC| FileIO
-    AIOverlay & Copilot & Editor <-->|AI リクエスト IPC| AiCore
+    AIOverlay & Copilot & Editor & GitUI <-->|AI リクエスト IPC| AiCore
     AiCore <-->|REST / SSE ストリーミング| Ollama
     Hooks --> TermView
     Hooks --> AIOverlay
@@ -315,6 +333,7 @@ sudo pacman -U src-tauri/target/release/bundle/pacman/waddle-0.1.0-1-x86_64.pkg.
   - **単語境界を考慮した破壊的コマンド事前検知**: ターミナルおよびエディタからの `rm -rf`、Git破壊操作、プロセス置換等の実行前に確認モーダルを表示（安全な貼り付け・即時実行・キャンセルの選択が可能）。
   - **壁紙バイナリ整合性検証**: マジックバイト検査によりスクリプト等の不正ファイル保存を防御。
   - **リモートエンドポイント警告**: 外部 Ollama サーバー利用時の通信リスクを可視化。
+  - **Git 連携の完全ローカル制御 & GitHub 限定ポリシー**: 設定画面から Git 連携をいつでも無効化でき、バックグラウンドでの Git ポーリングを全停止可能。有効時も非 GitHub リモートに対する push/pull を事前検知して自動遮断し、Webview CSP と連携して不用意な外部データ通信を防止。
 
 ---
 
