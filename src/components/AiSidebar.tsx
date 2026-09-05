@@ -15,6 +15,7 @@ import remarkGfm from 'remark-gfm';
 import { ChatMessage, TerminalContext } from '../types';
 import { TauriApi } from '../services/tauriApi';
 import { useI18n } from '../i18n';
+import { DangerousCommandModal, isDangerousCommand } from './DangerousCommandModal';
 
 interface AiSidebarProps {
   isOpen: boolean;
@@ -42,7 +43,16 @@ export const AiSidebar: React.FC<AiSidebarProps> = ({
   const [input, setInput] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const [confirmCmd, setConfirmCmd] = useState<string | null>(null);
   const chatBottomRef = useRef<HTMLDivElement>(null);
+
+  const handleRun = (cmd: string) => {
+    if (isDangerousCommand(cmd)) {
+      setConfirmCmd(cmd);
+    } else {
+      onExecuteCommand(cmd);
+    }
+  };
   const activeStreamCleanupRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
@@ -184,7 +194,7 @@ export const AiSidebar: React.FC<AiSidebarProps> = ({
                             <button
                               className="btn-primary"
                               style={{ padding: '3px 8px', fontSize: '11px' }}
-                              onClick={() => onExecuteCommand(codeContent)}
+                              onClick={() => handleRun(codeContent)}
                               title={t.common.run}
                             >
                               <Play size={12} />
@@ -237,6 +247,22 @@ export const AiSidebar: React.FC<AiSidebarProps> = ({
           </button>
         </div>
       </div>
+
+      {confirmCmd && (
+        <DangerousCommandModal
+          isOpen={true}
+          command={confirmCmd}
+          onConfirmExecute={() => {
+            onExecuteCommand(confirmCmd);
+            setConfirmCmd(null);
+          }}
+          onSafeInsert={() => {
+            onInsertCommand(confirmCmd);
+            setConfirmCmd(null);
+          }}
+          onClose={() => setConfirmCmd(null)}
+        />
+      )}
     </aside>
   );
 };

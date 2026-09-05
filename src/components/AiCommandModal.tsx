@@ -12,6 +12,7 @@ import {
 import { CommandSuggestion, TerminalContext } from '../types';
 import { TauriApi } from '../services/tauriApi';
 import { useI18n } from '../i18n';
+import { DangerousCommandModal, isDangerousCommand } from './DangerousCommandModal';
 
 interface AiCommandModalProps {
   isOpen: boolean;
@@ -34,6 +35,7 @@ export const AiCommandModal: React.FC<AiCommandModalProps> = ({
   const [suggestion, setSuggestion] = useState<CommandSuggestion | null>(null);
   const [copied, setCopied] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [confirmCmd, setConfirmCmd] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -60,6 +62,15 @@ export const AiCommandModal: React.FC<AiCommandModalProps> = ({
     }
   };
 
+  const handleRun = (cmd: string) => {
+    if (suggestion?.is_dangerous || isDangerousCommand(cmd)) {
+      setConfirmCmd(cmd);
+    } else {
+      onExecuteCommand(cmd);
+      onClose();
+    }
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Escape') {
       onClose();
@@ -67,8 +78,7 @@ export const AiCommandModal: React.FC<AiCommandModalProps> = ({
       if (e.ctrlKey || e.metaKey) {
         // Ctrl+Enter -> Execute immediately
         if (suggestion) {
-          onExecuteCommand(suggestion.command);
-          onClose();
+          handleRun(suggestion.command);
         } else {
           handleGenerate();
         }
@@ -220,10 +230,7 @@ export const AiCommandModal: React.FC<AiCommandModalProps> = ({
               </button>
               <button
                 className="btn-primary"
-                onClick={() => {
-                  onExecuteCommand(suggestion.command);
-                  onClose();
-                }}
+                onClick={() => handleRun(suggestion.command)}
               >
                 <Play size={13} />
                 <span>{t.aiCommand.runBtn}</span>
@@ -232,6 +239,24 @@ export const AiCommandModal: React.FC<AiCommandModalProps> = ({
           )}
         </div>
       </div>
+
+      {confirmCmd && (
+        <DangerousCommandModal
+          isOpen={true}
+          command={confirmCmd}
+          onConfirmExecute={() => {
+            onExecuteCommand(confirmCmd);
+            setConfirmCmd(null);
+            onClose();
+          }}
+          onSafeInsert={() => {
+            onInsertCommand(confirmCmd);
+            setConfirmCmd(null);
+            onClose();
+          }}
+          onClose={() => setConfirmCmd(null)}
+        />
+      )}
     </div>
   );
 };

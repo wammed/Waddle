@@ -174,6 +174,12 @@ export interface Translations {
     fallbackTitle: string;
     retry: string;
   };
+  security: {
+    dangerousWarningTitle: string;
+    dangerousWarningDesc: string;
+    dangerousConfirmRun: string;
+    dangerousSafeInsert: string;
+  };
 }
 
 export const translations: Record<Language, Translations> = {
@@ -352,6 +358,12 @@ export const translations: Record<Language, Translations> = {
       fallbackTitle: 'An error occurred in the component',
       retry: 'Retry',
     },
+    security: {
+      dangerousWarningTitle: 'Dangerous Command Warning',
+      dangerousWarningDesc: 'This command contains potentially destructive operations (file deletion, system modification, or elevated privileges). Are you sure you want to execute it directly?',
+      dangerousConfirmRun: 'Execute Anyway',
+      dangerousSafeInsert: 'Insert into Terminal (Safe)',
+    },
   },
 
   'en-GB': {
@@ -529,6 +541,12 @@ export const translations: Record<Language, Translations> = {
       fallbackTitle: 'An error occurred in the component',
       retry: 'Retry',
     },
+    security: {
+      dangerousWarningTitle: 'Dangerous Command Warning',
+      dangerousWarningDesc: 'This command contains potentially destructive operations (file deletion, system modification, or elevated privileges). Are you sure you want to execute it directly?',
+      dangerousConfirmRun: 'Execute Anyway',
+      dangerousSafeInsert: 'Insert into Terminal (Safe)',
+    },
   },
 
   ja: {
@@ -705,6 +723,12 @@ export const translations: Record<Language, Translations> = {
     errorBoundary: {
       fallbackTitle: 'コンポーネントでエラーが発生しました',
       retry: '再試行',
+    },
+    security: {
+      dangerousWarningTitle: '危険なコマンドの警告',
+      dangerousWarningDesc: 'このコマンドには破壊的な操作（ファイル削除、システム変更、特権実行など）が含まれている可能性があります。本当に端末で直接実行しますか？',
+      dangerousConfirmRun: 'リスクを理解して実行',
+      dangerousSafeInsert: '端末に入力のみ行う（安全）',
     },
   },
 };

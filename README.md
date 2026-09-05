@@ -116,6 +116,13 @@
 - **Live Preview & Persistence**: Switching languages instantly updates all dialogs, toolbars, error banners, and copilot prompts, and persists across restarts in `~/.config/waddle/config.json`.
 - **Sensible Default**: Defaults to English (`en-US`) for international Linux users while providing full native Japanese support.
 
+### 12. 🛡️ Hardened Security & AI Safety Guardrails
+- **Tauri Strict CSP & Asset Isolation**: Strict Content Security Policy blocks unauthorized external network calls and script injection. The custom asset protocol is scoped strictly to wallpapers, pictures, and downloads, completely blocking renderer access to sensitive files (`~/.ssh`, `~/.gnupg`, etc.).
+- **Prompt Injection Defense**: Terminal output passed to AI is length-capped and isolated inside `<untrusted_terminal_output>` delimiters, accompanied by explicit system prompt guardrails that prevent LLMs from following embedded prompt injection payloads.
+- **Dangerous Command Interception (`DangerousCommandModal`)**: Deterministic Rust & React keyword detection flags destructive commands (`rm`, `dd`, `mkfs`, `sudo`, `> /dev/`, `chmod -R`, `curl | sh`, etc.) and presents a warning modal with safe terminal insertion rather than blind execution.
+- **Protected File Operations**: Rust file handlers strictly prevent accidental or malicious deletion of root (`/`), the user's home directory (`$HOME`), or critical system paths (`/etc`, `/usr`, `/bin`).
+- **Subprocess Hardening**: Background Git status polling executes with `--no-optional-locks` and `GIT_OPTIONAL_LOCKS=0` to prevent repository lock collisions, and native file pickers prioritize trusted `/usr/bin/` paths.
+
 ---
 
 ## ⌨️ Keybindings
@@ -134,6 +141,7 @@
 | `Alt + 2` | Switch to **2-Split (Side by Side)** layout |
 | `Alt + 3` | Switch to **3-Split (Left Main)** layout |
 | `Alt + 4` | Switch to **4-Split (2×2 Grid)** layout |
+| `Alt + Z` | Toggle **Zoom / Maximize active pane** |
 | `Alt + ↑ / ↓ / ← / →` | Move focus between split panes |
 | `Ctrl + ,` | Open **Settings** (Ollama model, wallpaper, themes, fonts, language) |
 | `Enter` *(in AI modal)* | Insert generated command into terminal |
@@ -254,6 +262,12 @@ sudo pacman -U src-tauri/target/release/bundle/pacman/waddle-0.1.0-1-x86_64.pkg.
 
 - **100% Offline & Local**: No telemetry, no third-party cloud API keys, and no command/log transmissions over the internet.
 - **Complete Data Sovereignty**: Safe to use in enterprise, air-gapped, or sensitive internal networks.
+- **Hardened Defense-in-Depth Architecture**:
+  - **Strict Content Security Policy (CSP)**: Blocks unauthorized external network calls and arbitrary script injections into the Webview.
+  - **Scoped Asset Protocol**: Confines custom asset loading to wallpaper and picture folders, strictly denying access to sensitive user files (`~/.ssh`, `~/.gnupg`, etc.).
+  - **Indirect Prompt Injection Shield**: Isolates terminal output into untrusted blocks with token limits to neutralize malicious log payloads.
+  - **Dangerous Command Interception**: Intercepts destructive actions (`rm -rf`, disk wipes, partition changes, elevated scripts) with interactive confirmation modals.
+  - **Filesystem Deletion Protection**: Core Rust handlers block deletion of root (`/`), `$HOME`, and essential system paths.
 
 ---
 

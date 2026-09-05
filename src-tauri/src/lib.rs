@@ -180,12 +180,46 @@ fn create_directory(path: String) -> Result<(), String> {
     fs::create_dir_all(p).map_err(|e| format!("Failed to create directory: {}", e))
 }
 
+fn validate_safe_deletion(path: &Path) -> Result<(), String> {
+    let canonical = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+
+    // 1. Never allow root directory "/"
+    if canonical.parent().is_none() || canonical == Path::new("/") {
+        return Err("安全上の理由によりルートディレクトリ (/) の削除は禁止されています。".to_string());
+    }
+
+    // 2. Never allow user home directory directly
+    if let Some(home) = dirs::home_dir() {
+        if let Ok(home_canonical) = home.canonicalize() {
+            if canonical == home_canonical {
+                return Err("安全上の理由によりホームディレクトリ自体の削除は禁止されています。".to_string());
+            }
+        } else if canonical == home {
+            return Err("安全上の理由によりホームディレクトリ自体の削除は禁止されています。".to_string());
+        }
+    }
+
+    // 3. Never allow critical system directories
+    let forbidden_system_dirs = [
+        "/etc", "/usr", "/bin", "/sbin", "/boot", "/lib", "/lib64",
+        "/sys", "/proc", "/dev", "/var", "/opt", "/root", "/run"
+    ];
+    for &sys_dir in &forbidden_system_dirs {
+        if canonical == Path::new(sys_dir) {
+            return Err(format!("安全上の理由によりシステムディレクトリ ({}) の削除は禁止されています。", sys_dir));
+        }
+    }
+
+    Ok(())
+}
+
 #[tauri::command]
 fn delete_entry(path: String) -> Result<(), String> {
     let p = Path::new(&path);
     if !p.exists() {
         return Ok(());
     }
+    validate_safe_deletion(p)?;
     if p.is_dir() {
         fs::remove_dir_all(p).map_err(|e| format!("Failed to delete directory: {}", e))
     } else {
@@ -273,8 +307,13 @@ async fn ai_edit_code(
 #[tauri::command]
 async fn pick_wallpaper_file() -> Result<Option<String>, String> {
     tokio::task::spawn_blocking(|| {
-        // Try zenity first (standard native dialog on GTK/Linux desktop)
-        if let Ok(output) = std::process::Command::new("zenity")
+        // Prefer /usr/bin/zenity to prevent PATH spoofing
+        let zenity_bin = if Path::new("/usr/bin/zenity").is_file() {
+            "/usr/bin/zenity"
+        } else {
+            "zenity"
+        };
+        if let Ok(output) = std::process::Command::new(zenity_bin)
             .args([
                 "--file-selection",
                 "--title=壁紙画像を選択",
@@ -292,7 +331,12 @@ async fn pick_wallpaper_file() -> Result<Option<String>, String> {
         }
 
         // Try kdialog fallback
-        if let Ok(output) = std::process::Command::new("kdialog")
+        let kdialog_bin = if Path::new("/usr/bin/kdialog").is_file() {
+            "/usr/bin/kdialog"
+        } else {
+            "kdialog"
+        };
+        if let Ok(output) = std::process::Command::new(kdialog_bin)
             .args(["--getopenfilename", ".", "*.png *.jpg *.jpeg *.webp *.gif *.svg *.bmp"])
             .output()
         {
@@ -457,5 +501,21 @@ mod tests {
         assert!(!Path::new(&sub_dir).exists());
 
         let _ = fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_forbidden_deletion_prevention() {
+        // Root deletion should be blocked
+        assert!(delete_entry("/".to_string()).is_err());
+
+        // System dir deletion should be blocked
+        assert!(delete_entry("/etc".to_string()).is_err());
+        assert!(delete_entry("/usr".to_string()).is_err());
+
+        // User home dir deletion should be blocked
+        if let Some(home) = dirs::home_dir() {
+            let home_str = home.to_string_lossy().to_string();
+            assert!(delete_entry(home_str).is_err());
+        }
     }
 }

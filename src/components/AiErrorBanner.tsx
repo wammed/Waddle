@@ -12,6 +12,7 @@ import {
 import { ErrorExplanation, TerminalContext } from '../types';
 import { TauriApi } from '../services/tauriApi';
 import { useI18n } from '../i18n';
+import { DangerousCommandModal, isDangerousCommand } from './DangerousCommandModal';
 
 interface AiErrorBannerProps {
   command: string;
@@ -36,6 +37,7 @@ export const AiErrorBanner: React.FC<AiErrorBannerProps> = ({
   const [loading, setLoading] = useState(false);
   const [explanation, setExplanation] = useState<ErrorExplanation | null>(null);
   const [expanded, setExpanded] = useState(false);
+  const [confirmCmd, setConfirmCmd] = useState<string | null>(null);
 
   const handleExplain = async () => {
     setLoading(true);
@@ -176,8 +178,13 @@ export const AiErrorBanner: React.FC<AiErrorBannerProps> = ({
                     color: '#000',
                   }}
                   onClick={() => {
-                    onExecuteCommand(explanation.fix_command!);
-                    onDismiss();
+                    const cmd = explanation.fix_command!;
+                    if (isDangerousCommand(cmd)) {
+                      setConfirmCmd(cmd);
+                    } else {
+                      onExecuteCommand(cmd);
+                      onDismiss();
+                    }
                   }}
                   title={t.errorBanner.runFix}
                 >
@@ -188,6 +195,24 @@ export const AiErrorBanner: React.FC<AiErrorBannerProps> = ({
             </div>
           )}
         </div>
+      )}
+
+      {confirmCmd && (
+        <DangerousCommandModal
+          isOpen={true}
+          command={confirmCmd}
+          onConfirmExecute={() => {
+            onExecuteCommand(confirmCmd);
+            setConfirmCmd(null);
+            onDismiss();
+          }}
+          onSafeInsert={() => {
+            onInsertCommand(confirmCmd);
+            setConfirmCmd(null);
+            onDismiss();
+          }}
+          onClose={() => setConfirmCmd(null)}
+        />
       )}
     </div>
   );

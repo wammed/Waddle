@@ -260,7 +260,8 @@ pub fn check_git_status(path_str: &str) -> GitStatus {
     }
 
     let output = std::process::Command::new("git")
-        .args(["status", "--porcelain", "-b"])
+        .args(["--no-optional-locks", "status", "--porcelain", "-b"])
+        .env("GIT_OPTIONAL_LOCKS", "0")
         .current_dir(path)
         .output();
 
