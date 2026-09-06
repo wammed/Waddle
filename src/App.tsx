@@ -13,7 +13,7 @@ import { SettingsModal } from './components/SettingsModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { AppConfig, SystemInfo, TerminalContext } from './types';
 import { TauriApi } from './services/tauriApi';
-import { THEMES } from './theme';
+import { THEMES, hexToRgbString } from './theme';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import waddleWallpaper from './assets/waddle-wallpaper.png';
 import { I18nProvider } from './i18n';
@@ -165,6 +165,12 @@ export function App() {
     root.style.setProperty('--accent', activeTheme.ui.accent);
     root.style.setProperty('--accent-glow', activeTheme.ui.accentGlow);
     root.style.setProperty('--border', activeTheme.ui.border);
+
+    // Synchronize dynamic RGB and active accents for intense neon aura across the whole window
+    const rgb = activeTheme.accentRgb || hexToRgbString(activeTheme.ui.accent);
+    root.style.setProperty('--accent-rgb', rgb);
+    root.style.setProperty('--border-active', `rgba(${rgb}, 0.5)`);
+    root.style.setProperty('--accent-blue', activeTheme.ui.accent);
   }, [config.terminal.theme]);
 
   // Initial load for config and system info

@@ -16,6 +16,7 @@ import {
   AlertTriangle,
   GitBranch,
   ShieldCheck,
+  Zap,
 } from 'lucide-react';
 import { AppConfig, Language, OllamaStatus } from '../types';
 import { THEMES } from '../theme';
@@ -458,26 +459,119 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               {t.settings.terminalSectionTitle}
             </div>
 
-            <div className="form-group">
-              <label className="form-label" style={{ color: '#94a3b8' }}>{t.settings.themeLabel}</label>
-              <select
-                className="form-select"
-                style={inputStyle}
-                value={formData.terminal.theme}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    terminal: { ...formData.terminal, theme: e.target.value },
-                  })
-                }
-              >
-                {Object.values(THEMES).map((th) => (
-                  <option key={th.id} value={th.id} style={{ background: '#181e2e', color: '#f8fafc' }}>
-                    {th.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {/* Color Theme Selection */}
+            {(() => {
+              const neonThemes = Object.values(THEMES).filter((th) => th.category === 'neon');
+              const classicThemes = Object.values(THEMES).filter((th) => th.category !== 'neon');
+              const currentTheme = THEMES[formData.terminal.theme] || THEMES.waddle_dark;
+              const isNeon = currentTheme.category === 'neon';
+
+              return (
+                <div className="form-group">
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                    <label className="form-label" style={{ color: '#94a3b8', margin: 0 }}>{t.settings.themeLabel}</label>
+                    {isNeon && (
+                      <span className="theme-neon-badge">
+                        <Zap size={10} />
+                        {t.settings.neonBadge}
+                      </span>
+                    )}
+                  </div>
+                  <select
+                    className="form-select"
+                    style={inputStyle}
+                    value={formData.terminal.theme}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        terminal: { ...formData.terminal, theme: e.target.value },
+                      })
+                    }
+                  >
+                    <optgroup label={t.settings.neonThemesGroup}>
+                      {neonThemes.map((th) => (
+                        <option key={th.id} value={th.id} style={{ background: '#181e2e', color: '#f8fafc' }}>
+                          {th.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                    <optgroup label={t.settings.classicThemesGroup}>
+                      {classicThemes.map((th) => (
+                        <option key={th.id} value={th.id} style={{ background: '#181e2e', color: '#f8fafc' }}>
+                          {th.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                  </select>
+
+                  {/* Live Theme Preview Box */}
+                  <div className={`theme-preview-card ${isNeon ? 'is-neon' : ''}`}>
+                    {currentTheme.description && (
+                      <div className="theme-preview-desc">
+                        {currentTheme.description}
+                      </div>
+                    )}
+                    <div className="theme-preview-swatches">
+                      <div className="theme-swatch" title={`UI Accent: ${currentTheme.ui.accent}`}>
+                        <span
+                          className="theme-swatch-dot glowing"
+                          style={{
+                            backgroundColor: currentTheme.ui.accent,
+                            color: currentTheme.ui.accent,
+                          }}
+                        />
+                        <span>Accent</span>
+                      </div>
+                      <div className="theme-swatch" title={`Cursor: ${currentTheme.terminal.cursor || currentTheme.ui.accent}`}>
+                        <span
+                          className="theme-swatch-dot"
+                          style={{ backgroundColor: (currentTheme.terminal.cursor as string) || currentTheme.ui.accent }}
+                        />
+                        <span>Cursor</span>
+                      </div>
+                      <div className="theme-ansi-strip" title="ANSI Color Palette">
+                        {[
+                          currentTheme.terminal.red,
+                          currentTheme.terminal.green,
+                          currentTheme.terminal.yellow,
+                          currentTheme.terminal.blue,
+                          currentTheme.terminal.magenta,
+                          currentTheme.terminal.cyan,
+                        ].map((c, i) => (
+                          <span
+                            key={i}
+                            className="theme-ansi-dot"
+                            style={{ backgroundColor: c as string }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                    {/* Live mini terminal prompt preview */}
+                    <div
+                      className="theme-mini-terminal"
+                      style={{
+                        backgroundColor: (currentTheme.terminal.background as string) || '#0a0a0a',
+                        color: (currentTheme.terminal.foreground as string) || '#ffffff',
+                      }}
+                    >
+                      <span style={{ color: currentTheme.ui.accent }}>~/waddle</span>
+                      <span style={{ color: (currentTheme.terminal.green as string) || currentTheme.ui.accent }}>❯</span>
+                      <span>git status</span>
+                      <span
+                        style={{
+                          display: 'inline-block',
+                          width: '7px',
+                          height: '13px',
+                          backgroundColor: (currentTheme.terminal.cursor as string) || currentTheme.ui.accent,
+                          boxShadow: `0 0 6px ${currentTheme.ui.accent}`,
+                          marginLeft: '2px',
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Font Selection */}
             <div className="form-group">

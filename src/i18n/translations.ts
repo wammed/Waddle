@@ -199,6 +199,9 @@ export interface Translations {
     temperatureLabel: (temp: number) => string;
     terminalSectionTitle: string;
     themeLabel: string;
+    neonThemesGroup: string;
+    classicThemesGroup: string;
+    neonBadge: string;
     fontLabel: string;
     customFontPlaceholder: string;
     fontSizeLabel: string;
@@ -445,6 +448,9 @@ export const translations: Record<Language, Translations> = {
       temperatureLabel: (temp) => `Generation Temperature (${temp})`,
       terminalSectionTitle: 'Terminal Appearance',
       themeLabel: 'Color Theme',
+      neonThemesGroup: '⚡ High-Voltage Neon Themes',
+      classicThemesGroup: 'Classic & Pro Themes',
+      neonBadge: '⚡ NEON',
       fontLabel: 'Font Family',
       customFontPlaceholder: "e.g., 'Hack', 'MesloLGS NF', monospace",
       fontSizeLabel: 'Font Size (px)',
@@ -690,6 +696,9 @@ export const translations: Record<Language, Translations> = {
       temperatureLabel: (temp) => `Generation Temperature (${temp})`,
       terminalSectionTitle: 'Terminal Appearance',
       themeLabel: 'Colour Theme',
+      neonThemesGroup: '⚡ High-Voltage Neon Themes',
+      classicThemesGroup: 'Classic & Pro Themes',
+      neonBadge: '⚡ NEON',
       fontLabel: 'Font Family',
       customFontPlaceholder: "e.g. 'Hack', 'MesloLGS NF', monospace",
       fontSizeLabel: 'Font Size (px)',
@@ -935,6 +944,9 @@ export const translations: Record<Language, Translations> = {
       temperatureLabel: (temp) => `生成 Temperature (${temp})`,
       terminalSectionTitle: 'ターミナル外観',
       themeLabel: 'カラーテーマ',
+      neonThemesGroup: '⚡ 高電圧ネオン・ハデハデテーマ',
+      classicThemesGroup: 'スタンダード・プロテーマ',
+      neonBadge: '⚡ NEON',
       fontLabel: 'フォント (Font Family)',
       customFontPlaceholder: "例: 'Hack', 'MesloLGS NF', monospace",
       fontSizeLabel: 'フォントサイズ (px)',

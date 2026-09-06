@@ -2525,5 +2525,125 @@ input::placeholder {
   flex-shrink: 0;
 }
 
+/* ==========================================================================
+   Theme Preview Box & Neon Styling (Settings Modal)
+   ========================================================================== */
+.theme-preview-card {
+  margin-top: 10px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.theme-preview-card.is-neon {
+  border-color: rgba(var(--accent-rgb), 0.4);
+  box-shadow: 0 0 20px rgba(var(--accent-rgb), 0.18), inset 0 0 15px rgba(var(--accent-rgb), 0.05);
+  background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.08) 0%, rgba(10, 10, 18, 0.6) 100%);
+}
+
+.theme-neon-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  color: #ffffff;
+  background: linear-gradient(135deg, #ff007f 0%, #7928ca 50%, #00f7ff 100%);
+  background-size: 200% 200%;
+  animation: neon-gradient-shift 3.5s ease infinite;
+  box-shadow: 0 0 12px rgba(255, 0, 127, 0.45);
+  text-transform: uppercase;
+}
+
+@keyframes neon-gradient-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.theme-preview-desc {
+  font-size: 11.5px;
+  color: #94a3b8;
+  line-height: 1.45;
+  font-style: italic;
+}
+
+.theme-preview-swatches {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.theme-swatch {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 11px;
+  color: #cbd5e1;
+}
+
+.theme-swatch-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  flex-shrink: 0;
+}
+
+.theme-swatch-dot.glowing {
+  box-shadow: 0 0 8px currentColor;
+}
+
+.theme-ansi-strip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  background: rgba(0, 0, 0, 0.35);
+  padding: 4px 6px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.theme-ansi-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.theme-ansi-dot:hover {
+  transform: scale(1.35);
+  box-shadow: 0 0 6px currentColor;
+}
+
+.theme-mini-terminal {
+  padding: 7px 12px;
+  border-radius: 6px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5);
+  overflow-x: hidden;
+  white-space: nowrap;
+}
+
+
 
 

@@ -113,12 +113,20 @@
 - **Sub-Millisecond 0ms Startup**: High-efficiency 2D Canvas rendering (`@xterm/addon-canvas`) over transparent background without GPU driver stalls, ensuring immediate terminal readiness and keyboard input acceptance from Frame 0.
 - **Smart Git & CWD Polling**: Automatically pauses polling when the window is hidden (`document.hidden`) or inactive, and updates immediately upon command submission.
 
-### 11. 🎨 13 Premium Themes & Dynamic UI Color Sync
-- **13 Built-in Designer Themes**:
-  - **Waddle Cyber (Default)**, **Tokyo Night**, **Catppuccin Mocha**, **Dracula**
-  - **Nord (Arctic)**, **Gruvbox Dark**, **One Dark Pro**, **Rosé Pine**
-  - **Monokai Pro**, **Cyberpunk 2077**, **Solarized Dark**, **Synthwave '84**, **Midnight Abyss (OLED Pure Black)**
-- **Full UI Synchronization**: Window titlebar, tabs, borders, status bar, and modal accents dynamically adapt to the selected theme.
+### 11. 🎨 22 Premium Themes & High-Voltage Neon Collection
+- **22 Built-in Designer Themes (Categorized into Neon & Classic Groups)**:
+  - **⚡ High-Voltage Neon Collection (11 Themes)**:
+    - **Neon Overdrive** (Laser Pink & Electric Cyan), **Toxic Matrix** (Fluorescent Biohazard Lime)
+    - **Outrun Sunset** (Blazing Orange & Gold), **Electric Violet** (Ultraviolet & Screaming Magenta)
+    - **Neo Tokyo 2099** (Laser Red & Gold), **Acid Cyber** (Highlighter Acid Yellow)
+    - **Miami Vice Neon** (Turquoise & Flamingo Pink), **Laser Glitch** (Glitch Magenta & White Strobe)
+    - **Plasma Cyan** (Extreme Plasma Cyan & Sapphire), **Cyberpunk 2077**, **Synthwave '84**
+  - **Classic & Pro Collection (11 Themes)**:
+    - **Waddle Cyber (Default)**, **Tokyo Night**, **Catppuccin Mocha**, **Dracula**
+    - **Nord (Arctic)**, **Gruvbox Dark**, **One Dark Pro**, **Rosé Pine**
+    - **Monokai Pro**, **Solarized Dark**, **Midnight Abyss (OLED Pure Black)**
+- **Full UI Glow Synchronization**: Window titlebar, tabs, active border, status bar, and modal glow auras dynamically synchronize with the selected theme's RGB accent.
+- **Live Preview in Settings**: Grouped selector (`<optgroup>`), animated `⚡ NEON` badge, accent/cursor/ANSI swatches, and simulated terminal prompt preview.
 - **Nerd Fonts**: Presets for **JetBrainsMono Nerd Font**, **MesloLGS NF**, **FiraCode Nerd Font**, **Hack Nerd Font**, or custom local fonts with automatic glyph fallback.
 
 ### 12. 🌐 Multi-Language Support (English US / UK, 日本語)
