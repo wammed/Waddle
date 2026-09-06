@@ -2,7 +2,7 @@ import os
 from PIL import Image
 
 def generate_rgba_icons():
-    src_path = "images/waddle-origin.png"
+    src_path = "images/waddle-matte-icon.png"
     if not os.path.exists(src_path):
         print(f"Error: {src_path} not found")
         return
@@ -12,9 +12,7 @@ def generate_rgba_icons():
     w, h = img.size
     print(f"Source size: {w}x{h}, Mode: {img.mode}")
 
-    # Crop center penguin with cyber background
-    box_center = (450, 150, 1050, 750)
-    center_icon = img.crop(box_center).convert("RGBA")
+    center_icon = img
 
     # Output directories
     out_dirs = ["src/assets", "public", "src-tauri/icons", "images"]

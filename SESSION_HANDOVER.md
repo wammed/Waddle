@@ -48,6 +48,9 @@
     - ユーザー要望「neon系のハデハデテーマをもっと増やして」に応え、9種の新規超高輝度ネオンテーマを追加（全22テーマ中、ネオン11種）。
     - CSS変数（`--accent-rgb`, `--border-active`, `--accent-blue`）を全テーマ同期させ、UI全体がネオン発光するよう強化。
     - 設定画面に「⚡ High-Voltage Neon Themes」カテゴリ分類、`⚡ NEON` アニメーションバッジ、リアルタイムカラー見本＆ミニターミナルプレビューカードを新設。
+12. **アプリアイコンの完全差し替え（waddle-matte-icon.svg）**:
+    - ユーザー指定の `images/waddle-matte-icon.svg` に基づき、フロントエンド（`src/assets/waddle-icon.svg`, `public/waddle-icon.svg`, `images/waddle-icon.svg`）、Tauriバンドルアイコン全種（`src-tauri/icons/` 配下の ICO, ICNS, 各サイズPNG, iOS/Android）、Linuxデスクトップ環境（`~/.local/share/icons/hicolor/` 配下の scalable SVG および 512px/256px/128px PNG）を全件差し替え更新。
+    - `generate_icons.py` の生成元パスを更新し、`npm run build` を再実行して `dist/` 配下の配信用アセットも同期完了。
 
 ---
 
