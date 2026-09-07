@@ -60,6 +60,13 @@
     - ボタン押下時に誤操作を防止するモーダル確認ダイアログ（`RefreshConfirmModal`）を `createPortal` 経由で最前面に表示。
     - 確認ダイアログでは、全タブ・分割ペインの終了、実行中プロセスの停止、セッション保存情報（`localStorage`）のクリア、ホームディレクトリへのリセットを視覚的バッジ付きで明示し、`Escape` キーまたはキャンセルボタンで安全に中断可能。
     - 実行時は、すべての PTY プロセスを確実に終了させ、初期ホームディレクトリでの単一タブ・単一ペインを生成。さらにファイルツリーのキャッシュ・展開状態・エディタ・各種モーダルを完全クリアして初期状態へ復帰。
+15. **ドキュメント構造の体系化 & README (日英) のスリム化・リファクタリング**:
+    - ユーザー要望「Waddleのドキュメント構造を整理し、ルートの `README.md` をスリム化・リファクタリング」「日本語版README.ja.mdも再構成」に基づき実施。
+    - 内部実装・詳細仕様・アーキテクチャ・セキュリティポリシーを専門ドキュメントへ完全移行：
+      - `docs/FEATURES.md` & `docs/FEATURES.ja.md`: 全15機能の詳細解説、内部仕様、全ショートカット一覧。
+      - `docs/ARCHITECTURE.md` & `docs/ARCHITECTURE.ja.md`: Mermaid システム構成図、PTY 32KB コアレッシング、UTF-8 境界処理、プロセスグループ終了、CWD 追跡、Tech Stack テーブル。
+      - `SECURITY.md` & `SECURITY.ja.md`: システムディレクトリ前方一致保護、認証情報保護、プロンプトインジェクション対策、危険コマンド検知一覧、CSP、GitHub 限定ポリシー。
+    - ルートの `README.md` および `README.ja.md` をそれぞれ 350行超から 148行へスリム化し、訪問者が主要価値を短時間で把握できる scannable な構成（Highlights, Quick Start, Keybindings, Overview, Callout, License）に再構築。
 
 ---
 
