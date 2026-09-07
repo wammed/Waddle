@@ -13,6 +13,7 @@ interface TerminalPaneProps {
   onToggleZoomPane: (tabId: string) => void;
   onUpdatePane: (tabId: string, paneId: string, updates: Partial<TerminalPaneInfo>) => void;
   onErrorDetected: (command: string, output: string, exitCode: number) => void;
+  onUpdateSplitRatios?: (tabId: string, ratios: Record<string, number>) => void;
 }
 
 export const TerminalPane: React.FC<TerminalPaneProps> = ({
@@ -24,30 +25,41 @@ export const TerminalPane: React.FC<TerminalPaneProps> = ({
   onToggleZoomPane,
   onUpdatePane,
   onErrorDetected,
+  onUpdateSplitRatios,
 }) => {
   const { t } = useI18n();
   const activePaneId = tab.activePaneId || tab.panes[0]?.id;
   const activePane = tab.panes.find((p) => p.id === activePaneId) || tab.panes[0];
 
   // Ratios for 2-way splits & main-splits
-  const [ratioX, setRatioX] = useState(0.5);
-  const [ratioY, setRatioY] = useState(0.5);
+  const [ratioX, setRatioX] = useState(tab.splitRatios?.ratioX ?? 0.5);
+  const [ratioY, setRatioY] = useState(tab.splitRatios?.ratioY ?? 0.5);
 
   // Multi-column / multi-row ratios for 3-pane & 4-pane layouts
-  const [ratioX1, setRatioX1] = useState(0.333);
-  const [ratioX2, setRatioX2] = useState(0.667);
-  const [ratioX3, setRatioX3] = useState(0.75);
+  const [ratioX1, setRatioX1] = useState(tab.splitRatios?.ratioX1 ?? 0.333);
+  const [ratioX2, setRatioX2] = useState(tab.splitRatios?.ratioX2 ?? 0.667);
+  const [ratioX3, setRatioX3] = useState(tab.splitRatios?.ratioX3 ?? 0.75);
 
-  const [ratioY1, setRatioY1] = useState(0.333);
-  const [ratioY2, setRatioY2] = useState(0.667);
+  const [ratioY1, setRatioY1] = useState(tab.splitRatios?.ratioY1 ?? 0.333);
+  const [ratioY2, setRatioY2] = useState(tab.splitRatios?.ratioY2 ?? 0.667);
 
   const [activeDrag, setActiveDrag] = useState<string | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const isDraggingRef = useRef<string | null>(null);
 
-  // Reset default ratios whenever tab layout changes
+  // Reset default ratios whenever tab layout changes unless customized
   useEffect(() => {
+    if (tab.splitRatios) {
+      if (tab.splitRatios.ratioX !== undefined) setRatioX(tab.splitRatios.ratioX);
+      if (tab.splitRatios.ratioY !== undefined) setRatioY(tab.splitRatios.ratioY);
+      if (tab.splitRatios.ratioX1 !== undefined) setRatioX1(tab.splitRatios.ratioX1);
+      if (tab.splitRatios.ratioX2 !== undefined) setRatioX2(tab.splitRatios.ratioX2);
+      if (tab.splitRatios.ratioX3 !== undefined) setRatioX3(tab.splitRatios.ratioX3);
+      if (tab.splitRatios.ratioY1 !== undefined) setRatioY1(tab.splitRatios.ratioY1);
+      if (tab.splitRatios.ratioY2 !== undefined) setRatioY2(tab.splitRatios.ratioY2);
+      return;
+    }
     switch (tab.layout) {
       case 'split-2-h':
         setRatioX(0.5);
@@ -194,11 +206,67 @@ export const TerminalPane: React.FC<TerminalPaneProps> = ({
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
       window.dispatchEvent(new Event('resize'));
+
+      onUpdateSplitRatios?.(tab.id, {
+        ratioX: pendingUpdates['x'] ?? ratioX,
+        ratioY: pendingUpdates['y'] ?? ratioY,
+        ratioX1: pendingUpdates['x1'] ?? ratioX1,
+        ratioX2: pendingUpdates['x2'] ?? ratioX2,
+        ratioX3: pendingUpdates['x3'] ?? ratioX3,
+        ratioY1: pendingUpdates['y1'] ?? ratioY1,
+        ratioY2: pendingUpdates['y2'] ?? ratioY2,
+      });
     };
 
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
   };
+
+  // Keyboard resize: Ctrl+Alt+Arrow keys adjust active split ratio
+  useEffect(() => {
+    if (!isActive || tab.layout === 'single') return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.altKey) {
+        if (e.key === 'ArrowLeft') {
+          e.preventDefault();
+          setRatioX((rx) => {
+            const next = Math.max(0.15, Math.min(0.85, rx - 0.05));
+            onUpdateSplitRatios?.(tab.id, { ratioX: next, ratioY, ratioX1, ratioX2, ratioX3, ratioY1, ratioY2 });
+            return next;
+          });
+          window.dispatchEvent(new Event('resize'));
+        } else if (e.key === 'ArrowRight') {
+          e.preventDefault();
+          setRatioX((rx) => {
+            const next = Math.max(0.15, Math.min(0.85, rx + 0.05));
+            onUpdateSplitRatios?.(tab.id, { ratioX: next, ratioY, ratioX1, ratioX2, ratioX3, ratioY1, ratioY2 });
+            return next;
+          });
+          window.dispatchEvent(new Event('resize'));
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          setRatioY((ry) => {
+            const next = Math.max(0.15, Math.min(0.85, ry - 0.05));
+            onUpdateSplitRatios?.(tab.id, { ratioX, ratioY: next, ratioX1, ratioX2, ratioX3, ratioY1, ratioY2 });
+            return next;
+          });
+          window.dispatchEvent(new Event('resize'));
+        } else if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          setRatioY((ry) => {
+            const next = Math.max(0.15, Math.min(0.85, ry + 0.05));
+            onUpdateSplitRatios?.(tab.id, { ratioX, ratioY: next, ratioX1, ratioX2, ratioX3, ratioY1, ratioY2 });
+            return next;
+          });
+          window.dispatchEvent(new Event('resize'));
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isActive, tab.id, tab.layout, ratioX, ratioY, ratioX1, ratioX2, ratioX3, ratioY1, ratioY2, onUpdateSplitRatios]);
 
   if (!tab.panes || tab.panes.length === 0) {
     return null;

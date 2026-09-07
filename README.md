@@ -169,7 +169,10 @@
 - **Settings Toggle & GitHub Privacy Shield**:
   - **Git Integration Toggle**: Toggle Git integration completely ON/OFF in Settings (`Ctrl + ,`) for a pure lightweight terminal experience with zero Git subprocess polling.
   - **GitHub Restriction Policy**: Automatically inspects `git remote -v` and blocks push/pull operations to non-GitHub remotes (e.g. GitLab, Bitbucket, custom servers), alerting users in the UI.
-  - **Content Security Policy (CSP)**: Strictly confines Webview network connections to `localhost:11434` (Ollama) and `github.com`.
+### 15. 🔄 One-Click Workspace Refresh & Safe Confirmation Dialog
+- **Direct Titlebar Refresh Button**: A prominent `RotateCcw` button positioned in the titlebar between Layout selection and Settings.
+- **Safe Modal Confirmation Dialog**: Clicking opens a full-window modal clearly summarizing the reset action: closing all open tabs and split panes, terminating running processes, clearing persisted session storage, and returning to a fresh terminal in your home directory.
+- **Thorough Cleanup**: Safely closes all PTY process groups, clears `waddle_session_state` from `localStorage`, resets active directory, and completely re-initializes the file tree sidebar cache and open editors.
 
 ---
 
@@ -186,6 +189,8 @@
 | `Ctrl + T` | Open new terminal tab |
 | `Ctrl + W` | Close current terminal tab |
 | `Ctrl + Shift + W` | Close active split pane |
+| `Ctrl + Shift + S` | **Swap panes** in current split tab |
+| `Ctrl + Alt + ↑ / ↓ / ← / →` | **Resize active split ratio** via keyboard (5% steps) |
 | `Alt + 1` | Switch to **Single Pane** layout |
 | `Alt + 2` | Switch to **2-Split (Side by Side)** layout |
 | `Alt + 3` | Switch to **3-Split (Left Main)** layout |

@@ -34,6 +34,17 @@ export interface Translations {
     settingsTooltip: string;
     newTabTooltip: string;
     closeTabTooltip: string;
+    refreshAll: string;
+    refreshAllTooltip: string;
+    refreshModalTitle: string;
+    refreshModalDesc: string;
+    refreshModalBulletTabs: string;
+    refreshModalBulletProcess: string;
+    refreshModalBulletStorage: string;
+    refreshModalBulletCwd: string;
+    refreshModalWarning: string;
+    refreshModalConfirm: string;
+    refreshModalCancel: string;
   };
   panes: {
     layoutSelectorTitle: string;
@@ -79,6 +90,12 @@ export interface Translations {
     createFailed: string;
     deleteFailed: string;
     noDirectory: string;
+    rename: string;
+    renamePlaceholder: string;
+    renameFailed: string;
+    revealInFileManager: string;
+    copyRelativePath: string;
+    copyAbsolutePath: string;
   };
   editor: {
     title: string;
@@ -169,6 +186,8 @@ export interface Translations {
     pushing: string;
     pushTooltip: string;
     pushSuccess: string;
+    authTipTitle: string;
+    authTipDesc: string;
   };
   diffViewer: {
     title: (file: string) => string;
@@ -282,6 +301,17 @@ export const translations: Record<Language, Translations> = {
       settingsTooltip: 'Settings (Ctrl+,)',
       newTabTooltip: 'New Tab (Ctrl+T)',
       closeTabTooltip: 'Close tab',
+      refreshAll: 'Refresh',
+      refreshAllTooltip: 'Refresh workspace (tabs, panes, directory)',
+      refreshModalTitle: 'Reset Entire Workspace?',
+      refreshModalDesc: 'This will close all open tabs and split panes, terminate running processes, clear saved session state, and return to a fresh terminal in your home directory.',
+      refreshModalBulletTabs: 'Close all tabs and split panes',
+      refreshModalBulletProcess: 'Terminate active terminal processes',
+      refreshModalBulletStorage: 'Clear saved session state',
+      refreshModalBulletCwd: 'Reset working directory to home folder',
+      refreshModalWarning: 'Unsaved command outputs or ongoing background tasks will be lost.',
+      refreshModalConfirm: 'Refresh Workspace',
+      refreshModalCancel: 'Cancel',
     },
     panes: {
       layoutSelectorTitle: 'Terminal Layout',
@@ -327,6 +357,12 @@ export const translations: Record<Language, Translations> = {
       createFailed: 'Failed to create: ',
       deleteFailed: 'Failed to delete: ',
       noDirectory: 'No directory information',
+      rename: 'Rename',
+      renamePlaceholder: 'New name...',
+      renameFailed: 'Failed to rename: ',
+      revealInFileManager: 'Reveal in File Manager',
+      copyRelativePath: 'Copy Relative Path',
+      copyAbsolutePath: 'Copy Absolute Path',
     },
     editor: {
       title: 'Editor',
@@ -418,6 +454,8 @@ export const translations: Record<Language, Translations> = {
       pushing: 'Pushing...',
       pushTooltip: 'Push local commits to remote (git push)',
       pushSuccess: 'Push completed successfully',
+      authTipTitle: 'GitHub Auth Tip',
+      authTipDesc: 'Check that your SSH key (~/.ssh/id_ed25519) is configured on GitHub or run "gh auth login" in the terminal.',
     },
     diffViewer: {
       title: (file) => `Diff: ${file}`,
@@ -530,6 +568,17 @@ export const translations: Record<Language, Translations> = {
       settingsTooltip: 'Settings (Ctrl+,)',
       newTabTooltip: 'New Tab (Ctrl+T)',
       closeTabTooltip: 'Close tab',
+      refreshAll: 'Refresh',
+      refreshAllTooltip: 'Refresh workspace (tabs, panes, directory)',
+      refreshModalTitle: 'Reset Entire Workspace?',
+      refreshModalDesc: 'This will close all open tabs and split panes, terminate running processes, clear saved session state, and return to a fresh terminal in your home directory.',
+      refreshModalBulletTabs: 'Close all tabs and split panes',
+      refreshModalBulletProcess: 'Terminate active terminal processes',
+      refreshModalBulletStorage: 'Clear saved session state',
+      refreshModalBulletCwd: 'Reset working directory to home folder',
+      refreshModalWarning: 'Unsaved command outputs or ongoing background tasks will be lost.',
+      refreshModalConfirm: 'Refresh Workspace',
+      refreshModalCancel: 'Cancel',
     },
     panes: {
       layoutSelectorTitle: 'Terminal Layout',
@@ -575,6 +624,12 @@ export const translations: Record<Language, Translations> = {
       createFailed: 'Failed to create: ',
       deleteFailed: 'Failed to delete: ',
       noDirectory: 'No directory information',
+      rename: 'Rename',
+      renamePlaceholder: 'New name...',
+      renameFailed: 'Failed to rename: ',
+      revealInFileManager: 'Reveal in File Manager',
+      copyRelativePath: 'Copy Relative Path',
+      copyAbsolutePath: 'Copy Absolute Path',
     },
     editor: {
       title: 'Editor',
@@ -666,6 +721,8 @@ export const translations: Record<Language, Translations> = {
       pushing: 'Pushing...',
       pushTooltip: 'Push local commits to remote (git push)',
       pushSuccess: 'Push completed successfully',
+      authTipTitle: 'GitHub Auth Tip',
+      authTipDesc: 'Check that your SSH key (~/.ssh/id_ed25519) is configured on GitHub or run "gh auth login" in the terminal.',
     },
     diffViewer: {
       title: (file) => `Diff: ${file}`,
@@ -778,6 +835,17 @@ export const translations: Record<Language, Translations> = {
       settingsTooltip: '設定 (Ctrl+,)',
       newTabTooltip: '新規タブ (Ctrl+T)',
       closeTabTooltip: 'タブを閉じる',
+      refreshAll: 'リフレッシュ',
+      refreshAllTooltip: '全タブ・ペイン・作業ディレクトリを初期状態にリフレッシュ',
+      refreshModalTitle: 'ワークスペース全体をリフレッシュしますか？',
+      refreshModalDesc: '開いているすべてのタブと分割ペインを閉じ、実行中のプロセスを終了して、セッション保存状態をクリアし、ホームディレクトリの新規単一ターミナルに戻します。',
+      refreshModalBulletTabs: 'すべてのタブと分割ペインを閉じる',
+      refreshModalBulletProcess: '実行中のターミナルプロセスを終了',
+      refreshModalBulletStorage: 'セッション保存状態をクリア',
+      refreshModalBulletCwd: '作業ディレクトリを初期ホームディレクトリにリセット',
+      refreshModalWarning: '未保存の作業内容や実行中のバックグラウンドタスクは失われます。',
+      refreshModalConfirm: 'すべてリフレッシュ',
+      refreshModalCancel: 'キャンセル',
     },
     panes: {
       layoutSelectorTitle: '画面分割レイアウト',
@@ -823,6 +891,12 @@ export const translations: Record<Language, Translations> = {
       createFailed: '作成に失敗しました: ',
       deleteFailed: '削除に失敗しました: ',
       noDirectory: 'ディレクトリ情報がありません',
+      rename: '名前の変更',
+      renamePlaceholder: '新しい名前...',
+      renameFailed: '名前の変更に失敗しました: ',
+      revealInFileManager: 'ファイルマネージャーで表示',
+      copyRelativePath: '相対パスをコピー',
+      copyAbsolutePath: '絶対パスをコピー',
     },
     editor: {
       title: 'Editor',
@@ -914,6 +988,8 @@ export const translations: Record<Language, Translations> = {
       pushing: 'Push中...',
       pushTooltip: 'コミットをリモートへ送信 (git push)',
       pushSuccess: 'Pushが正常に完了しました',
+      authTipTitle: 'GitHub認証のヒント',
+      authTipDesc: 'SSH秘密鍵 (~/.ssh/id_ed25519) がGitHubアカウントに登録されているか、またはターミナルで「gh auth login」を実行して認証されているか確認してください。',
     },
     diffViewer: {
       title: (file) => `差分: ${file}`,

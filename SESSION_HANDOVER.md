@@ -52,52 +52,60 @@
     - ユーザー指定の `images/waddle-matte-icon.svg` に基づき、フロントエンド（`src/assets/waddle-icon.svg`, `public/waddle-icon.svg`, `images/waddle-icon.svg`）、Tauriバンドルアイコン全種（`src-tauri/icons/` 配下の ICO, ICNS, 各サイズPNG, iOS/Android）、Linuxデスクトップ環境（`~/.local/share/icons/hicolor/` 配下の scalable SVG および 512px/256px/128px PNG）を全件差し替え更新。
     - `generate_icons.py` の生成元パスを更新し、`npm run build` を再実行して `dist/` 配下の配信用アセットも同期完了。
 
+13. **包括的なセキュリティ強化・パフォーマンス最適化・セッション永続化・超リッチファイルツリーの実装**:
+    - ユーザー要望「全体のレビュー・セキュリティ評価」および「すべての改善、拡充を実行して。あと、左側ファイルツリーの表示をもっとリッチにして」に基づき、バックエンドからフロントエンドまで網羅的に実装・検証。
+14. **タイトルバーへのワークスペース全リフレッシュボタン設置 & 確認ダイアログの実装**:
+    - ユーザー要望「tab,pane,current directory等、すべてをリフレッシュするボタンをタイトルバーに設置して ボタンクリック時に確認ダイアログが挟まれるように」に基づき実装。
+    - タイトルバー右側のレイアウト選択と設定ボタンの間に `RotateCcw` アイコン付きの「リフレッシュ（Refresh）」ボタン（`#btn-refresh-all`）を新設。
+    - ボタン押下時に誤操作を防止するモーダル確認ダイアログ（`RefreshConfirmModal`）を `createPortal` 経由で最前面に表示。
+    - 確認ダイアログでは、全タブ・分割ペインの終了、実行中プロセスの停止、セッション保存情報（`localStorage`）のクリア、ホームディレクトリへのリセットを視覚的バッジ付きで明示し、`Escape` キーまたはキャンセルボタンで安全に中断可能。
+    - 実行時は、すべての PTY プロセスを確実に終了させ、初期ホームディレクトリでの単一タブ・単一ペインを生成。さらにファイルツリーのキャッシュ・展開状態・エディタ・各種モーダルを完全クリアして初期状態へ復帰。
+
 ---
 
 ## 3. 実施された主要な改善と技術的解決策
 
-### A. 全10レイアウトの分割ペイン境界ドラッグリサイズ
-- **対象ファイル**: [`src/components/TerminalPane.tsx`](file:///home/susie/GitHUB/wammed/Waddle/src/components/TerminalPane.tsx), [`src/index.css`](file:///home/susie/GitHUB/wammed/Waddle/src/index.css)
-- **対応内容**:
-  - **全レイアウト網羅**: 単一 (`single`)、2分割 (`split-2-h`, `split-2-v`)、3分割 (`split-3-left-main`, `split-3-top-main`, `split-3-h`, `split-3-v`)、4分割 (`grid-4`, `split-4-left-main`, `split-4-h`) の全レイアウトにインタラクティブなディバイダーを配置。
-  - **センタリング & 16px ヒット領域**: `.pane-divider-x` に `margin-left: -8px;`、`.pane-divider-y` に `margin-top: -8px;` を適用し、境界線を中心とする ±8px の余裕あるグラブ領域を確保。
-  - **2×2 グリッド交差点の 4方向リサイズハンドル**: `grid-4` では水平線を左右独立分割し垂直線との干渉を排除。中央交差点に 20×20px の `.pane-divider-corner` を配置し、斜めドラッグで縦横を同時に伸縮可能に。
-  - **動的 CSS グリッド計算**: 各レイアウトのギャップを考慮した正確な `gridTemplateColumns` / `gridTemplateRows` スタイルを生成。
+### A. セキュリティ防御とファイル保護の厳格化
+- **対象ファイル**: [`src-tauri/src/pty.rs`](file:///home/susie/GitHUB/wammed/Waddle/src-tauri/src/pty.rs), [`src-tauri/src/ai.rs`](file:///home/susie/GitHUB/wammed/Waddle/src-tauri/src/ai.rs), [`src-tauri/src/lib.rs`](file:///home/susie/GitHUB/wammed/Waddle/src-tauri/src/lib.rs)
+- **Git パストラバーサル防止**: `git_discard_file` で `ParentDir` (`..`) および正規化パスがリポジトリルート外を指す場合のファイル破棄・削除を厳格拒否。
+- **Git 引数インジェクション防止**: `git_checkout_branch` に `--` デリミタを適用し、`-b` や `--track` などのフラグ偽装によるコマンド誤爆を抑止。
+- **シェル起動設定ファイルの保護**: `validate_safe_write` および `validate_safe_deletion` において、`~/.bashrc`, `~/.bash_profile`, `~/.bash_login`, `~/.zshrc`, `~/.zprofile`, `~/.zshenv`, `~/.profile` への直接書き込み・削除を物理遮断。
+- **Ollama 64KB バッファガード**: `stream_ollama` で改行なしの長大ストリームによるメモリ枯渇 (DoS) を防止する 64KB リミットを導入。
+- **危険コマンド検出パターンの拡張**: `mkswap`, `cryptsetup`, `iptables -F`, `ufw disable`, `git push --delete`, `git branch -D`, パイプ/リダイレクト経由のスクリプト実行（`| python`, `| python3`, `| perl`, `| ruby`, `python <(...)` など）を網羅。
 
-### B. ペインリサイズ時のフリッカー（ちらつき）完全解消
-- **対象ファイル**: [`src/components/TerminalPane.tsx`](file:///home/susie/GitHUB/wammed/Waddle/src/components/TerminalPane.tsx), [`src/components/SingleTerminalView.tsx`](file:///home/susie/GitHUB/wammed/Waddle/src/components/SingleTerminalView.tsx)
-- **対応内容**:
-  - ドラッグ中フラグ `isResizing={Boolean(activeDrag !== null)}` を `SingleTerminalView` へ伝達。
-  - ドラッグ中は `ResizeObserver` 内の `fitTerminal()` および `term.resize()` の実行を完全停止。CSS グリッドの GPU クリッピング伸縮のみで描画し、HTML5 Canvas のクリアによる白化/透明化をゼロに抑止。
-  - マウスを離した瞬間（ドラッグ完了時）にのみ 1 回だけ `fitTerminal()` を実行して文字セルを確定。
-  - 行・列サイズが変わらない微小な変動でのシェル `SIGWINCH` 再描画スパムを `lastDimensionsRef` で遮断。
+### B. PTY 出力コアレッシング & 大規模ディレクトリ防御
+- **対象ファイル**: [`src-tauri/src/pty.rs`](file:///home/susie/GitHUB/wammed/Waddle/src-tauri/src/pty.rs), [`src-tauri/src/lib.rs`](file:///home/susie/GitHUB/wammed/Waddle/src-tauri/src/lib.rs)
+- PTY リーダーバッファを 32KB に拡張し、UTF-8 デコード結果を1回の IPC イベントにコアレッシングして一括送信。大量ログ出力時の IPC 負荷を劇的に削減しつつ、キー入力の 0ms レイテンシを維持。
+- `read_directory` で最大読み取り件数を 500 件に制限し、巨大フォルダ（node_modules 等）展開時の UI フリーズを防止。
 
-### C. 起動速度の安定化 & 初期プロンプト取りこぼし防止
-- **対象ファイル**: [`src-tauri/src/pty.rs`](file:///home/susie/GitHUB/wammed/Waddle/src-tauri/src/pty.rs), [`src-tauri/src/lib.rs`](file:///home/susie/GitHUB/wammed/Waddle/src-tauri/src/lib.rs), [`src/services/tauriApi.ts`](file:///home/susie/GitHUB/wammed/Waddle/src/services/tauriApi.ts), [`src/components/SingleTerminalView.tsx`](file:///home/susie/GitHUB/wammed/Waddle/src/components/SingleTerminalView.tsx)
-- **対応内容**:
-  - **`start_pty` 同期ハンドシェイク**: Rust の PTY リーダースレッドに `recv_timeout` 同期チャンネルを新設。
-  - フロントエンドがマウントされ、`onPtyOutput` イベントリスナーの登録が完了した瞬間に `TauriApi.startPty(sessionId)` をコールしてストリームを開始。
-  - シェル起動直後のプロンプト（Linux カーネルの PTY バッファに保持）がリスナー登録後に 100% 確実にフロントエンドへ届くよう保証。起動時の黒画面待機を解消。
+### C. セッション状態・分割比率・作業ディレクトリの完全永続化 (Auto-Restore)
+- **対象ファイル**: [`src/hooks/useTerminalTabs.ts`](file:///home/susie/GitHUB/wammed/Waddle/src/hooks/useTerminalTabs.ts), [`src/types.ts`](file:///home/susie/GitHUB/wammed/Waddle/src/types.ts)
+- `localStorage` (`waddle_session_state`) を活用し、アプリ終了時のタブ構成、各ペインのレイアウト、CWD（カレントディレクトリ）、分割比率、アクティブタブを自動保存。
+- 次回起動時に保存セッションを自動復元し、それぞれの作業ディレクトリで PTY プロセスを再生成。
 
-### D. Git & GitHub 連携の統合 (Quick Popover, Conventional Commits, Diff, Push/Pull)
-- **対象ファイル**:
-  - [`src/components/GitQuickPopover.tsx`](file:///home/susie/GitHUB/wammed/Waddle/src/components/GitQuickPopover.tsx), [`src/components/GitDiffModal.tsx`](file:///home/susie/GitHUB/wammed/Waddle/src/components/GitDiffModal.tsx), [`src/components/FileTreeSidebar.tsx`](file:///home/susie/GitHUB/wammed/Waddle/src/components/FileTreeSidebar.tsx)
-  - [`src-tauri/src/pty.rs`](file:///home/susie/GitHUB/wammed/Waddle/src-tauri/src/pty.rs), [`src-tauri/src/lib.rs`](file:///home/susie/GitHUB/wammed/Waddle/src-tauri/src/lib.rs), [`src/services/tauriApi.ts`](file:///home/susie/GitHUB/wammed/Waddle/src/services/tauriApi.ts)
-- **対応内容**:
-  - **Quick Git Popover**: ステータスバーの Git バッジをクリックして展開。ブランチ切替、ステージ/アンステージ（ファイル単体および一括）、変更破棄、コミット入力欄。
-  - **1クリック Pull & Push**: ヘッダー同期エリアから直接 `git pull` / `git push` を実行。遅延（Behind）はアンバー、先行（Ahead）はシアンのバッジで件数を強調表示。非同期実行（`spawn_blocking`）と `GIT_TERMINAL_PROMPT=0` により UI フリーズを防止。
-  - **ローカル Ollama AI による Conventional Commit 自動生成**: ステージ済みの差分からコミットメッセージ（`feat:`, `fix:` 等）を完全ローカルで自動生成。
-  - **内蔵 GUI Diff ビューワー**: unified diff を色分け表示。新規未追跡ファイルにも対応し、差分画面から直接ステージングや破棄が可能。
-  - **ファイルツリー Git 状態装飾**: M（変更）、U（未追跡）、S（ステージ済）、C（競合）バッジ、および親フォルダへの点灯インジケータードット。
+### D. 全10レイアウトの分割ペイン境界ドラッグ & キーボードリサイズ & スワップ
+- **対象ファイル**: [`src/components/TerminalPane.tsx`](file:///home/susie/GitHUB/wammed/Waddle/src/components/TerminalPane.tsx), [`src/hooks/useGlobalShortcuts.ts`](file:///home/susie/GitHUB/wammed/Waddle/src/hooks/useGlobalShortcuts.ts), [`src/hooks/useTerminalTabs.ts`](file:///home/susie/GitHUB/wammed/Waddle/src/hooks/useTerminalTabs.ts), [`src/index.css`](file:///home/susie/GitHUB/wammed/Waddle/src/index.css)
+- マウスドラッグによる境界リサイズに加え、`Ctrl+Alt+ArrowLeft/Right/Up/Down` によるキーボード駆動の微細リサイズ（5%刻み、0.15〜0.85クランプ）、および `Ctrl+Shift+S` による分割ペイン間スワップを実装。
 
-### E. ローカル完結ポリシー & GitHub 限定セキュリティ保護
-- **対象ファイル**:
-  - [`src-tauri/src/config.rs`](file:///home/susie/GitHUB/wammed/Waddle/src-tauri/src/config.rs), [`src/components/SettingsModal.tsx`](file:///home/susie/GitHUB/wammed/Waddle/src/components/SettingsModal.tsx), [`src-tauri/tauri.conf.json`](file:///home/susie/GitHUB/wammed/Waddle/src-tauri/tauri.conf.json)
-- **対応内容**:
-  - **Git 連携 ON/OFF 設定**: 設定画面から Git 連携を無効化可能。無効時は `git status` ポーリングが一切走らず、ステータスバーやファイルツリーの Git UI が非表示化され、純粋な超軽量ローカルターミナルとして動作。
-  - **GitHub 特化リモート検証 (`inspect_github_remotes`)**: リポジトリのリモートが `github.com`（または `github.io`）以外（GitLab, Bitbucket, 独自外部サーバー等）である場合に遮断・警告。
-  - **Push / Pull 実行時のポリシー強制**: 非 GitHub リモートに対する push/pull は Rust 側で事前に拒否。
-  - **厳格な CSP 設定**: Webview の `connect-src` を `localhost:11434` (Ollama) および `https://api.github.com https://github.com` のみに制限し、外部への不用意な通信を物理遮断。
+### E. 左側ファイルツリーの超リッチ全面改修
+- **対象ファイル**: [`src/components/FileTreeSidebar.tsx`](file:///home/susie/GitHUB/wammed/Waddle/src/components/FileTreeSidebar.tsx), [`src/index.css`](file:///home/susie/GitHUB/wammed/Waddle/src/index.css), [`src/i18n/translations.ts`](file:///home/susie/GitHUB/wammed/Waddle/src/i18n/translations.ts), [`src/services/tauriApi.ts`](file:///home/susie/GitHUB/wammed/Waddle/src/services/tauriApi.ts), [`src-tauri/src/lib.rs`](file:///home/susie/GitHUB/wammed/Waddle/src-tauri/src/lib.rs)
+- **言語別カラフルバッジ & アイコン**: TypeScript (TS/TSX), Rust (RS), Python (PY), JSON, Markdown, CSS, HTML, Shell (SH) など20種以上のファイル形式に応じた専用カラーバッジとアイコンを表示。
+- **クリック可能ブレッドクラム**: サイドバー上部にパス階層をピル形式で表示し、任意の親フォルダへワンクリックでジャンプ。
+- **ツリーガイドライン**: 入れ子フォルダの階層構造を Zed / VS Code 風のインデントガイドラインで視覚化。
+- **ファイルサイズ & 子要素数バッジ**: ファイル行にサイズ（例: `4.2 KB`）、フォルダ行にアイテム数（例: `(12)`）を表示。
+- **右クリックコンテキストメニュー**:
+  - 📝 エディタで開く
+  - 💻 ターミナルへパス挿入
+  - 📋 相対パス / 絶対パスのコピー
+  - 📁 OS標準ファイルマネージャーで表示 (`reveal_in_file_manager`)
+  - ✏️ 名前の変更 (`rename_entry` / インラインプロンプト)
+  - 🗑️ 削除
+  - ➕ フォルダ配下への新規ファイル/フォルダ作成
+- **ホバークイックアクション**: 行ホバー時にエディタ、パスコピー、ターミナル挿入、削除の各ボタンを配置。
+
+### F. Git 認証エラーガイダンス
+- **対象ファイル**: [`src/components/GitQuickPopover.tsx`](file:///home/susie/GitHUB/wammed/Waddle/src/components/GitQuickPopover.tsx), [`src/i18n/translations.ts`](file:///home/susie/GitHUB/wammed/Waddle/src/i18n/translations.ts)
+- `git push` / `git pull` で公開鍵認証やクレデンシャルエラーが発生した場合、SSH 秘密鍵の登録や `gh auth login` を促すフレンドリーなガイダンスバナーを表示。
 
 ---
 
@@ -105,21 +113,16 @@
 
 | ファイルパス | 主な役割・変更内容 |
 |---|---|
-| `src-tauri/src/pty.rs` | PTY 管理、`start_pty` 受信チャンネル、Git 操作（`git_status`, `git_push`, `git_pull`, `git_commit`, `git_get_diff` 等）、`resolve_repo_root`、`inspect_github_remotes` |
-| `src-tauri/src/lib.rs` | Tauri コマンド公開（`repo_path` 統一、`git_push`, `git_pull`）、非同期タスク管理、セキュリティユニットテスト |
-| `src-tauri/src/config.rs` | `GitIntegrationConfig`（`enabled`, `restrict_to_github`）、壁紙設定、設定永続化 |
-| `src-tauri/tauri.conf.json` | CSP `connect-src` の GitHub & Ollama 限定化 |
-| `src/services/tauriApi.ts` | フロントエンド Tauri API ラッパー（`gitPush`, `gitPull`, `gitCommit`, `gitGetDiff` 等） |
-| `src/components/GitQuickPopover.tsx` | Git フローティングパネル（ブランチ切替、ステージング、AIコミット、Pull/Push アクション、Ahead/Behind バッジ、警告バナー） |
-| `src/components/GitDiffModal.tsx` | シンタックスハイライト付き内蔵差分ビューワー |
-| `src/components/SettingsModal.tsx` | Git & GitHub 連携設定セクション（有効化トグル、GitHub限定ポリシートグル） |
-| `src/components/StatusBar.tsx` | Git ステータスバッジ（Ahead/Behind、競合警告、非GitHub遮断バッジ）、GitPopver トリガー |
-| `src/components/FileTreeSidebar.tsx` | ファイルツリーの Git ステータス装飾（M, U, S, C）およびフォルダ変更ドット |
-| `src/components/TerminalPane.tsx` | 全10レイアウトのディバイダー描画、ドラッグ座標計算、`isResizing` の伝達 |
-| `src/components/SingleTerminalView.tsx` | `isResizing` ガード（Canvasクリア抑止）、`startPty` ハンドシェイク、Git ポーリング制御 |
-| `src/i18n/translations.ts` | 日英多言語辞書（Git 設定、Git ポップオーバー、Diff ビューワー、Pull/Push メッセージ） |
-| `src/index.css` | ディバイダー、Git ポップオーバー、Pull/Push ボタンスタイル、Diff ビューワー、テーマ定義 |
-| `src/types.ts` | `GitConfig`, `GitStatus`, `GitFileEntry` 型定義 |
+| `src-tauri/src/pty.rs` | PTY 32KB コアレッシング、Git discard パストラバーサル防止、checkout `--` デリミタ |
+| `src-tauri/src/ai.rs` | 64KB ストリームバッファガード、危険コマンド判定パターンの大幅拡張 |
+| `src-tauri/src/lib.rs` | シェル設定保護、500件制限、`rename_entry`, `reveal_in_file_manager` 実装とテスト |
+| `src/types.ts` | `splitRatios`, `SavedSessionState`, `SavedSessionTab` 型定義 |
+| `src/components/RefreshConfirmModal.tsx` | ワークスペース全リフレッシュのモーダル確認ダイアログ (Portal, キーボード操作, 警告・箇条書き) |
+| `src/components/TitleBar.tsx` | リフレッシュボタン (`#btn-refresh-all`) 設置 & 確認ダイアログ状態管理 |
+| `src/hooks/useTerminalTabs.ts` | `handleRefreshAll` による全PTY安全クローズ & セッションクリア & 初期タブ再生成 |
+| `src/App.tsx` | ペインスワップ・比率更新ハンドラー・全リフレッシュ・ファイルツリー完全リセットの全体配線 |
+| `src/i18n/translations.ts` | 日英多言語辞書（リフレッシュボタン、確認ダイアログ文言、リッチファイルツリー、名前変更、Git認証ヒント） |
+| `src/index.css` | リフレッシュ確認ダイアログ、ブレッドクラム、ガイドライン、コンテキストメニュー、言語バッジスタイル |
 
 ---
 
@@ -143,13 +146,9 @@ npm run tauri dev
 
 ## 6. 次回再開時の検討・作業候補（Next Steps）
 
-現時点でユーザー様からご指示いただいた改善・拡張要望（パフォーマンス、描画ちらつき、ドラッグ境界、Git連携、設定画面、セキュリティ接続制限、Push/Pull）はすべて正常に実装・検証済みです。今後さらに拡張・改善を進める場合の推奨テーマ：
-
-1. **ペイン比率の永続化**:
-   - 現在はレイアウト切り替え時にデフォルト比率にリセットされるため、ユーザーがドラッグ調整した比率をタブ状態やローカルストレージに保存・復元する機能。
-2. **ショートカットによるリサイズ**:
-   - キーボードのみ（例: `Ctrl+Alt+Left/Right/Up/Down`）でアクティブペインを伸縮できる機能の追加。
-3. **ペインのスワップ・並び替え（ドラッグ＆ドロップ）**:
-   - ペインヘッダーをドラッグして、分割されたスロット間でターミナルセッションを入れ替える操作の拡充。
-4. **GitHub Issue / PR 参照連携**:
-   - ローカル完結かつ GitHub 限定ポリシーの枠組みの中で、GitHub CLI (`gh`) または GitHub API 経由でカレントブランチに関連する Issue や PR の簡易ステータスを表示する拡張。
+1. **ファイルツリーのドラッグ＆ドロップ移動**:
+   - ファイルやフォルダを別のディレクトリへドラッグして移動する操作の追加。
+2. **GitHub Issue / PR 参照連携**:
+   - GitHub 限定ポリシーの枠組みの中で、GitHub CLI (`gh`) または GitHub API 経由でカレントブランチに関連する Issue や PR の簡易ステータスを表示する拡張。
+3. **エディタペインのタブ化**:
+   - 複数ファイルを同時に開いて切り替えられるタブ型エディタへの発展。

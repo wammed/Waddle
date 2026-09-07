@@ -120,7 +120,37 @@ export function App() {
     handleToggleZoomPane,
     handleApplyLayout,
     handleDirectionalFocus,
+    handleSwapPanes,
+    handleUpdateSplitRatios,
+    handleRefreshAll,
   } = useTerminalTabs({ isFileTreeOpen });
+
+  // Workspace reset key to reinitialize file tree and workspace state
+  const [workspaceKey, setWorkspaceKey] = useState(0);
+
+  // Full workspace refresh handler
+  const handleFullWorkspaceRefresh = useCallback(async () => {
+    // 1. Close open editor & reset target file
+    setIsEditorOpen(false);
+    setTargetEditorFile(null);
+
+    // 2. Close AI command modal, AI sidebar, git popovers and diff modal
+    setIsAiCommandOpen(false);
+    setIsAiSidebarOpen(false);
+    setIsGitPopoverOpen(false);
+    setDiffModalState({
+      isOpen: false,
+      filePath: '',
+      isStaged: false,
+    });
+    setErrorAlert(null);
+
+    // 3. Increment workspaceKey to re-mount and reset FileTreeSidebar cache & state
+    setWorkspaceKey((prev) => prev + 1);
+
+    // 4. Run tabs/panes/pty reset
+    await handleRefreshAll();
+  }, [handleRefreshAll]);
 
   // Git status refresh handler
   const handleRefreshGitStatus = useCallback(async () => {
@@ -144,6 +174,7 @@ export function App() {
     handleClosePane,
     handleApplyLayout,
     handleDirectionalFocus,
+    handleSwapPanes,
     createNewTab,
     closeTab,
     setIsAiCommandOpen,
@@ -263,6 +294,7 @@ export function App() {
           onToggleAiSidebar={() => setIsAiSidebarOpen((prev) => !prev)}
           onToggleFileTree={() => setIsFileTreeOpen((prev) => !prev)}
           onOpenSettings={() => setIsSettingsOpen(true)}
+          onRefreshAll={handleFullWorkspaceRefresh}
           isEditorOpen={isEditorOpen}
           isAiSidebarOpen={isAiSidebarOpen}
           isFileTreeOpen={isFileTreeOpen}
@@ -272,6 +304,7 @@ export function App() {
         <main className="main-content">
           {/* Left File Tree Sidebar */}
           <FileTreeSidebar
+            key={workspaceKey}
             isOpen={isFileTreeOpen}
             onClose={() => setIsFileTreeOpen(false)}
             cwd={activePane?.cwd || activeTab?.cwd || '/'}
@@ -375,6 +408,7 @@ export function App() {
                   onToggleZoomPane={handleToggleZoomPane}
                   onUpdatePane={updatePane}
                   onErrorDetected={handleErrorDetected}
+                  onUpdateSplitRatios={handleUpdateSplitRatios}
                 />
               </ErrorBoundary>
             ))}

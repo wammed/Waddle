@@ -249,6 +249,17 @@ fn validate_safe_write(path: &Path) -> Result<(), String> {
                 return Err(format!("安全上の理由により重要資格情報領域 (~/{}) への書き込みは禁止されています。", rel));
             }
         }
+
+        let sensitive_shell_files = [
+            ".bashrc", ".bash_profile", ".bash_login",
+            ".zshrc", ".zprofile", ".zshenv", ".profile"
+        ];
+        for file in &sensitive_shell_files {
+            let target = home_canon.join(file);
+            if canonical == target {
+                return Err(format!("安全上の理由によりシェル設定ファイル (~/{}) への書き込みは禁止されています。", file));
+            }
+        }
     }
 
     // 3. Protect critical system directories
@@ -290,6 +301,17 @@ fn validate_safe_deletion(path: &Path) -> Result<(), String> {
             let target = home_canon.join(rel);
             if canonical == target || canonical.starts_with(&target) {
                 return Err(format!("安全上の理由により重要資格情報領域 (~/{}) の削除は禁止されています。", rel));
+            }
+        }
+
+        let sensitive_shell_files = [
+            ".bashrc", ".bash_profile", ".bash_login",
+            ".zshrc", ".zprofile", ".zshenv", ".profile"
+        ];
+        for file in &sensitive_shell_files {
+            let target = home_canon.join(file);
+            if canonical == target {
+                return Err(format!("安全上の理由によりシェル設定ファイル (~/{}) の削除は禁止されています。", file));
             }
         }
 
@@ -397,6 +419,11 @@ fn read_directory(path: String, show_hidden: bool) -> Result<Vec<FileEntry>, Str
             .then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase()))
     });
 
+    // Limit to 500 entries to prevent frontend UI lockup on massive directories
+    if entries_list.len() > 500 {
+        entries_list.truncate(500);
+    }
+
     Ok(entries_list)
 }
 
@@ -433,6 +460,62 @@ fn delete_entry(path: String) -> Result<(), String> {
     } else {
         fs::remove_file(p).map_err(|e| format!("Failed to delete file: {}", e))
     }
+}
+
+#[tauri::command]
+fn rename_entry(old_path: String, new_path: String) -> Result<(), String> {
+    let old_p = Path::new(&old_path);
+    let new_p = Path::new(&new_path);
+    validate_safe_deletion(old_p)?;
+    validate_safe_write(new_p)?;
+    if !old_p.exists() {
+        return Err("変更対象のファイルまたはディレクトリが存在しません。".to_string());
+    }
+    if new_p.exists() {
+        return Err("変更先のファイル名またはパスが既に存在します。".to_string());
+    }
+    if let Some(parent) = new_p.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    fs::rename(old_p, new_p).map_err(|e| format!("名前の変更に失敗しました: {}", e))
+}
+
+#[tauri::command]
+fn reveal_in_file_manager(path: String) -> Result<(), String> {
+    let p = Path::new(&path);
+    if !p.exists() {
+        return Err("対象パスが存在しません。".to_string());
+    }
+    let target_dir = if p.is_dir() {
+        p
+    } else {
+        p.parent().unwrap_or(p)
+    };
+
+    #[cfg(target_os = "linux")]
+    {
+        std::process::Command::new("xdg-open")
+            .arg(target_dir)
+            .spawn()
+            .map_err(|e| format!("ファイルマネージャーの起動に失敗しました: {}", e))?;
+    }
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg("-R")
+            .arg(&path)
+            .spawn()
+            .map_err(|e| format!("ファイルマネージャーの起動に失敗しました: {}", e))?;
+    }
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("explorer")
+            .arg(format!("/select,{}", path))
+            .spawn()
+            .map_err(|e| format!("ファイルマネージャーの起動に失敗しました: {}", e))?;
+    }
+
+    Ok(())
 }
 
 // --- AI Commands (Ollama) ---
@@ -671,6 +754,8 @@ pub fn run() {
             create_file,
             create_directory,
             delete_entry,
+            rename_entry,
+            reveal_in_file_manager,
             check_ollama_status,
             generate_command,
             explain_error,
@@ -725,7 +810,13 @@ mod tests {
         let all_names: Vec<String> = entries_with_hidden.iter().map(|e| e.name.clone()).collect();
         assert!(all_names.contains(&".hidden".to_string()));
 
-        // 5. Delete file and folder
+        // 5. Rename entry
+        let file_renamed = format!("{}/gamma.txt", dir_path);
+        assert!(rename_entry(file_b.clone(), file_renamed.clone()).is_ok());
+        assert!(!Path::new(&file_b).exists());
+        assert!(Path::new(&file_renamed).exists());
+
+        // 6. Delete file and folder
         assert!(delete_entry(file_a.clone()).is_ok());
         assert!(!Path::new(&file_a).exists());
         assert!(delete_entry(sub_dir.clone()).is_ok());
@@ -763,6 +854,12 @@ mod tests {
 
             let config_root = home.join(".config").to_string_lossy().to_string();
             assert!(delete_entry(config_root).is_err());
+
+            let bashrc_path = home.join(".bashrc").to_string_lossy().to_string();
+            assert!(delete_entry(bashrc_path).is_err());
+
+            let zshrc_path = home.join(".zshrc").to_string_lossy().to_string();
+            assert!(delete_entry(zshrc_path).is_err());
         }
     }
 
@@ -784,6 +881,12 @@ mod tests {
 
             let gpg_key = home.join(".gnupg").join("private-keys-v1.d").join("key.sec").to_string_lossy().to_string();
             assert!(write_file(gpg_key.clone(), "secret".to_string()).is_err());
+
+            let bashrc = home.join(".bashrc").to_string_lossy().to_string();
+            assert!(write_file(bashrc.clone(), "# malicious payload".to_string()).is_err());
+
+            let zshrc = home.join(".zshrc").to_string_lossy().to_string();
+            assert!(write_file(zshrc.clone(), "# malicious payload".to_string()).is_err());
         }
     }
 

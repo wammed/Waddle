@@ -155,6 +155,28 @@ export interface TerminalTab {
   lastExitCode?: number;
   lastOutput?: string;
   hasErrorAlert?: boolean;
+  splitRatios?: Record<string, number>;
+}
+
+export interface SavedPaneInfo {
+  id: string;
+  cwd: string;
+  title: string;
+}
+
+export interface SavedSessionTab {
+  id: string;
+  title: string;
+  layout: PaneLayout;
+  panes: SavedPaneInfo[];
+  activePaneId: string;
+  splitRatios?: Record<string, number>;
+}
+
+export interface SavedSessionState {
+  version: number;
+  activeTabId: string;
+  tabs: SavedSessionTab[];
 }
 
 export interface FileEntry {

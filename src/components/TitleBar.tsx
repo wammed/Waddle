@@ -12,11 +12,13 @@ import {
   Rows2,
   LayoutGrid,
   Square,
+  RotateCcw,
 } from 'lucide-react';
 import { PaneLayout, TerminalTab } from '../types';
 import waddleIcon from '../assets/waddle-icon.svg';
 import { useI18n } from '../i18n';
 import { LayoutSelectorPopover } from './LayoutSelectorPopover';
+import { RefreshConfirmModal } from './RefreshConfirmModal';
 
 interface TitleBarProps {
   tabs: TerminalTab[];
@@ -34,6 +36,7 @@ interface TitleBarProps {
   onToggleEditor: () => void;
   isFileTreeOpen: boolean;
   onToggleFileTree: () => void;
+  onRefreshAll: () => void;
 }
 
 export const TitleBar: React.FC<TitleBarProps> = ({
@@ -52,9 +55,11 @@ export const TitleBar: React.FC<TitleBarProps> = ({
   onToggleEditor,
   isFileTreeOpen,
   onToggleFileTree,
+  onRefreshAll,
 }) => {
   const { t } = useI18n();
   const [isLayoutPopoverOpen, setIsLayoutPopoverOpen] = useState(false);
+  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
 
   const getLayoutIcon = (layout: PaneLayout) => {
     switch (layout) {
@@ -184,6 +189,16 @@ export const TitleBar: React.FC<TitleBarProps> = ({
         </button>
 
         <button
+          id="btn-refresh-all"
+          className="action-btn"
+          onClick={() => setIsConfirmModalOpen(true)}
+          title={t.titleBar.refreshAllTooltip}
+        >
+          <RotateCcw size={14} />
+          <span>{t.titleBar.refreshAll}</span>
+        </button>
+
+        <button
           id="btn-settings"
           className="action-btn"
           onClick={onOpenSettings}
@@ -203,6 +218,15 @@ export const TitleBar: React.FC<TitleBarProps> = ({
             }}
           />
         )}
+
+        <RefreshConfirmModal
+          isOpen={isConfirmModalOpen}
+          onClose={() => setIsConfirmModalOpen(false)}
+          onConfirm={() => {
+            setIsConfirmModalOpen(false);
+            onRefreshAll();
+          }}
+        />
       </div>
     </header>
   );

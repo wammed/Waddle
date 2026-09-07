@@ -15,6 +15,7 @@ import {
   ChevronDown,
   ShieldAlert,
   ShieldCheck,
+  Info,
 } from 'lucide-react';
 import { GitStatus } from '../types';
 import { TauriApi } from '../services/tauriApi';
@@ -372,6 +373,37 @@ export const GitQuickPopover: React.FC<GitQuickPopoverProps> = ({
           <button onClick={() => setActionError(null)}>
             <X size={11} />
           </button>
+        </div>
+      )}
+      {actionError && (
+        actionError.includes('Permission denied (publickey)') ||
+        actionError.includes('could not read Username') ||
+        actionError.includes('Authentication failed') ||
+        actionError.includes('fatal: Authentication') ||
+        actionError.includes('Please make sure you have the correct access rights')
+      ) && (
+        <div
+          style={{
+            margin: '4px 12px 8px',
+            padding: '8px 10px',
+            background: 'rgba(56, 189, 248, 0.12)',
+            border: '1px solid rgba(56, 189, 248, 0.3)',
+            borderRadius: '6px',
+            fontSize: '11px',
+            color: '#7dd3fc',
+            lineHeight: '1.4',
+            display: 'flex',
+            gap: '6px',
+            alignItems: 'flex-start',
+          }}
+        >
+          <Info size={13} style={{ flexShrink: 0, marginTop: '2px' }} />
+          <div>
+            <strong style={{ display: 'block', marginBottom: '2px', color: '#38bdf8' }}>
+              {t.gitPopover.authTipTitle}
+            </strong>
+            {t.gitPopover.authTipDesc}
+          </div>
         </div>
       )}
       {successMessage && (

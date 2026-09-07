@@ -226,6 +226,16 @@ export const TauriApi = {
     return await invoke('delete_entry', { path });
   },
 
+  async renameEntry(oldPath: string, newPath: string): Promise<void> {
+    if (!isTauri()) return;
+    return await invoke('rename_entry', { oldPath, newPath });
+  },
+
+  async revealInFileManager(path: string): Promise<void> {
+    if (!isTauri()) return;
+    return await invoke('reveal_in_file_manager', { path });
+  },
+
   async listDirectoryFiles(path: string): Promise<string[]> {
     try {
       const entries = await this.readDirectory(path, false);

@@ -134,7 +134,7 @@ impl PtyManager {
             let _ = start_rx.recv_timeout(std::time::Duration::from_millis(1000));
 
             let mut reader = reader;
-            let mut buffer = [0u8; 8192];
+            let mut buffer = [0u8; 32768];
             let mut pending_bytes: Vec<u8> = Vec::new();
             let event_name = format!("pty-output-{}", session_id_clone);
 
@@ -154,27 +154,25 @@ impl PtyManager {
                         };
 
                         let mut slice = &to_process[..];
+                        let mut decoded = String::with_capacity(slice.len());
+
                         while !slice.is_empty() {
                             match std::str::from_utf8(slice) {
                                 Ok(valid) => {
-                                    if let Err(e) = app_clone.emit(&event_name, valid) {
-                                        eprintln!("Error emitting PTY output: {}", e);
-                                    }
+                                    decoded.push_str(valid);
                                     break;
                                 }
                                 Err(e) => {
                                     let valid_len = e.valid_up_to();
                                     if valid_len > 0 {
-                                        if let Err(err) = app_clone.emit(&event_name, &slice[..valid_len]) {
-                                            eprintln!("Error emitting PTY output: {}", err);
+                                        if let Ok(s) = std::str::from_utf8(&slice[..valid_len]) {
+                                            decoded.push_str(s);
                                         }
                                         slice = &slice[valid_len..];
                                     }
                                     if let Some(err_len) = e.error_len() {
                                         // Actual invalid byte sequence (e.g. binary output)
-                                        if let Err(err) = app_clone.emit(&event_name, "\u{FFFD}") {
-                                            eprintln!("Error emitting PTY output: {}", err);
-                                        }
+                                        decoded.push('\u{FFFD}');
                                         slice = &slice[err_len..];
                                     } else {
                                         // Incomplete multi-byte UTF-8 sequence at the end of buffer!
@@ -183,6 +181,12 @@ impl PtyManager {
                                         break;
                                     }
                                 }
+                            }
+                        }
+
+                        if !decoded.is_empty() {
+                            if let Err(e) = app_clone.emit(&event_name, &decoded) {
+                                eprintln!("Error emitting PTY output: {}", e);
                             }
                         }
                     }
@@ -604,6 +608,18 @@ pub fn git_unstage_all(path_str: &str) -> Result<(), String> {
 
 pub fn git_discard_file(path_str: &str, file_path: &str) -> Result<(), String> {
     let repo_dir = get_effective_repo_dir(path_str);
+    // Security check: ensure file_path does not contain path traversal outside repo_dir
+    let clean_path = std::path::Path::new(file_path);
+    if clean_path.components().any(|c| c == std::path::Component::ParentDir) {
+        return Err("Path traversal detected in file_path".to_string());
+    }
+    let p = repo_dir.join(clean_path);
+    if let (Ok(repo_canon), Ok(p_canon)) = (repo_dir.canonicalize(), p.canonicalize()) {
+        if !p_canon.starts_with(&repo_canon) {
+            return Err("Attempted to discard file outside repository root".to_string());
+        }
+    }
+
     let status = std::process::Command::new("git")
         .args(["status", "--porcelain", "--", file_path])
         .current_dir(&repo_dir)
@@ -611,7 +627,6 @@ pub fn git_discard_file(path_str: &str, file_path: &str) -> Result<(), String> {
     if let Ok(st) = status {
         let out = String::from_utf8_lossy(&st.stdout);
         if out.starts_with("??") {
-            let p = repo_dir.join(file_path);
             if p.is_dir() {
                 let _ = std::fs::remove_dir_all(&p);
             } else if p.is_file() {
@@ -677,7 +692,7 @@ pub fn git_get_branches(path_str: &str) -> Result<Vec<String>, String> {
 pub fn git_checkout_branch(path_str: &str, branch: &str) -> Result<String, String> {
     let repo_dir = get_effective_repo_dir(path_str);
     let output = std::process::Command::new("git")
-        .args(["checkout", branch])
+        .args(["checkout", "--", branch])
         .current_dir(&repo_dir)
         .output()
         .map_err(|e| format!("Failed to run git checkout: {}", e))?;

@@ -8,6 +8,7 @@ interface UseGlobalShortcutsOptions {
   handleClosePane: (tabId: string, paneId: string) => void;
   handleApplyLayout: (layout: PaneLayout) => void;
   handleDirectionalFocus: (direction: 'up' | 'down' | 'left' | 'right') => void;
+  handleSwapPanes: (tabId: string) => void;
   createNewTab: () => void;
   closeTab: (tabId: string) => void;
   setIsAiCommandOpen: React.Dispatch<React.SetStateAction<boolean>>;
@@ -23,6 +24,7 @@ export function useGlobalShortcuts({
   handleClosePane,
   handleApplyLayout,
   handleDirectionalFocus,
+  handleSwapPanes,
   createNewTab,
   closeTab,
   setIsAiCommandOpen,
@@ -37,6 +39,15 @@ export function useGlobalShortcuts({
         e.preventDefault();
         if (activeTab && activePane) {
           handleClosePane(activeTab.id, activePane.id);
+        }
+        return;
+      }
+
+      // Ctrl+Shift+S: Swap panes in current split
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toUpperCase() === 'S') {
+        e.preventDefault();
+        if (activeTab) {
+          handleSwapPanes(activeTab.id);
         }
         return;
       }
@@ -119,6 +130,7 @@ export function useGlobalShortcuts({
     handleClosePane,
     handleApplyLayout,
     handleDirectionalFocus,
+    handleSwapPanes,
     createNewTab,
     closeTab,
     setIsAiCommandOpen,

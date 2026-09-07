@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   Folder,
   FolderOpen,
@@ -21,6 +21,10 @@ import {
   X,
   Loader2,
   GitCommit,
+  Copy,
+  Edit2,
+  ExternalLink,
+  Check,
 } from 'lucide-react';
 import { FileEntry, GitStatus, GitFileEntry } from '../types';
 import { TauriApi } from '../services/tauriApi';
@@ -34,6 +38,47 @@ interface FileTreeSidebarProps {
   onOpenFile: (filePath: string) => void;
   onInsertToTerminal?: (text: string) => void;
   onOpenDiff?: (filePath: string, isStaged: boolean) => void;
+}
+
+interface FileLanguageMeta {
+  ext: string;
+  color: string;
+  bgColor: string;
+}
+
+function getFileLanguageMeta(fileName: string): FileLanguageMeta {
+  const lower = fileName.toLowerCase();
+
+  if (lower.endsWith('.tsx')) return { ext: 'TSX', color: '#2dd4bf', bgColor: 'rgba(45, 212, 191, 0.15)' };
+  if (lower.endsWith('.ts')) return { ext: 'TS', color: '#38bdf8', bgColor: 'rgba(56, 189, 248, 0.15)' };
+  if (lower.endsWith('.jsx')) return { ext: 'JSX', color: '#60a5fa', bgColor: 'rgba(96, 165, 250, 0.15)' };
+  if (lower.endsWith('.js') || lower.endsWith('.mjs') || lower.endsWith('.cjs')) return { ext: 'JS', color: '#facc15', bgColor: 'rgba(250, 204, 21, 0.15)' };
+  if (lower.endsWith('.rs')) return { ext: 'RS', color: '#dea584', bgColor: 'rgba(222, 165, 132, 0.15)' };
+  if (lower.endsWith('.py')) return { ext: 'PY', color: '#38bdf8', bgColor: 'rgba(56, 189, 248, 0.15)' };
+  if (lower.endsWith('.json')) return { ext: 'JSON', color: '#fbbf24', bgColor: 'rgba(251, 191, 36, 0.15)' };
+  if (lower.endsWith('.md') || lower.endsWith('.markdown')) return { ext: 'MD', color: '#06b6d4', bgColor: 'rgba(6, 182, 212, 0.15)' };
+  if (lower.endsWith('.css') || lower.endsWith('.scss') || lower.endsWith('.sass') || lower.endsWith('.less')) return { ext: 'CSS', color: '#38bdf8', bgColor: 'rgba(56, 189, 248, 0.15)' };
+  if (lower.endsWith('.html') || lower.endsWith('.htm')) return { ext: 'HTML', color: '#f97316', bgColor: 'rgba(249, 115, 22, 0.15)' };
+  if (lower.endsWith('.sh') || lower.endsWith('.bash') || lower.endsWith('.zsh')) return { ext: 'SH', color: '#4ade80', bgColor: 'rgba(74, 222, 128, 0.15)' };
+  if (lower.endsWith('.yaml') || lower.endsWith('.yml')) return { ext: 'YML', color: '#f43f5e', bgColor: 'rgba(244, 63, 94, 0.15)' };
+  if (lower.endsWith('.toml')) return { ext: 'TOML', color: '#f87171', bgColor: 'rgba(248, 113, 113, 0.15)' };
+  if (lower.endsWith('.sql')) return { ext: 'SQL', color: '#eab308', bgColor: 'rgba(234, 179, 8, 0.15)' };
+  if (lower.endsWith('.go')) return { ext: 'GO', color: '#00add8', bgColor: 'rgba(0, 173, 216, 0.15)' };
+  if (lower.endsWith('.c') || lower.endsWith('.h')) return { ext: 'C', color: '#a8b9cc', bgColor: 'rgba(168, 185, 204, 0.15)' };
+  if (lower.endsWith('.cpp') || lower.endsWith('.hpp') || lower.endsWith('.cc')) return { ext: 'C++', color: '#f34b7d', bgColor: 'rgba(243, 75, 125, 0.15)' };
+  if (lower.endsWith('.png') || lower.endsWith('.jpg') || lower.endsWith('.jpeg') || lower.endsWith('.svg') || lower.endsWith('.webp') || lower.endsWith('.ico') || lower.endsWith('.gif')) {
+    return { ext: 'IMG', color: '#ec4899', bgColor: 'rgba(236, 72, 153, 0.15)' };
+  }
+  if (lower.endsWith('.zip') || lower.endsWith('.tar') || lower.endsWith('.gz') || lower.endsWith('.7z') || lower.endsWith('.zst')) {
+    return { ext: 'ZIP', color: '#a855f7', bgColor: 'rgba(168, 85, 247, 0.15)' };
+  }
+  if (lower.startsWith('.env') || lower === '.gitignore' || lower === '.dockerignore' || lower === 'dockerfile') {
+    return { ext: 'CFG', color: '#94a3b8', bgColor: 'rgba(148, 163, 184, 0.15)' };
+  }
+  if (lower.endsWith('.lock')) {
+    return { ext: 'LOCK', color: '#64748b', bgColor: 'rgba(100, 116, 139, 0.15)' };
+  }
+  return { ext: 'FILE', color: 'var(--fg-muted)', bgColor: 'rgba(255, 255, 255, 0.05)' };
 }
 
 export const FileTreeSidebar: React.FC<FileTreeSidebarProps> = ({
@@ -54,12 +99,27 @@ export const FileTreeSidebar: React.FC<FileTreeSidebarProps> = ({
   const [loadingPaths, setLoadingPaths] = useState<Set<string>>(new Set());
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
 
+  // Copied feedback toast / state
+  const [copiedPath, setCopiedPath] = useState<string | null>(null);
+
+  // Right-click context menu state
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    entry: FileEntry;
+  } | null>(null);
+  const contextMenuRef = useRef<HTMLDivElement>(null);
+
   // New file/folder inline prompt
   const [newEntryTarget, setNewEntryTarget] = useState<{
     parentPath: string;
     type: 'file' | 'folder';
   } | null>(null);
   const [newEntryName, setNewEntryName] = useState('');
+
+  // Rename inline prompt
+  const [renamingEntry, setRenamingEntry] = useState<FileEntry | null>(null);
+  const [renameValue, setRenameValue] = useState('');
 
   // Sync root with cwd when cwd changes
   useEffect(() => {
@@ -69,6 +129,28 @@ export const FileTreeSidebar: React.FC<FileTreeSidebarProps> = ({
       setExpandedPaths(new Set([cwd]));
     }
   }, [cwd]);
+
+  // Close context menu on outside click or Escape
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (contextMenuRef.current && !contextMenuRef.current.contains(e.target as Node)) {
+        setContextMenu(null);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setContextMenu(null);
+        setNewEntryTarget(null);
+        setRenamingEntry(null);
+      }
+    };
+    window.addEventListener('mousedown', handleOutsideClick);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('mousedown', handleOutsideClick);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
 
   // Load a directory's contents
   const loadDirectory = useCallback(
@@ -161,9 +243,37 @@ export const FileTreeSidebar: React.FC<FileTreeSidebarProps> = ({
     }
   };
 
+  // Confirm rename
+  const handleConfirmRename = async () => {
+    if (!renamingEntry || !renameValue.trim() || renameValue.trim() === renamingEntry.name) {
+      setRenamingEntry(null);
+      return;
+    }
+
+    const parentPath = renamingEntry.path.substring(0, renamingEntry.path.lastIndexOf('/')) || rootPath;
+    const newPath = `${parentPath.replace(/\/$/, '')}/${renameValue.trim()}`;
+    try {
+      await TauriApi.renameEntry(renamingEntry.path, newPath);
+      await loadDirectory(parentPath);
+      if (expandedPaths.has(renamingEntry.path)) {
+        setExpandedPaths((prev) => {
+          const next = new Set(prev);
+          next.delete(renamingEntry.path);
+          next.add(newPath);
+          return next;
+        });
+      }
+    } catch (err) {
+      alert(`${t.fileTree.renameFailed}: ${err}`);
+    } finally {
+      setRenamingEntry(null);
+    }
+  };
+
   // Delete file or folder
-  const handleDelete = async (entry: FileEntry, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleDelete = async (entry: FileEntry, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setContextMenu(null);
     const typeStr = entry.is_dir ? t.fileTree.folderType : t.fileTree.fileType;
     if (confirm(t.fileTree.deleteConfirm(typeStr, entry.name))) {
       try {
@@ -178,8 +288,9 @@ export const FileTreeSidebar: React.FC<FileTreeSidebarProps> = ({
   };
 
   // Insert to terminal
-  const handleInsert = (entry: FileEntry, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleInsert = (entry: FileEntry, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setContextMenu(null);
     if (onInsertToTerminal) {
       // Relative path if inside root, else full path
       const relative = entry.path.startsWith(rootPath)
@@ -189,54 +300,47 @@ export const FileTreeSidebar: React.FC<FileTreeSidebarProps> = ({
     }
   };
 
-  // Icon helper based on file extension
-  const getFileIcon = (fileName: string) => {
-    const lower = fileName.toLowerCase();
-    if (lower.endsWith('.ts') || lower.endsWith('.tsx')) {
-      return <FileCode size={14} color="#38bdf8" />;
+  // Copy path helper
+  const handleCopyPath = (entry: FileEntry, isAbsolute: boolean, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setContextMenu(null);
+    const textToCopy = isAbsolute
+      ? entry.path
+      : entry.path.startsWith(rootPath)
+      ? entry.path.replace(rootPath, '').replace(/^\//, '')
+      : entry.path;
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(textToCopy);
+      setCopiedPath(entry.path);
+      setTimeout(() => setCopiedPath(null), 1500);
     }
-    if (lower.endsWith('.js') || lower.endsWith('.jsx')) {
-      return <FileCode size={14} color="#facc15" />;
+  };
+
+  // Reveal in OS file manager
+  const handleRevealInFileManager = async (entry: FileEntry, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setContextMenu(null);
+    try {
+      await TauriApi.revealInFileManager(entry.path);
+    } catch (err) {
+      console.error('Failed to reveal in file manager:', err);
     }
-    if (lower.endsWith('.py')) {
-      return <FileCode size={14} color="#60a5fa" />;
-    }
-    if (lower.endsWith('.rs')) {
-      return <FileCode size={14} color="#fb923c" />;
-    }
-    if (lower.endsWith('.sh') || lower.endsWith('.bash') || lower.endsWith('.zsh')) {
-      return <Terminal size={14} color="#34d399" />;
-    }
-    if (
-      lower.endsWith('.json') ||
-      lower.endsWith('.yaml') ||
-      lower.endsWith('.yml') ||
-      lower.endsWith('.toml')
-    ) {
-      return <FileCode size={14} color="#eab308" />;
-    }
-    if (lower.endsWith('.md') || lower.endsWith('.txt') || lower.endsWith('.log')) {
-      return <FileText size={14} color="#c084fc" />;
-    }
-    if (
-      lower.endsWith('.png') ||
-      lower.endsWith('.jpg') ||
-      lower.endsWith('.jpeg') ||
-      lower.endsWith('.svg') ||
-      lower.endsWith('.webp') ||
-      lower.endsWith('.ico')
-    ) {
-      return <FileImage size={14} color="#f472b6" />;
-    }
-    if (
-      lower.endsWith('.tar') ||
-      lower.endsWith('.gz') ||
-      lower.endsWith('.zip') ||
-      lower.endsWith('.zst')
-    ) {
-      return <FileArchive size={14} color="#fbbf24" />;
-    }
-    return <File size={14} color="var(--fg-muted)" />;
+  };
+
+  // Open context menu
+  const handleContextMenu = (e: React.MouseEvent, entry: FileEntry) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setSelectedPath(entry.path);
+
+    // Clamp coordinates to prevent clipping
+    const menuWidth = 220;
+    const menuHeight = 280;
+    const x = Math.min(e.clientX, window.innerWidth - menuWidth - 10);
+    const y = Math.min(e.clientY, window.innerHeight - menuHeight - 10);
+
+    setContextMenu({ x, y, entry });
   };
 
   // Format file size
@@ -250,6 +354,16 @@ export const FileTreeSidebar: React.FC<FileTreeSidebarProps> = ({
     if (!rootPath) return 'Files';
     const parts = rootPath.split('/').filter(Boolean);
     return parts[parts.length - 1] || rootPath;
+  }, [rootPath]);
+
+  // Clickable path breadcrumbs
+  const pathBreadcrumbs = useMemo(() => {
+    if (!rootPath) return [];
+    const parts = rootPath.split('/').filter(Boolean);
+    return parts.map((part, idx) => {
+      const full = '/' + parts.slice(0, idx + 1).join('/');
+      return { name: part, path: full };
+    });
   }, [rootPath]);
 
   // Helper to match file with gitStatus
@@ -290,6 +404,55 @@ export const FileTreeSidebar: React.FC<FileTreeSidebarProps> = ({
     [gitStatus?.files, rootPath]
   );
 
+  // Icon helper based on file extension
+  const renderFileIconWithBadge = (fileName: string) => {
+    const meta = getFileLanguageMeta(fileName);
+    const lower = fileName.toLowerCase();
+
+    let baseIcon = <FileCode size={14} color={meta.color} />;
+    if (lower.endsWith('.md') || lower.endsWith('.txt') || lower.endsWith('.log')) {
+      baseIcon = <FileText size={14} color={meta.color} />;
+    } else if (
+      lower.endsWith('.png') ||
+      lower.endsWith('.jpg') ||
+      lower.endsWith('.jpeg') ||
+      lower.endsWith('.svg') ||
+      lower.endsWith('.webp') ||
+      lower.endsWith('.ico')
+    ) {
+      baseIcon = <FileImage size={14} color={meta.color} />;
+    } else if (
+      lower.endsWith('.tar') ||
+      lower.endsWith('.gz') ||
+      lower.endsWith('.zip') ||
+      lower.endsWith('.zst')
+    ) {
+      baseIcon = <FileArchive size={14} color={meta.color} />;
+    } else if (lower.endsWith('.sh') || lower.endsWith('.bash') || lower.endsWith('.zsh')) {
+      baseIcon = <Terminal size={14} color={meta.color} />;
+    } else if (meta.ext === 'FILE') {
+      baseIcon = <File size={14} color="var(--fg-muted)" />;
+    }
+
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+        {baseIcon}
+        {meta.ext !== 'FILE' && (
+          <span
+            className="file-lang-badge"
+            style={{
+              color: meta.color,
+              borderColor: meta.color,
+              background: meta.bgColor,
+            }}
+          >
+            {meta.ext}
+          </span>
+        )}
+      </div>
+    );
+  };
+
   // Recursive Tree Node renderer
   const renderTree = (parentPath: string, depth = 0) => {
     const entries = directoryCache[parentPath] || [];
@@ -320,6 +483,16 @@ export const FileTreeSidebar: React.FC<FileTreeSidebarProps> = ({
 
     return (
       <div className="tree-level">
+        {/* Indentation guide line */}
+        {depth > 0 && (
+          <div
+            className="tree-guide-line"
+            style={{
+              left: `${depth * 14 + 6}px`,
+            }}
+          />
+        )}
+
         {filtered.map((entry) => {
           const isDir = entry.is_dir;
           const isExpanded = expandedPaths.has(entry.path);
@@ -327,13 +500,16 @@ export const FileTreeSidebar: React.FC<FileTreeSidebarProps> = ({
           const isLoading = loadingPaths.has(entry.path);
           const gitEntry = !isDir ? getGitEntryForPath(entry.path) : undefined;
           const hasFolderChanges = isDir && folderHasGitChanges(entry.path);
+          const folderChildrenCount = isDir && directoryCache[entry.path]
+            ? directoryCache[entry.path].length
+            : null;
 
           return (
             <div key={entry.path} className="tree-node-wrapper">
               <div
                 className={`tree-node-item ${isSelected ? 'selected' : ''}`}
                 style={{
-                  paddingLeft: `${depth * 14 + 10}px`,
+                  paddingLeft: `${depth * 14 + 8}px`,
                 }}
                 onClick={(e) => {
                   setSelectedPath(entry.path);
@@ -343,6 +519,7 @@ export const FileTreeSidebar: React.FC<FileTreeSidebarProps> = ({
                     onOpenFile(entry.path);
                   }
                 }}
+                onContextMenu={(e) => handleContextMenu(e, entry)}
                 title={`${entry.name} (${isDir ? t.fileTree.folderType : formatSize(entry.size)})\n${entry.path}${gitEntry ? ` [Git: ${gitEntry.status_code}]` : ''}`}
               >
                 {/* Arrow / Folder Icon */}
@@ -366,12 +543,12 @@ export const FileTreeSidebar: React.FC<FileTreeSidebarProps> = ({
 
                   {isDir ? (
                     isExpanded ? (
-                      <FolderOpen size={14} color="#f59e0b" style={{ flexShrink: 0 }} />
+                      <FolderOpen size={15} color="#f59e0b" style={{ flexShrink: 0 }} />
                     ) : (
-                      <Folder size={14} color="#eab308" style={{ flexShrink: 0 }} />
+                      <Folder size={15} color="#eab308" style={{ flexShrink: 0 }} />
                     )
                   ) : (
-                    getFileIcon(entry.name)
+                    renderFileIconWithBadge(entry.name)
                   )}
                 </div>
 
@@ -392,9 +569,23 @@ export const FileTreeSidebar: React.FC<FileTreeSidebarProps> = ({
                   {entry.name}
                 </span>
 
+                {/* Folder Item Count Badge */}
+                {isDir && folderChildrenCount !== null && (
+                  <span className="tree-folder-count">
+                    ({folderChildrenCount})
+                  </span>
+                )}
+
                 {/* Folder change dot */}
                 {isDir && hasFolderChanges && (
                   <span className="folder-git-dot" title="Contains modified files" />
+                )}
+
+                {/* File Size */}
+                {!isDir && entry.size > 0 && (
+                  <span className="tree-file-size">
+                    {formatSize(entry.size)}
+                  </span>
                 )}
 
                 {/* Git Status Badge */}
@@ -447,6 +638,25 @@ export const FileTreeSidebar: React.FC<FileTreeSidebarProps> = ({
                       <FileCode size={12} />
                     </button>
                   )}
+                  {isDir && (
+                    <button
+                      className="node-action-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setNewEntryTarget({ parentPath: entry.path, type: 'file' });
+                      }}
+                      title={t.fileTree.newFile}
+                    >
+                      <FilePlus size={12} />
+                    </button>
+                  )}
+                  <button
+                    className="node-action-btn"
+                    onClick={(e) => handleCopyPath(entry, false, e)}
+                    title={t.fileTree.copyRelativePath}
+                  >
+                    {copiedPath === entry.path ? <Check size={12} color="#10b981" /> : <Copy size={12} />}
+                  </button>
                   <button
                     className="node-action-btn"
                     onClick={(e) => handleInsert(entry, e)}
@@ -544,6 +754,35 @@ export const FileTreeSidebar: React.FC<FileTreeSidebarProps> = ({
         </div>
       </div>
 
+      {/* Interactive Breadcrumbs Bar */}
+      <div className="filetree-breadcrumbs">
+        <button
+          className="filetree-breadcrumb-item"
+          onClick={() => {
+            setRootPath('/');
+            setExpandedPaths(new Set(['/']));
+          }}
+          title="Root (/)"
+        >
+          /
+        </button>
+        {pathBreadcrumbs.map((crumb, idx) => (
+          <React.Fragment key={crumb.path}>
+            <span className="filetree-breadcrumb-sep">/</span>
+            <button
+              className={`filetree-breadcrumb-item ${idx === pathBreadcrumbs.length - 1 ? 'active' : ''}`}
+              onClick={() => {
+                setRootPath(crumb.path);
+                setExpandedPaths(new Set([crumb.path]));
+              }}
+              title={crumb.path}
+            >
+              {crumb.name}
+            </button>
+          </React.Fragment>
+        ))}
+      </div>
+
       {/* Quick Search Filter */}
       <div className="filetree-search-bar">
         <Search size={12} color="var(--fg-dim)" />
@@ -565,6 +804,40 @@ export const FileTreeSidebar: React.FC<FileTreeSidebarProps> = ({
         )}
       </div>
 
+      {/* Rename Prompt Bar */}
+      {renamingEntry && (
+        <div className="filetree-rename-dialog">
+          <Edit2 size={13} color="#f59e0b" />
+          <input
+            type="text"
+            autoFocus
+            placeholder={t.fileTree.renamePlaceholder}
+            value={renameValue}
+            onChange={(e) => setRenameValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleConfirmRename();
+              if (e.key === 'Escape') setRenamingEntry(null);
+            }}
+            className="filetree-rename-input"
+          />
+          <button
+            className="btn-create-submit"
+            style={{ background: '#f59e0b', color: '#000' }}
+            onClick={handleConfirmRename}
+            title={`${t.common.save} (Enter)`}
+          >
+            {t.common.save}
+          </button>
+          <button
+            className="btn-create-cancel"
+            onClick={() => setRenamingEntry(null)}
+            title={`${t.common.cancel} (Esc)`}
+          >
+            <X size={12} />
+          </button>
+        </div>
+      )}
+
       {/* New File / Folder Prompt */}
       {newEntryTarget && (
         <div className="new-entry-inline-bar">
@@ -577,7 +850,9 @@ export const FileTreeSidebar: React.FC<FileTreeSidebarProps> = ({
             type="text"
             autoFocus
             placeholder={
-              newEntryTarget.type === 'file' ? t.fileTree.newFilePlaceholder : t.fileTree.newFolderPlaceholder
+              newEntryTarget.type === 'file'
+                ? t.fileTree.newFilePlaceholder
+                : t.fileTree.newFolderPlaceholder
             }
             value={newEntryName}
             onChange={(e) => setNewEntryName(e.target.value)}
@@ -612,6 +887,117 @@ export const FileTreeSidebar: React.FC<FileTreeSidebarProps> = ({
           <div className="filetree-empty">{t.fileTree.noDirectory}</div>
         )}
       </div>
+
+      {/* Floating Right-Click Context Menu */}
+      {contextMenu && (
+        <div
+          ref={contextMenuRef}
+          className="filetree-context-menu"
+          style={{
+            left: `${contextMenu.x}px`,
+            top: `${contextMenu.y}px`,
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="context-menu-header">
+            {contextMenu.entry.name}
+          </div>
+
+          {!contextMenu.entry.is_dir && (
+            <button
+              className="context-menu-item"
+              onClick={() => {
+                setContextMenu(null);
+                onOpenFile(contextMenu.entry.path);
+              }}
+            >
+              <FileCode size={13} color="var(--accent)" />
+              <span>{t.fileTree.openInEditor}</span>
+            </button>
+          )}
+
+          <button
+            className="context-menu-item"
+            onClick={() => handleInsert(contextMenu.entry)}
+          >
+            <Terminal size={13} color="#34d399" />
+            <span>{t.fileTree.insertPath}</span>
+          </button>
+
+          <button
+            className="context-menu-item"
+            onClick={() => handleCopyPath(contextMenu.entry, false)}
+          >
+            <Copy size={13} />
+            <span>{t.fileTree.copyRelativePath}</span>
+          </button>
+
+          <button
+            className="context-menu-item"
+            onClick={() => handleCopyPath(contextMenu.entry, true)}
+          >
+            <Copy size={13} color="var(--fg-dim)" />
+            <span>{t.fileTree.copyAbsolutePath}</span>
+          </button>
+
+          <div className="context-menu-sep" />
+
+          <button
+            className="context-menu-item"
+            onClick={() => handleRevealInFileManager(contextMenu.entry)}
+          >
+            <ExternalLink size={13} color="#38bdf8" />
+            <span>{t.fileTree.revealInFileManager}</span>
+          </button>
+
+          {contextMenu.entry.is_dir && (
+            <>
+              <button
+                className="context-menu-item"
+                onClick={() => {
+                  setNewEntryTarget({ parentPath: contextMenu.entry.path, type: 'file' });
+                  setContextMenu(null);
+                }}
+              >
+                <FilePlus size={13} color="var(--accent)" />
+                <span>{t.fileTree.newFile}</span>
+              </button>
+              <button
+                className="context-menu-item"
+                onClick={() => {
+                  setNewEntryTarget({ parentPath: contextMenu.entry.path, type: 'folder' });
+                  setContextMenu(null);
+                }}
+              >
+                <FolderPlus size={13} color="#f59e0b" />
+                <span>{t.fileTree.newFolder}</span>
+              </button>
+            </>
+          )}
+
+          <div className="context-menu-sep" />
+
+          <button
+            className="context-menu-item"
+            onClick={() => {
+              setRenamingEntry(contextMenu.entry);
+              setRenameValue(contextMenu.entry.name);
+              setContextMenu(null);
+            }}
+          >
+            <Edit2 size={13} color="#f59e0b" />
+            <span>{t.fileTree.rename}</span>
+          </button>
+
+          <button
+            className="context-menu-item danger"
+            onClick={() => handleDelete(contextMenu.entry)}
+          >
+            <Trash2 size={13} color="#f43f5e" />
+            <span>{t.common.delete}</span>
+          </button>
+        </div>
+      )}
     </aside>
   );
 };
