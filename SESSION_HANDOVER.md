@@ -159,3 +159,29 @@ npm run tauri dev
    - GitHub 限定ポリシーの枠組みの中で、GitHub CLI (`gh`) または GitHub API 経由でカレントブランチに関連する Issue や PR の簡易ステータスを表示する拡張。
 3. **エディタペインのタブ化**:
    - 複数ファイルを同時に開いて切り替えられるタブ型エディタへの発展。
+
+---
+
+## 7. 今後の機能追加・修正時におけるドキュメント同期方針 (Documentation Policy)
+
+ユーザー指示に基づき、今後**機能追加（Feature）**、**バグ修正（Bug Fix）**、**セキュリティ強化（Security Fix）**を実施した際は、以下の 8 ドキュメント構成に従って**英語版・日本語版を必ずセットで同期更新**します：
+
+1. **ルート概要ドキュメント（スリム・Scannable構成を維持）**:
+   - [`README.md`](file:///home/susie/GitHUB/wammed/Waddle/README.md) & [`README.ja.md`](file:///home/susie/GitHUB/wammed/Waddle/README.ja.md)
+   - 新機能や主要変更の 1〜2 行要約バレット（Highlights）の追加・更新。
+   - 変更に関連する詳細ドキュメントへのリンク付与。
+   - 日常使用ショートカット一覧の同期。
+2. **機能詳細・内部仕様・全キーバインド**:
+   - [`docs/FEATURES.md`](file:///home/susie/GitHUB/wammed/Waddle/docs/FEATURES.md) & [`docs/FEATURES.ja.md`](file:///home/susie/GitHUB/wammed/Waddle/docs/FEATURES.ja.md)
+   - 機能の低レイヤ内部仕様、Tauri/Rust/React 連携機構、API/通信仕様の詳細追記。
+   - 完全版ショートカットキーテーブルへの反映。
+3. **アーキテクチャ・システム設計**:
+   - [`docs/ARCHITECTURE.md`](file:///home/susie/GitHUB/wammed/Waddle/docs/ARCHITECTURE.md) & [`docs/ARCHITECTURE.ja.md`](file:///home/susie/GitHUB/wammed/Waddle/docs/ARCHITECTURE.ja.md)
+   - Mermaid 構成図の更新、PTY・IPC・各サブシステムの設計変更追記、技術スタック一覧の更新。
+4. **セキュリティ仕様・ガードレール**:
+   - [`SECURITY.md`](file:///home/susie/GitHUB/wammed/Waddle/SECURITY.md) & [`SECURITY.ja.md`](file:///home/susie/GitHUB/wammed/Waddle/SECURITY.ja.md)
+   - パストラバーサル防止、保護対象パス、危険コマンド検知パターン、Webview CSP、ネットワーク境界ポリシーの更新。
+5. **開発履歴・引き継ぎ**:
+   - [`SESSION_HANDOVER.md`](file:///home/susie/GitHUB/wammed/Waddle/SESSION_HANDOVER.md)
+   - ユーザー要望、時系列開発履歴、変更重要ファイル、ビルド検証結果の追記。
+
