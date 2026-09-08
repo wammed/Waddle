@@ -73,6 +73,7 @@ Waddle is built on a hybrid architecture combining a high-performance **Rust bac
   - `pty.rs`: Pseudo-terminal allocation, output stream coalescing, UTF-8 decoders, and process group lifecycle control.
   - `ai.rs`: Ollama HTTP client, line-buffered SSE chunk assembly, prompt templates, and dangerous command detection engine.
   - `config.rs`: Atomic read/write operations for `~/.config/waddle/config.json`, wallpaper management, and legacy migration.
+  - `kitty.rs`: Sandboxed local image reader with path canonicalization, symlink escape checks, decompression bomb defenses, and Base64 encoder.
   - `lib.rs`: Tauri command router, directory traversal, file operations with prefix guards, and Git CLI wrappers.
 
 ---
@@ -162,6 +163,57 @@ Waddle is built on a hybrid architecture combining a high-performance **Rust bac
   - Wallpapers are stored at `~/.config/waddle/wallpapers/<filename>`.
   - Tauri's `assetProtocol` serves images directly to the Webview over `asset://localhost/...`.
   - Scope is strictly constrained to `$CONFIG/waddle/**/*`, `$PICTURE/**/*`, and `$DOWNLOAD/**/*`.
+
+---
+
+### 5. Kitty Graphics Subsystem & Canvas Pipeline (`src-tauri/src/kitty.rs` & `src/services/kittyGraphics/`)
+
+```
++---------------------------------------------------------------------------------+
+|                         Kitty Graphics Pipeline Architecture                    |
+|                                                                                 |
+|  [PTY Output Stream]                                                            |
+|          |                                                                      |
+|          v                                                                      |
+|  [KittyApcParser] ---> Plain Terminal Text ----------> [xterm.js term.write()] |
+|          |                                                    |                 |
+|          | APC Sequence (\x1b_G...;)                          |                 |
+|          v                                                    v                 |
+|  [KittyGraphicsManager]                                [.xterm-screen]          |
+|    |            |                                             |                 |
+|    | Query a=q  | Transmit / Display a=T, a=t, a=p            |                 |
+|    |            v                                             |                 |
+|    |    [KittyDecoder]                                        |                 |
+|    |      - Direct Base64 (f=100 PNG, f=32 RGBA, f=24 RGB)    |                 |
+|    |      - Local File Sandbox (t=f via Tauri Command)        |                 |
+|    |            |                                             |                 |
+|    |            v                                             |                 |
+|    |    [KittyLruCache] (256MB Cap, bitmap.close() on evict)  |                 |
+|    |            |                                             |                 |
+|    |            v                                             |                 |
+|    |    [CanvasOverlay] <-------------------------------------+                 |
+|    |    Order: [Wallpaper] -> [Kitty Canvas] -> [TextLayer] -> [CursorLayer]    |
+|    |                                                                            |
+|    v (Immediate reply)                                                          |
+|  [TauriApi.writePty("\x1b_Gi=<id>;OK\x1b\")]                                    |
++---------------------------------------------------------------------------------+
+```
+
+- **Zero-Lag Stream Separation**:
+  - APC escape sequences (`\x1b_G...`) carrying megabytes of Base64 image data are intercepted before reaching `@xterm/xterm`.
+  - Stripped text is passed to `term.write()`, preventing parser bottlenecking and terminal lag.
+- **Strict Path Canonicalization & Directory Jail**:
+  - For `t=f`, the Rust backend verifies `$HOME/Pictures` prefix against `std::fs::canonicalize`.
+  - Symlink escapes and `../` path traversal are strictly rejected with `EACCES` / `ENOENT`.
+- **Decompression Bomb Protection**:
+  - Image dimensions are capped at 4096×4096 px. PNG IHDR and JPEG SOF headers are validated before memory decoding.
+- **LRU Texture Cache & GPU VRAM Management**:
+  - Cache size is tracked dynamically (`width * height * 4` bytes).
+  - Old textures are evicted when cache exceeds 256 MB.
+  - Crucially, `ImageBitmap.close()` is called on eviction or deletion (`a=d`) to immediately free WebKitGTK and GPU memory.
+- **Pipeline Layering Order**:
+  - Inside `.xterm-screen`, the graphics canvas is mounted beneath the text layer.
+  - Layer stack: **Terminal Background / Wallpaper → Kitty Graphics Canvas Layer → Text/Glyphs Layer → Cursor Layer**.
 
 ---
 

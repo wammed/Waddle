@@ -1,0 +1,366 @@
+use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+use base64::Engine;
+use serde::{Deserialize, Serialize};
+use std::fs;
+use std::path::{Path, PathBuf};
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct KittyFileData {
+    pub data: String, // Base64 encoded payload
+    pub mime: String,
+    pub width: Option<u32>,
+    pub height: Option<u32>,
+}
+
+/// Expands leading `~` or `$HOME` to the user's home directory.
+fn expand_path(p: &str) -> PathBuf {
+    let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("/"));
+    if p == "~" {
+        return home;
+    }
+    if let Some(stripped) = p.strip_prefix("~/") {
+        return home.join(stripped);
+    }
+    if let Some(stripped) = p.strip_prefix("$HOME/") {
+        return home.join(stripped);
+    }
+    if p == "$HOME" {
+        return home;
+    }
+    PathBuf::from(p)
+}
+
+/// Validates whether a directory is a dangerous system root directory.
+fn is_dangerous_dir(path: &Path) -> bool {
+    let s = path.to_string_lossy();
+    let normalized = s.trim_end_matches('/');
+
+    if normalized.is_empty()
+        || normalized == "/"
+        || normalized == "/etc"
+        || normalized == "/usr"
+        || normalized == "/bin"
+        || normalized == "/sbin"
+        || normalized == "/lib"
+        || normalized == "/lib64"
+        || normalized == "/dev"
+        || normalized == "/proc"
+        || normalized == "/sys"
+        || normalized == "/var"
+        || normalized == "/root"
+        || normalized == "/boot"
+    {
+        return true;
+    }
+
+    if normalized.ends_with("/.ssh")
+        || normalized.ends_with("/.gnupg")
+        || normalized.contains("/.ssh/")
+        || normalized.contains("/.gnupg/")
+    {
+        return true;
+    }
+
+    false
+}
+
+/// Inspects image header to detect MIME type and extract image dimensions.
+/// Prevents decompression bombs before images are passed to frontend.
+fn inspect_image_dimensions(data: &[u8]) -> Result<(String, Option<u32>, Option<u32>), String> {
+    if data.is_empty() {
+        return Err("ENOENT: Image data is empty".to_string());
+    }
+
+    // 1. PNG check: magic bytes 89 50 4E 47 0D 0A 1A 0A
+    if data.starts_with(b"\x89PNG\r\n\x1a\n") {
+        if data.len() >= 24 && &data[12..16] == b"IHDR" {
+            let width = u32::from_be_bytes([data[16], data[17], data[18], data[19]]);
+            let height = u32::from_be_bytes([data[20], data[21], data[22], data[23]]);
+            return Ok(("image/png".to_string(), Some(width), Some(height)));
+        }
+        return Ok(("image/png".to_string(), None, None));
+    }
+
+    // 2. JPEG check: magic bytes FF D8 FF
+    if data.starts_with(b"\xFF\xD8\xFF") {
+        let mut idx = 2;
+        let len = data.len();
+        while idx + 8 < len {
+            if data[idx] != 0xFF {
+                idx += 1;
+                continue;
+            }
+            let marker = data[idx + 1];
+            // SOF0 (0xC0), SOF1 (0xC1), SOF2 (0xC2)
+            if marker == 0xC0 || marker == 0xC1 || marker == 0xC2 {
+                let height = u16::from_be_bytes([data[idx + 5], data[idx + 6]]) as u32;
+                let width = u16::from_be_bytes([data[idx + 7], data[idx + 8]]) as u32;
+                return Ok(("image/jpeg".to_string(), Some(width), Some(height)));
+            }
+            // Skip marker segment
+            let seg_len = u16::from_be_bytes([data[idx + 2], data[idx + 3]]) as usize;
+            if seg_len == 0 {
+                break;
+            }
+            idx += 2 + seg_len;
+        }
+        return Ok(("image/jpeg".to_string(), None, None));
+    }
+
+    // 3. GIF check: GIF87a or GIF89a
+    if data.starts_with(b"GIF87a") || data.starts_with(b"GIF89a") {
+        if data.len() >= 10 {
+            let width = u16::from_le_bytes([data[6], data[7]]) as u32;
+            let height = u16::from_le_bytes([data[8], data[9]]) as u32;
+            return Ok(("image/gif".to_string(), Some(width), Some(height)));
+        }
+        return Ok(("image/gif".to_string(), None, None));
+    }
+
+    // 4. WebP check: RIFF .... WEBP
+    if data.len() >= 12 && &data[0..4] == b"RIFF" && &data[8..12] == b"WEBP" {
+        return Ok(("image/webp".to_string(), None, None));
+    }
+
+    // 5. SVG check
+    if data.starts_with(b"<svg")
+        || (data.starts_with(b"<?xml") && String::from_utf8_lossy(&data[..data.len().min(512)]).contains("<svg"))
+    {
+        return Ok(("image/svg+xml".to_string(), None, None));
+    }
+
+    // Fallback binary
+    Ok(("application/octet-stream".to_string(), None, None))
+}
+
+/// Reads an image file with strict directory sandboxing and decompression bomb validation.
+pub fn read_kitty_file(
+    path: &str,
+    allowed_dir: Option<&str>,
+    max_bytes: usize,
+    max_dimension: u32,
+) -> Result<KittyFileData, String> {
+    // 1. Resolve and validate allowed directory
+    let raw_allowed = match allowed_dir {
+        Some(d) if !d.trim().is_empty() => expand_path(d.trim()),
+        _ => dirs::picture_dir()
+            .or_else(|| dirs::home_dir().map(|h| h.join("Pictures")))
+            .unwrap_or_else(|| PathBuf::from("/tmp")),
+    };
+
+    let canonical_allowed = fs::canonicalize(&raw_allowed)
+        .map_err(|e| format!("ENOENT: Allowed directory does not exist or cannot be resolved: {}", e))?;
+
+    if is_dangerous_dir(&canonical_allowed) {
+        return Err("EACCES: Target directory is restricted by security policy".to_string());
+    }
+
+    // 2. Resolve target path relative to allowed directory or absolute
+    let raw_target = expand_path(path.trim());
+    let target_to_check = if raw_target.is_relative() {
+        canonical_allowed.join(raw_target)
+    } else {
+        raw_target
+    };
+
+    // 3. Canonicalize target path (resolves all `..` traversal and symlinks)
+    let canonical_target = fs::canonicalize(&target_to_check)
+        .map_err(|e| format!("ENOENT: Cannot resolve file path: {}", e))?;
+
+    // 4. STRICT SANDBOX ENFORCEMENT: canonical target MUST start with canonical allowed dir
+    if !canonical_target.starts_with(&canonical_allowed) {
+        return Err("EACCES: Path traversal or symlink escape detected. File is outside the allowed directory.".to_string());
+    }
+
+    // 5. Must be a regular file
+    if !canonical_target.is_file() {
+        return Err("ENOENT: Path is not a regular file".to_string());
+    }
+
+    // 6. Check file size against max_bytes
+    let metadata = fs::metadata(&canonical_target)
+        .map_err(|e| format!("ENOENT: Failed to read file metadata: {}", e))?;
+
+    if metadata.len() as usize > max_bytes {
+        return Err(format!(
+            "EFBIG: File size ({} bytes) exceeds maximum allowed payload limit ({} bytes)",
+            metadata.len(),
+            max_bytes
+        ));
+    }
+
+    // 7. Read file contents
+    let bytes = fs::read(&canonical_target)
+        .map_err(|e| format!("EIO: Failed to read file: {}", e))?;
+
+    // 8. Inspect dimensions to prevent decompression bombs
+    let (mime, width, height) = inspect_image_dimensions(&bytes)?;
+
+    if let (Some(w), Some(h)) = (width, height) {
+        if w > max_dimension || h > max_dimension {
+            return Err(format!(
+                "EBADMSG: Image dimensions ({}x{} px) exceed maximum permitted limit ({} px)",
+                w, h, max_dimension
+            ));
+        }
+    }
+
+    // 9. Return Base64 payload with metadata
+    let base64_payload = BASE64_STANDARD.encode(&bytes);
+
+    Ok(KittyFileData {
+        data: base64_payload,
+        mime,
+        width,
+        height,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs::File;
+    use std::io::Write;
+
+    fn create_test_dir(name: &str) -> PathBuf {
+        let path = std::env::temp_dir().join(format!("waddle_test_{}", name));
+        let _ = fs::remove_dir_all(&path);
+        fs::create_dir_all(&path).unwrap();
+        fs::canonicalize(&path).unwrap()
+    }
+
+    fn create_dummy_png(path: &Path, width: u32, height: u32) {
+        let mut f = File::create(path).unwrap();
+        // PNG Header
+        f.write_all(b"\x89PNG\r\n\x1a\n").unwrap();
+        // IHDR chunk: 4 bytes len (13), 4 bytes "IHDR", 13 bytes data, 4 bytes CRC
+        f.write_all(&13u32.to_be_bytes()).unwrap();
+        f.write_all(b"IHDR").unwrap();
+        f.write_all(&width.to_be_bytes()).unwrap();
+        f.write_all(&height.to_be_bytes()).unwrap();
+        f.write_all(&[8, 6, 0, 0, 0]).unwrap(); // 8bit RGBA
+        f.write_all(&[0, 0, 0, 0]).unwrap(); // dummy CRC
+    }
+
+    #[test]
+    fn test_valid_file_in_sandbox() {
+        let dir = create_test_dir("valid_sandbox");
+        let file_path = dir.join("test.png");
+        create_dummy_png(&file_path, 100, 100);
+
+        let res = read_kitty_file(
+            file_path.to_str().unwrap(),
+            Some(dir.to_str().unwrap()),
+            1024 * 1024,
+            4096,
+        );
+        assert!(res.is_ok(), "Expected valid file read to succeed: {:?}", res);
+        let data = res.unwrap();
+        assert_eq!(data.mime, "image/png");
+        assert_eq!(data.width, Some(100));
+        assert_eq!(data.height, Some(100));
+        assert!(!data.data.is_empty());
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_reject_path_traversal() {
+        let sandbox = create_test_dir("sandbox_traversal");
+        let outside = create_test_dir("outside_traversal");
+        let outside_file = outside.join("secret.png");
+        create_dummy_png(&outside_file, 50, 50);
+
+        // Try accessing via relative `../` traversal
+        let traversal_path = format!("{}/../{}/secret.png", sandbox.to_str().unwrap(), outside.file_name().unwrap().to_str().unwrap());
+
+        let res = read_kitty_file(
+            &traversal_path,
+            Some(sandbox.to_str().unwrap()),
+            1024 * 1024,
+            4096,
+        );
+        assert!(res.is_err());
+        let err = res.unwrap_err();
+        assert!(err.contains("EACCES"), "Error should be EACCES: {}", err);
+
+        let _ = fs::remove_dir_all(&sandbox);
+        let _ = fs::remove_dir_all(&outside);
+    }
+
+    #[test]
+    fn test_reject_symlink_escape() {
+        let sandbox = create_test_dir("sandbox_symlink");
+        let outside = create_test_dir("outside_symlink");
+        let outside_file = outside.join("secret.png");
+        create_dummy_png(&outside_file, 50, 50);
+
+        // Create symlink inside sandbox pointing to outside file
+        let symlink_path = sandbox.join("symlink_to_outside.png");
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::symlink;
+            let _ = symlink(&outside_file, &symlink_path);
+            if symlink_path.exists() {
+                let res = read_kitty_file(
+                    symlink_path.to_str().unwrap(),
+                    Some(sandbox.to_str().unwrap()),
+                    1024 * 1024,
+                    4096,
+                );
+                assert!(res.is_err(), "Symlink escape outside sandbox must be rejected!");
+                let err = res.unwrap_err();
+                assert!(err.contains("EACCES"), "Expected EACCES error: {}", err);
+            }
+        }
+
+        let _ = fs::remove_dir_all(&sandbox);
+        let _ = fs::remove_dir_all(&outside);
+    }
+
+    #[test]
+    fn test_reject_dangerous_allowed_dir() {
+        let res = read_kitty_file("/etc/passwd", Some("/etc"), 1024 * 1024, 4096);
+        assert!(res.is_err());
+        assert!(res.unwrap_err().contains("EACCES"));
+    }
+
+    #[test]
+    fn test_reject_oversized_file() {
+        let dir = create_test_dir("oversized");
+        let file_path = dir.join("big.png");
+        create_dummy_png(&file_path, 10, 10);
+
+        // max_bytes = 10 bytes, file is ~33 bytes
+        let res = read_kitty_file(
+            file_path.to_str().unwrap(),
+            Some(dir.to_str().unwrap()),
+            10,
+            4096,
+        );
+        assert!(res.is_err());
+        assert!(res.unwrap_err().contains("EFBIG"));
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_reject_decompression_bomb_dimensions() {
+        let dir = create_test_dir("bomb");
+        let file_path = dir.join("bomb.png");
+        // 5000 x 5000 exceeds max_dimension 4096
+        create_dummy_png(&file_path, 5000, 5000);
+
+        let res = read_kitty_file(
+            file_path.to_str().unwrap(),
+            Some(dir.to_str().unwrap()),
+            1024 * 1024,
+            4096,
+        );
+        assert!(res.is_err());
+        let err = res.unwrap_err();
+        assert!(err.contains("EBADMSG"), "Expected EBADMSG error: {}", err);
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+}

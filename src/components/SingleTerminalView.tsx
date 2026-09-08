@@ -9,6 +9,7 @@ import { THEMES } from '../theme';
 import { AppConfig, TerminalPaneInfo, GitStatus } from '../types';
 import { TauriApi } from '../services/tauriApi';
 import { useI18n } from '../i18n';
+import { KittyGraphicsManager } from '../services/kittyGraphics';
 
 interface SingleTerminalViewProps {
   pane: TerminalPaneInfo;
@@ -57,6 +58,7 @@ export const SingleTerminalView: React.FC<SingleTerminalViewProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [caseSensitive, setCaseSensitive] = useState(false);
   const [useRegex, setUseRegex] = useState(false);
+  const kittyManagerRef = useRef<KittyGraphicsManager | null>(null);
 
   // Refs for callbacks to prevent re-triggering terminal recreation
   const onUpdatePaneRef = useRef(onUpdatePane);
@@ -191,6 +193,22 @@ export const SingleTerminalView: React.FC<SingleTerminalViewProps> = ({
     termRef.current = term;
     fitAddonRef.current = fitAddon;
 
+    // Initialize Kitty Graphics Protocol Manager
+    let kittyManager: KittyGraphicsManager | null = null;
+    if (config.kitty_graphics?.enabled !== false && containerRef.current) {
+      try {
+        kittyManager = new KittyGraphicsManager(
+          term,
+          containerRef.current,
+          pane.sessionId,
+          config.kitty_graphics
+        );
+        kittyManagerRef.current = kittyManager;
+      } catch (err) {
+        console.warn('Failed to initialize KittyGraphicsManager:', err);
+      }
+    }
+
     // Instant focus on terminal immediately upon opening
     term.focus();
 
@@ -312,13 +330,17 @@ export const SingleTerminalView: React.FC<SingleTerminalViewProps> = ({
     let unlistenExit: (() => void) | undefined;
 
     TauriApi.onPtyOutput(pane.sessionId, (output) => {
-      term.write(output);
-      outputBufferRef.current += output;
-      if (outputBufferRef.current.length > 10000) {
-        outputBufferRef.current = outputBufferRef.current.slice(-10000);
+      // Intercept Kitty APC sequences before passing clean text to xterm
+      const textToWrite = kittyManager ? kittyManager.filterPtyOutput(output) : output;
+      if (textToWrite) {
+        term.write(textToWrite);
+        outputBufferRef.current += textToWrite;
+        if (outputBufferRef.current.length > 10000) {
+          outputBufferRef.current = outputBufferRef.current.slice(-10000);
+        }
+        onUpdatePaneRef.current({ lastOutput: outputBufferRef.current });
+        detectErrorPatterns(textToWrite);
       }
-      onUpdatePaneRef.current({ lastOutput: outputBufferRef.current });
-      detectErrorPatterns(output);
     }).then((unlisten) => {
       unlistenOutput = unlisten;
       // Start streaming now that frontend listener is ready
@@ -374,6 +396,10 @@ export const SingleTerminalView: React.FC<SingleTerminalViewProps> = ({
       onDataDisposable.dispose();
       if (unlistenOutput) unlistenOutput();
       if (unlistenExit) unlistenExit();
+      if (kittyManager) {
+        kittyManager.dispose();
+        kittyManagerRef.current = null;
+      }
       try {
         term.dispose();
       } catch (e) {
@@ -384,6 +410,18 @@ export const SingleTerminalView: React.FC<SingleTerminalViewProps> = ({
       }
     };
   }, [pane.sessionId, fitTerminal, focusTerminal]);
+
+  // Synchronize Kitty Graphics configuration updates
+  useEffect(() => {
+    kittyManagerRef.current?.updateConfig(config.kitty_graphics);
+  }, [config.kitty_graphics]);
+
+  // Force render graphics when tab or pane becomes active
+  useEffect(() => {
+    if (isTabActive && isActivePane) {
+      kittyManagerRef.current?.render();
+    }
+  }, [isTabActive, isActivePane]);
 
   // Update theme & font & background when config changes
   useEffect(() => {

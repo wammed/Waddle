@@ -136,6 +136,31 @@ Executable scripts, shell payloads, or ELF binaries disguised with image extensi
 
 ---
 
+## 🖼️ Kitty Graphics Protocol Security & Resource Guards
+
+The Kitty Graphics Protocol subsystem is hardened with multiple layers of sandboxing and resource limiters to prevent arbitrary file access, terminal denial-of-service, and GPU memory exhaustion:
+
+### 1. Local File Reference Sandboxing (`t=f`)
+- **Restricted Sandbox Directory**: Local file loading via `t=f` is strictly restricted to **`$HOME/Pictures`** (and its subdirectories) by default.
+- **Backend Path Canonicalization**: Enforced exclusively in Rust (`src-tauri/src/kitty.rs`) using `std::fs::canonicalize`.
+- **Symlink & Traversal Escape Prevention**: Path traversal attempts using relative segments (`../`) or symlinks pointing outside the sandbox (such as `~/.ssh`, `/etc`, `/usr`) are strictly rejected with `EACCES` or `ENOENT`.
+- **System Root Protection**: The configuration manager actively disallows selecting system-critical directories (`/`, `/etc`, `/usr`, `/dev`, `/proc`, `/sys`, `~/.ssh`) as the allowed directory.
+
+### 2. Decompression Bomb & Resolution Limits
+- **Max Image Dimensions**: Single image resolution is capped at **4096 × 4096 px** by default (configurable between 1024 and 8192 px).
+- **Header Pre-Inspection**: PNG `IHDR` chunk and JPEG `SOF` segments are parsed directly from raw binary headers before full image memory allocation. Oversized images are immediately rejected with `EBADMSG`.
+- **Base64 Payload Limit**: Cumulative payload for single requests or chunked streams (`m=1`) is capped at **16 MB** (configurable between 4 and 64 MB). Over-limit streams are immediately terminated.
+
+### 3. Texture Cache & GPU VRAM Management (LRU)
+- **VRAM Upper Bound**: Texture cache is capped at **256 MB** (RGBA 4 bytes/px, configurable between 64 and 1024 MB).
+- **LRU Eviction**: Oldest textures are automatically evicted when cache limits are reached.
+- **Explicit Memory Reclamation**: On eviction or image deletion (`a=d`), `ImageBitmap.close()` is explicitly invoked to immediately release GPU VRAM and WebKitGTK graphics buffers, preventing memory leaks.
+
+### 4. PTY Stream Isolation
+- APC escape sequences (`\x1b_G...`) are intercepted by a streaming parser before terminal rendering. Cleaned terminal output is delivered to xterm, preventing megabytes of Base64 text from degrading the terminal parser.
+
+---
+
 ## 🔧 Subprocess Hardening
 
 - **Git Lock Safety**: Background polling runs with `GIT_OPTIONAL_LOCKS=0` and `--no-optional-locks` to prevent index file conflicts.

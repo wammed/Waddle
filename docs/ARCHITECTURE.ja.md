@@ -73,6 +73,7 @@ Waddle は、高速・堅牢な **Rust バックエンド** と、最新の **Re
   - `pty.rs`: 疑似端末（PTY）の生成、出力コアレッシング、UTF-8 境界処理、プロセスグループ管理。
   - `ai.rs`: Ollama HTTP 通信、行バッファリング SSE デコード、プロンプト生成、危険コマンド判定。
   - `config.rs`: `~/.config/waddle/config.json` のアトミック保存、壁紙管理。
+  - `kitty.rs`: パス正規化・サンドボックス脱出遮断・展開爆弾対策・Base64 エンコードを備えた安全なローカル画像リーダー。
   - `lib.rs`: コマンドルーティング、ファイル操作ガードレール、Git 操作。
 
 ---
@@ -146,6 +147,56 @@ Waddle は、高速・堅牢な **Rust バックエンド** と、最新の **Re
 - **壁紙アセットプロトコル**:
   - 画像は `~/.config/waddle/wallpapers/` に実体保存。
   - Tauri の `assetProtocol.scope` を `$CONFIG/waddle/**/*`、`$PICTURE/**/*`、`$DOWNLOAD/**/*` に厳密限定。
+
+---
+
+### 5. Kitty 画像プロトコルサブシステム & Canvas 描画パイプライン (`src-tauri/src/kitty.rs` & `src/services/kittyGraphics/`)
+
+```
++---------------------------------------------------------------------------------+
+|                    Kitty Graphics パイプライン アーキテクチャ                   |
+|                                                                                 |
+|  [PTY 出力ストリーム]                                                           |
+|          |                                                                      |
+|          v                                                                      |
+|  [KittyApcParser] ---> 通常ターミナル文字列 ---------> [xterm.js term.write()] |
+|          |                                                    |                 |
+|          | APC シーケンス (\x1b_G...;)                        |                 |
+|          v                                                    v                 |
+|  [KittyGraphicsManager]                                [.xterm-screen]          |
+|    |            |                                             |                 |
+|    | 照会 a=q   | 転送・描画 a=T, a=t, a=p                    |                 |
+|    |            v                                             |                 |
+|    |    [KittyDecoder]                                        |                 |
+|    |      - ダイレクト Base64 (f=100 PNG, f=32 RGBA, f=24 RGB) |                 |
+|    |      - ローカルファイル参照 (t=f via Tauri Command)      |                 |
+|    |            |                                             |                 |
+|    |            v                                             |                 |
+|    |    [KittyLruCache] (256MB上限, 破棄時 bitmap.close())    |                 |
+|    |            |                                             |                 |
+|    |            v                                             |                 |
+|    |    [CanvasOverlay] <-------------------------------------+                 |
+|    |    描画順: [壁紙] -> [Kitty 画像] -> [テキスト層] -> [カーソル層]          |
+|    |                                                                            |
+|    v (即時レスポンス書き戻し)                                                   |
+|  [TauriApi.writePty("\x1b_Gi=<id>;OK\x1b\")]                                    |
++---------------------------------------------------------------------------------+
+```
+
+- **遅延ゼロのストリーム事前分離**:
+  - 数MBに及ぶ Base64 画像データを含む APC エスケープシーケンス (`\x1b_G...`) を xterm 到達前にインターセプト。
+  - 抽出後の通常テキストのみを `term.write()` へ送ることで、xterm パーサーの負荷とターミナルの描画遅延を防止。
+- **厳格なパス正規化とディレクトリサンドボックス**:
+  - `t=f` 指定時、Rust 側で `std::fs::canonicalize` による `$HOME/Pictures` プレフィックス検証を実施。
+  - `../` による脱出やサンドボックス外を指すシンボリックリンク経由のアクセスを `EACCES` / `ENOENT` で遮断。
+- **展開爆弾防御**:
+  - 最大解像度を 4096×4096 px に制限。PNG IHDR / JPEG SOF ヘッダーをデコード前にチェックし、超過画像を破棄。
+- **LRU テクスチャキャッシュ & GPU VRAM 管理**:
+  - キャッシュ総枠を 256 MB (RGBA 4bytes/px 換算) で管理し、超過時は古い画像から退避。
+  - WebKitGTK および GPU メモリリークを防止するため、破棄時および削除時 (`a=d`) に必ず明示的に `ImageBitmap.close()` を呼び出し。
+- **レイヤー合成順序**:
+  - `.xterm-screen` 内の最背面（TextRenderLayer の手前）にキャンバスをマウント。
+  - 合成順序: **ターミナル背景/壁紙 → Kitty 画像レイヤー → セルテキスト/グリフレイヤー → カーソルレイヤー**。
 
 ---
 

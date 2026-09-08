@@ -428,4 +428,26 @@ export const TauriApi = {
     }
     return await invoke<SystemInfo>('get_system_info');
   },
+
+  // Kitty Graphics Operations
+  async kittyReadFile(
+    path: string,
+    allowedDir?: string,
+    maxBytes?: number,
+    maxDimension?: number
+  ): Promise<{ data: string; mime: string; width?: number; height?: number }> {
+    if (!isTauri()) {
+      throw new Error('kittyReadFile is only available in Tauri environment');
+    }
+    return await invoke<{ data: string; mime: string; width?: number; height?: number }>(
+      'kitty_read_file',
+      {
+        path,
+        allowedDir: allowedDir || null,
+        maxBytes: maxBytes || null,
+        maxDimension: maxDimension || null,
+      }
+    );
+  },
 };
+

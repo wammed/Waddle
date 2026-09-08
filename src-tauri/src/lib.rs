@@ -1,5 +1,6 @@
 mod ai;
 mod config;
+mod kitty;
 mod pty;
 
 use ai::{
@@ -713,6 +714,20 @@ fn get_system_info() -> SystemInfo {
     }
 }
 
+// --- Kitty Graphics Commands ---
+
+#[tauri::command]
+fn kitty_read_file(
+    path: String,
+    allowed_dir: Option<String>,
+    max_bytes: Option<usize>,
+    max_dimension: Option<u32>,
+) -> Result<kitty::KittyFileData, String> {
+    let limit_bytes = max_bytes.unwrap_or(16 * 1024 * 1024);
+    let limit_dim = max_dimension.unwrap_or(4096);
+    kitty::read_kitty_file(&path, allowed_dir.as_deref(), limit_bytes, limit_dim)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let pty_manager = PtyManager::new();
@@ -766,6 +781,7 @@ pub fn run() {
             save_wallpaper_file,
             pick_wallpaper_file,
             get_system_info,
+            kitty_read_file,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Waddle terminal application");

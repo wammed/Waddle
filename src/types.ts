@@ -31,11 +31,20 @@ export interface GitConfig {
   restrict_to_github: boolean;
 }
 
+export interface KittyGraphicsConfig {
+  enabled: boolean;
+  max_dimension: number;
+  max_payload_mb: number;
+  cache_limit_mb: number;
+  allowed_dir: string;
+}
+
 export interface AppConfig {
   general?: GeneralConfig;
   ai: AiConfig;
   terminal: TerminalConfig;
   git?: GitConfig;
+  kitty_graphics?: KittyGraphicsConfig;
 }
 
 export interface OllamaStatus {

@@ -244,6 +244,18 @@ export interface Translations {
     githubRestrictionLabel: string;
     githubRestrictionDesc: string;
     nonGithubRemoteWarning: (remote: string) => string;
+    kittySectionTitle: string;
+    kittyEnabledLabel: string;
+    kittyEnabledDesc: string;
+    kittyMaxDimensionLabel: string;
+    kittyMaxDimensionDesc: string;
+    kittyMaxPayloadLabel: string;
+    kittyMaxPayloadDesc: string;
+    kittyCacheLimitLabel: string;
+    kittyCacheLimitDesc: string;
+    kittyAllowedDirLabel: string;
+    kittyAllowedDirDesc: string;
+    kittyAllowedDirWarning: string;
   };
   errorBoundary: {
     fallbackTitle: string;
@@ -512,6 +524,18 @@ export const translations: Record<Language, Translations> = {
       githubRestrictionLabel: 'Restrict to GitHub Only (Policy)',
       githubRestrictionDesc: 'Strictly restricts Git remote connections to GitHub (github.com). Connections to non-GitHub remotes such as GitLab or custom servers are blocked to protect privacy.',
       nonGithubRemoteWarning: (remote) => `Non-GitHub remote detected (${remote}). Connections are restricted by security policy.`,
+      kittySectionTitle: 'Kitty Graphics Protocol',
+      kittyEnabledLabel: 'Enable Graphics Protocol',
+      kittyEnabledDesc: 'Allows CLI and TUI tools (fastfetch, yazi, neovim image.nvim, etc.) to render inline graphics directly onto the canvas.',
+      kittyMaxDimensionLabel: 'Max Image Dimension (px)',
+      kittyMaxDimensionDesc: 'Protects against decompression bombs (1024 - 8192 px, default: 4096 px).',
+      kittyMaxPayloadLabel: 'Max Payload Limit (MB)',
+      kittyMaxPayloadDesc: 'Maximum cumulative Base64 transfer limit per image request (4 - 64 MB, default: 16 MB).',
+      kittyCacheLimitLabel: 'Texture Cache Limit (MB)',
+      kittyCacheLimitDesc: 'Maximum VRAM/RAM cache size managed via LRU eviction (64 - 1024 MB, default: 256 MB).',
+      kittyAllowedDirLabel: 'Allowed Local Image Directory (Sandbox)',
+      kittyAllowedDirDesc: 'Strict sandbox for local file references (t=f). Only files inside this path and subdirectories can be read (default: $HOME/Pictures).',
+      kittyAllowedDirWarning: 'System-critical directory detected! File access outside safe sandbox paths will be blocked.',
     },
     errorBoundary: {
       fallbackTitle: 'An error occurred in the component',
@@ -779,6 +803,18 @@ export const translations: Record<Language, Translations> = {
       githubRestrictionLabel: 'Restrict to GitHub Only (Policy)',
       githubRestrictionDesc: 'Strictly restricts Git remote connections to GitHub (github.com). Connections to non-GitHub remotes such as GitLab or custom servers are blocked to protect privacy.',
       nonGithubRemoteWarning: (remote) => `Non-GitHub remote detected (${remote}). Connections are restricted by security policy.`,
+      kittySectionTitle: 'Kitty Graphics Protocol',
+      kittyEnabledLabel: 'Enable Graphics Protocol',
+      kittyEnabledDesc: 'Allows CLI and TUI tools (fastfetch, yazi, neovim image.nvim, etc.) to render inline graphics directly onto the canvas.',
+      kittyMaxDimensionLabel: 'Max Image Dimension (px)',
+      kittyMaxDimensionDesc: 'Protects against decompression bombs (1024 - 8192 px, default: 4096 px).',
+      kittyMaxPayloadLabel: 'Max Payload Limit (MB)',
+      kittyMaxPayloadDesc: 'Maximum cumulative Base64 transfer limit per image request (4 - 64 MB, default: 16 MB).',
+      kittyCacheLimitLabel: 'Texture Cache Limit (MB)',
+      kittyCacheLimitDesc: 'Maximum VRAM/RAM cache size managed via LRU eviction (64 - 1024 MB, default: 256 MB).',
+      kittyAllowedDirLabel: 'Allowed Local Image Directory (Sandbox)',
+      kittyAllowedDirDesc: 'Strict sandbox for local file references (t=f). Only files inside this path and subdirectories can be read (default: $HOME/Pictures).',
+      kittyAllowedDirWarning: 'System-critical directory detected! File access outside safe sandbox paths will be blocked.',
     },
     errorBoundary: {
       fallbackTitle: 'An error occurred in the component',
@@ -1046,6 +1082,18 @@ export const translations: Record<Language, Translations> = {
       githubRestrictionLabel: 'GitHub 接続限定ポリシー (推奨)',
       githubRestrictionDesc: 'ローカル完結・GitHub特化ポリシーに基づき、Gitリモート接続先を GitHub (github.com) のみに限定します。GitLab や外部独自サーバー等の他サイトへの接続を遮断し、機密情報の流出を防止します。',
       nonGithubRemoteWarning: (remote) => `非GitHubリモートが検出されました (${remote})。セキュリティポリシーにより外部接続が遮断されています。`,
+      kittySectionTitle: 'Kitty 画像プロトコル (Kitty Graphics)',
+      kittyEnabledLabel: 'Kitty 画像描画プロトコルの有効化',
+      kittyEnabledDesc: 'fastfetch, yazi, neovim (image.nvim) などの CLI/TUI ツールからターミナル Canvas へのインライン画像描画・操作を許可します。',
+      kittyMaxDimensionLabel: '最大画像寸法 (px)',
+      kittyMaxDimensionDesc: '展開爆弾（Decompression Bomb）を防御する上限寸法 (1024〜8192 px, 初期値: 4096 px)。超過画像はデコード前に破棄されます。',
+      kittyMaxPayloadLabel: '最大ペイロードサイズ (MB)',
+      kittyMaxPayloadDesc: '単一リクエストあたりの累積 Base64 転送サイズ上限 (4〜64 MB, 初期値: 16 MB)。',
+      kittyCacheLimitLabel: 'テクスチャキャッシュ総枠 (MB)',
+      kittyCacheLimitDesc: 'LRU 方式で管理される GPU/VRAM キャッシュ上限枠 (64〜1024 MB, 初期値: 256 MB)。超過時は古い画像から確実に破棄・解放されます。',
+      kittyAllowedDirLabel: 'ローカル画像読み取り許可ディレクトリ (Sandbox)',
+      kittyAllowedDirDesc: 'ローカルファイル直接参照 (t=f) に対する厳格なサンドボックスです。このパス配下のファイルのみ参照可能（初期値: $HOME/Pictures）。../ 脱出やシンボリックリンク経由の脱出は遮断されます。',
+      kittyAllowedDirWarning: 'システム重要ディレクトリが指定されています。セキュリティ保護のためサンドボックス外へのアクセスは遮断されます。',
     },
     errorBoundary: {
       fallbackTitle: 'コンポーネントでエラーが発生しました',

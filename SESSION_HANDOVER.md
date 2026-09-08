@@ -67,6 +67,16 @@
       - `docs/ARCHITECTURE.md` & `docs/ARCHITECTURE.ja.md`: Mermaid システム構成図、PTY 32KB コアレッシング、UTF-8 境界処理、プロセスグループ終了、CWD 追跡、Tech Stack テーブル。
       - `SECURITY.md` & `SECURITY.ja.md`: システムディレクトリ前方一致保護、認証情報保護、プロンプトインジェクション対策、危険コマンド検知一覧、CSP、GitHub 限定ポリシー。
     - ルートの `README.md` および `README.ja.md` をそれぞれ 350行超から 148行へスリム化し、訪問者が主要価値を短時間で把握できる scannable な構成（Highlights, Quick Start, Keybindings, Overview, Callout, License）に再構築。
+16. **Kitty Graphics Protocol の完全実装と厳格なセキュリティ制御の統合**:
+    - `fastfetch`, `yazi`, Neovim (`image.nvim`) などの CLI/TUI ツールからターミナル Canvas への直接画像描画・操作をフルサポート。
+    - APC シーケンス解析 (`\x1b_G...` / ST `\x1b\` / BEL `\x07`)、アクション (`a=t, T, p, d, q`)、形式 (`f=100 PNG, 32 RGBA, 24 RGB`)、転送 (`t=d, f`)、チャンク化 (`m=1, 0`)、即時ハンドシェイク応答 (`\x1b_Gi=<id>;OK\x1b\`) を実装。
+    - `$HOME/Pictures` へのローカルファイル直接参照 (`t=f`) サンドボックス（Rust canonicalize による脱出遮断）。
+    - 展開爆弾 (Decompression Bomb) 防御 (最大 4096px、ヘッダー事前検査)。
+    - 累積 Base64 ペイロード制限 (16MB)。
+    - テクスチャキャッシュ & GPU/VRAM 上限管理 (256MB LRU, 明示的 `bitmap.close()`)。
+    - 描画パイプラインの分離: 「セル背景色 → 画像レイヤー (`ctx.drawImage`) → セルテキスト/グリフ → カーソル」。
+    - 設定画面 (`Ctrl + ,`) への画像プロトコル制御項目追加。
+    - 8ドキュメント（EN/JA）の完全対称同期更新。
 
 ---
 
@@ -114,32 +124,47 @@
 - **対象ファイル**: [`src/components/GitQuickPopover.tsx`](file:///home/susie/GitHUB/wammed/Waddle/src/components/GitQuickPopover.tsx), [`src/i18n/translations.ts`](file:///home/susie/GitHUB/wammed/Waddle/src/i18n/translations.ts)
 - `git push` / `git pull` で公開鍵認証やクレデンシャルエラーが発生した場合、SSH 秘密鍵の登録や `gh auth login` を促すフレンドリーなガイダンスバナーを表示。
 
+### G. Kitty 画像プロトコル (Kitty Graphics Protocol) 完全サポート & 厳格なセキュリティ制御
+- **対象ファイル**: [`src-tauri/src/kitty.rs`](file:///home/susie/GitHUB/wammed/Waddle/src-tauri/src/kitty.rs), [`src-tauri/src/lib.rs`](file:///home/susie/GitHUB/wammed/Waddle/src-tauri/src/lib.rs), [`src/services/kittyGraphics/`](file:///home/susie/GitHUB/wammed/Waddle/src/services/kittyGraphics/), [`src/components/SingleTerminalView.tsx`](file:///home/susie/GitHUB/wammed/Waddle/src/components/SingleTerminalView.tsx), [`src/components/SettingsModal.tsx`](file:///home/susie/GitHUB/wammed/Waddle/src/components/SettingsModal.tsx)
+- **ゼロ遅延ストリーム分離パーサー**: PTY バイナリストリームから APC エスケープシーケンス (`\x1b_G...`) を xterm 描画前に事前分離。数メガバイトに及ぶ Base64 データを xterm に通さず、ターミナルの描画遅延やフリーズを根絶。
+- **ローカルファイル直接参照 (`t=f`) サンドボックス**: 初期設定で `$HOME/Pictures` 配下に限定し、Rust 側の `std::fs::canonicalize` で `../` パストラバーサル脱出や外部シンボリックリンク経由のアクセスを `EACCES` / `ENOENT` で厳格遮断。
+- **展開爆弾 (Decompression Bomb) 対策**: 最大解像度 4096×4096 px、最大 Base64 ペイロード 16MB に制限。PNG IHDR / JPEG SOF ヘッダーをデコード前に直接検証し、超過画像を即時破棄。
+- **GPU/VRAM 上限管理 (LRU)**: 256MB キャッシュ総枠内で LRU 管理。解放時・削除時 (`a=d`) に必ず明示的に `ImageBitmap.close()` を呼び出し、WebKitGTK および GPU メモリリークを防止。
+- **合成パイプライン**: `.xterm-screen` の最背面にキャンバスをマウントし、「セル背景色 → 画像レイヤー → セルテキスト/グリフ → カーソル」の階層合成を実現。
+
 ---
 
 ## 4. 変更された重要ファイル一覧
 
 | ファイルパス | 主な役割・変更内容 |
 |---|---|
-| `src-tauri/src/pty.rs` | PTY 32KB コアレッシング、Git discard パストラバーサル防止、checkout `--` デリミタ |
-| `src-tauri/src/ai.rs` | 64KB ストリームバッファガード、危険コマンド判定パターンの大幅拡張 |
-| `src-tauri/src/lib.rs` | シェル設定保護、500件制限、`rename_entry`, `reveal_in_file_manager` 実装とテスト |
-| `src/types.ts` | `splitRatios`, `SavedSessionState`, `SavedSessionTab` 型定義 |
-| `src/components/RefreshConfirmModal.tsx` | ワークスペース全リフレッシュのモーダル確認ダイアログ (Portal, キーボード操作, 警告・箇条書き) |
-| `src/components/TitleBar.tsx` | リフレッシュボタン (`#btn-refresh-all`) 設置 & 確認ダイアログ状態管理 |
-| `src/hooks/useTerminalTabs.ts` | `handleRefreshAll` による全PTY安全クローズ & セッションクリア & 初期タブ再生成 |
-| `src/App.tsx` | ペインスワップ・比率更新ハンドラー・全リフレッシュ・ファイルツリー完全リセットの全体配線 |
-| `src/i18n/translations.ts` | 日英多言語辞書（リフレッシュボタン、確認ダイアログ文言、リッチファイルツリー、名前変更、Git認証ヒント） |
-| `src/index.css` | リフレッシュ確認ダイアログ、ブレッドクラム、ガイドライン、コンテキストメニュー、言語バッジスタイル |
+| `src-tauri/src/kitty.rs` | Kitty サンドボックスファイルリーダー、パス正規化、シンボリックリンク脱出防止、ヘッダー検査、単体テスト |
+| `src-tauri/src/config.rs` | `KittyGraphicsConfig` 構造体（有効化、最大寸法、ペイロード上限、キャッシュ上限、許可ディレクトリ） |
+| `src-tauri/src/lib.rs` | `kitty_read_file` Tauri コマンドの登録および公開 |
+| `src/types.ts` | `KittyGraphicsConfig` TypeScript インターフェース定義 |
+| `src/services/tauriApi.ts` | `kittyReadFile` フロントエンド API ラッパー |
+| `src/services/kittyGraphics/types.ts` | Kitty Graphics プロトコルキー・配置・画像レコードの型定義 |
+| `src/services/kittyGraphics/parser.ts` | APC ストリーミングパーサー（ST/BEL対応、Base64分離、チャンク化結合バッファリング） |
+| `src/services/kittyGraphics/decoder.ts` | 画像デコーダー（PNG/RGBA/RGB/ファイル参照、展開爆弾検証、ImageBitmap生成） |
+| `src/services/kittyGraphics/lruCache.ts` | LRU テクスチャキャッシュ（256MB上限、明示的 `bitmap.close()` メモリ解放） |
+| `src/services/kittyGraphics/manager.ts` | Kitty Graphics マネージャー（Canvasマウント、スクロール連動、クエリ即時応答、配置管理） |
+| `src/components/SingleTerminalView.tsx` | PTY ストリームの APC インターセプト、Canvas オーバーレイ統合、ライフサイクル管理 |
+| `src/components/SettingsModal.tsx` | Kitty Graphics 設定セクション（トグル、最大寸法、ペイロード、キャッシュ、許可パス、危険パス警告） |
+| `src/i18n/translations.ts` | 日英多言語辞書（Kitty 画像プロトコル設定文言・説明・警告） |
+| `docs/FEATURES.md` & `.ja.md` | 機能仕様書への第16項「Kitty Graphics Protocol」詳細解説の追加 |
+| `docs/ARCHITECTURE.md` & `.ja.md` | アーキテクチャ図および第5項「Kitty Graphics Subsystem & Pipeline」設計の追加 |
+| `SECURITY.md` & `.ja.md` | セキュリティ仕様書への「Kitty Graphics Protocol Security & Resource Guards」の追加 |
+| `README.md` & `.ja.md` | ルート README への Kitty Graphics Protocol ハイライト追加 |
 
 ---
 
 ## 5. ビルド・検証コマンド
 
 ```bash
-# フロントエンドの型検査 & 本番ビルド (Vite + TypeScript)
+# フロントエンドの型検査 & 本番ビルド (Vite + TypeScript) - 警告/エラー0件でビルド完了
 npm run build
 
-# Rust バックエンドの単体テスト (全12件)
+# Rust バックエンドの単体テスト (全18件すべてパス、うち Kitty セキュリティテスト6件)
 cargo test --manifest-path src-tauri/Cargo.toml
 
 # Rust の Clippy 静的解析 (警告0件)

@@ -21,7 +21,8 @@ Welcome to the comprehensive feature guide for **Waddle**, the AI-integrated, pr
 13. [🛡️ Hardened Multi-Layer Security & AI Safety Guardrails](#13-️-hardened-multi-layer-security--ai-safety-guardrails)
 14. [🐙 Git & GitHub Integration, Local AI Commits & Push/Pull Policy](#14--git--github-integration-local-ai-commits--pushpull-policy)
 15. [🔄 One-Click Workspace Refresh & Safe Confirmation Dialog](#15--one-click-workspace-refresh--safe-confirmation-dialog)
-16. [⌨️ Complete Keybindings Reference](#️-complete-keybindings-reference)
+16. [🖼️ Kitty Graphics Protocol Support & Strict Security Sandboxing](#16--kitty-graphics-protocol-support--strict-security-sandboxing)
+17. [⌨️ Complete Keybindings Reference](#️-complete-keybindings-reference)
 
 ---
 
@@ -276,6 +277,38 @@ Welcome to the comprehensive feature guide for **Waddle**, the AI-integrated, pr
   - Keyboard accessible: `Escape` to cancel, `Enter` to confirm.
 - **Thorough Reset**:
   - Safely closes all PTY process groups, deletes `waddle_session_state`, starts a fresh single tab in user home directory, and re-mounts the File Tree Sidebar with cleared cache.
+
+---
+
+### 16. 🖼️ Kitty Graphics Protocol Support & Strict Security Sandboxing
+
+- **Overview**:
+  - Full native support for the **Kitty Graphics Protocol** directly within Waddle's accelerated Canvas viewport, enabling inline image rendering and graphics manipulation from CLI and TUI tools such as `fastfetch`, `yazi`, and Neovim (`image.nvim`).
+- **APC Escape Sequence Parsing & Stream Interception**:
+  - State machine parser handles `\x1b_G<control_keys>;<payload>\x1b\` and `\x07` sequences.
+  - Strips megabytes of Base64 graphics data from the PTY stream before reaching `@xterm/xterm`, preventing terminal freezing or DEC parser degradation.
+  - Chunked transfer support: smoothly reassembles multi-chunk transmissions (`m=1` followed by `m=0`).
+  - Handshake & Query support (`a=q`): immediately answers protocol detection queries with `\x1b_Gi=<id>;OK\x1b\` without terminal stutter.
+- **Strict Security Sandboxing & Directory Jail (`t=f`)**:
+  - Local file reading via `t=f` is strictly restricted to `$HOME/Pictures` (and its subdirectories) by default.
+  - Rust backend enforces path canonicalization (`std::fs::canonicalize`).
+  - Directory traversal (`../`) and symbolic links pointing outside the sandbox (such as `~/.ssh`, `/etc`, or `/usr`) are actively rejected with `EACCES` / `ENOENT`.
+  - Configurable in Settings (`Ctrl + ,`), with real-time validation against sensitive system paths.
+- **Decompression Bomb Defense**:
+  - Image dimensions are capped at 4096×4096 px by default (configurable 1024–8192 px).
+  - PNG IHDR and JPEG SOF headers are inspected before full memory allocation. Oversized images are discarded immediately with `EBADMSG`.
+  - Single request cumulative Base64 payload is limited to 16 MB (configurable 4–64 MB).
+- **VRAM & Memory Management (LRU Cache)**:
+  - Cache size is capped at 256 MB (configurable 64–1024 MB).
+  - When the upper limit is reached, least recently used textures are evicted.
+  - Explicitly invokes `ImageBitmap.close()` upon eviction or image deletion (`a=d`), preventing GPU/VRAM and WebKitGTK memory leaks.
+- **Cell Occupancy & Scrollback Synchronization**:
+  - Automatically maps pixel graphics to character grid cells (`c` cols and `r` rows) with terminal aspect-ratio scaling.
+  - Accurately tracks absolute line numbers in the scrollback buffer (`term.buffer.active.baseY + cursorY`), seamlessly updating positions during terminal scrolling.
+  - Scrolled-out images beyond maximum scrollback history are automatically pruned.
+- **Layering Order**:
+  - Render pipeline: **Terminal Background / Wallpaper → Kitty Graphics Canvas Layer → Text/Glyphs Layer → Cursor Layer**.
+  - Text glyphs and the terminal cursor render crisp and clear on top of displayed graphics.
 
 ---
 

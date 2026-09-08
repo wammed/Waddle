@@ -48,6 +48,7 @@
 - 📝 **簡易内蔵コードエディタ**: 2画面分割編集（`Ctrl + E`）、クイックオープン、AI リファクタリング（`Ctrl + Shift + K`）、ターミナル実行（安全チェック付き）。([詳細](docs/FEATURES.ja.md#4--簡易内蔵エディタ--ai-コード支援-ctrl--e))
 - 📂 **高機能ファイルツリー**: `/proc/<pid>/cwd` によるカレントディレクトリ自動追跡、言語別カラーバッジ、ブレッドクラム、インデントガイド、右クリックメニュー。([詳細](docs/FEATURES.ja.md#3--左側ファイルツリーサイドバー-ctrl--b))
 - 🐙 **Git & GitHub 統合ハブ**: ステータスバー連動ポップオーバー、1クリック Push/Pull、ローカル AI による Conventional Commit 自動生成、GUI Diff ビューワー。([詳細](docs/FEATURES.ja.md#14--git--github-連携ローカル-ai-コミット生成--pushpull-ポリシー))
+- 🖼️ **Kitty 画像プロトコル (Kitty Graphics)**: `fastfetch`, `yazi`, Neovim (`image.nvim`) などの CLI/TUI ツールからのターミナル直接画像描画に完全対応。厳格な `$HOME/Pictures` サンドボックスおよび展開爆弾対策ガードレールを標準統合。([詳細](docs/FEATURES.ja.md#16--kitty-画像プロトコル-kitty-graphics-protocol-完全対応--厳格なセキュリティサンドボックス))
 - 🎨 **全22種のネオン & 洗練テーマ**: UI 全体の動的ネオン発光同期、すりガラスぼかし付き壁紙カスタマイズ、Nerd Fonts タイポグラフィ。([詳細](docs/FEATURES.ja.md#11--全22種類の洗練されたテーマ--高電圧ネオンコレクション))
 
 > 📖 **各機能の詳しい技術仕様や内部機構は** [機能仕様書 (docs/FEATURES.ja.md)](docs/FEATURES.ja.md) をご覧ください。

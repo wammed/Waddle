@@ -48,6 +48,7 @@
 - 📝 **Embedded Code Editor**: Side-by-side editing (`Ctrl + E`), quick file open, AI code refactoring (`Ctrl + Shift + K`), and in-terminal script execution with safety checks. ([Details](docs/FEATURES.md#4--embedded-lightweight-code-editor--ai-code-assistant-ctrl--e))
 - 📂 **Rich File Tree Explorer**: Real-time CWD tracking (`/proc/<pid>/cwd`), language-colored badges, clickable breadcrumbs, indent guides, and right-click context menu. ([Details](docs/FEATURES.md#3--left-sidebar-file-tree-explorer-ctrl--b))
 - 🐙 **Integrated Git & GitHub Hub**: Status bar quick popover, one-click push/pull, local AI conventional commit generator, and syntax-highlighted diff viewer. ([Details](docs/FEATURES.md#14--git--github-integration-local-ai-commits--pushpull-policy))
+- 🖼️ **Kitty Graphics Protocol**: Native inline image rendering and graphics support for CLI/TUI tools (`fastfetch`, `yazi`, Neovim `image.nvim`) with strict `$HOME/Pictures` sandboxing and decompression bomb protection. ([Details](docs/FEATURES.md#16--kitty-graphics-protocol-support--strict-security-sandboxing))
 - 🎨 **22 Cyberpunk & Neon Themes**: Vibrant UI glow synchronization, custom wallpaper support with frosted glass blur, and built-in Nerd Font typography. ([Details](docs/FEATURES.md#11--22-premium-themes--high-voltage-neon-collection))
 
 > 📖 **Looking for in-depth feature specifications?** See the full [Feature Guide (docs/FEATURES.md)](docs/FEATURES.md).

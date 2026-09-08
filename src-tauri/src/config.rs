@@ -112,6 +112,52 @@ impl Default for GitIntegrationConfig {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct KittyGraphicsConfig {
+    #[serde(default = "default_kitty_enabled")]
+    pub enabled: bool,
+    #[serde(default = "default_kitty_max_dimension")]
+    pub max_dimension: u32,
+    #[serde(default = "default_kitty_max_payload_mb")]
+    pub max_payload_mb: u32,
+    #[serde(default = "default_kitty_cache_limit_mb")]
+    pub cache_limit_mb: u32,
+    #[serde(default = "default_kitty_allowed_dir")]
+    pub allowed_dir: String,
+}
+
+fn default_kitty_enabled() -> bool {
+    true
+}
+
+fn default_kitty_max_dimension() -> u32 {
+    4096
+}
+
+fn default_kitty_max_payload_mb() -> u32 {
+    16
+}
+
+fn default_kitty_cache_limit_mb() -> u32 {
+    256
+}
+
+fn default_kitty_allowed_dir() -> String {
+    "$HOME/Pictures".to_string()
+}
+
+impl Default for KittyGraphicsConfig {
+    fn default() -> Self {
+        Self {
+            enabled: default_kitty_enabled(),
+            max_dimension: default_kitty_max_dimension(),
+            max_payload_mb: default_kitty_max_payload_mb(),
+            cache_limit_mb: default_kitty_cache_limit_mb(),
+            allowed_dir: default_kitty_allowed_dir(),
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct AppConfig {
     #[serde(default)]
@@ -120,6 +166,8 @@ pub struct AppConfig {
     pub terminal: TerminalConfig,
     #[serde(default)]
     pub git: GitIntegrationConfig,
+    #[serde(default)]
+    pub kitty_graphics: KittyGraphicsConfig,
 }
 
 pub struct ConfigManager {

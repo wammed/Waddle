@@ -902,6 +902,246 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </label>
             </div>
           </div>
+
+          {/* Kitty Graphics Protocol Section */}
+          <div className="settings-section">
+            <div className="section-title">
+              <ImageIcon size={14} style={{ display: 'inline', marginRight: 6 }} />
+              {t.settings.kittySectionTitle}
+            </div>
+
+            {/* Protocol Enabled Toggle */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              justifyContent: 'space-between',
+              padding: '12px 14px',
+              background: 'rgba(255, 255, 255, 0.02)',
+              border: '1px solid rgba(255, 255, 255, 0.06)',
+              borderRadius: '8px',
+              marginBottom: '10px',
+            }}>
+              <div style={{ paddingRight: '16px' }}>
+                <div style={{ fontSize: '13px', fontWeight: 600, color: '#f8fafc', marginBottom: '4px' }}>
+                  {t.settings.kittyEnabledLabel}
+                </div>
+                <div style={{ fontSize: '12px', color: '#94a3b8', lineHeight: 1.5 }}>
+                  {t.settings.kittyEnabledDesc}
+                </div>
+              </div>
+              <label className="toggle-switch" style={{ position: 'relative', display: 'inline-block', width: '44px', height: '24px', flexShrink: 0 }}>
+                <input
+                  type="checkbox"
+                  id="toggle-kitty-enabled"
+                  checked={formData.kitty_graphics?.enabled ?? true}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      kitty_graphics: {
+                        enabled: e.target.checked,
+                        max_dimension: formData.kitty_graphics?.max_dimension ?? 4096,
+                        max_payload_mb: formData.kitty_graphics?.max_payload_mb ?? 16,
+                        cache_limit_mb: formData.kitty_graphics?.cache_limit_mb ?? 256,
+                        allowed_dir: formData.kitty_graphics?.allowed_dir ?? '$HOME/Pictures',
+                      },
+                    })
+                  }
+                  style={{ opacity: 0, width: 0, height: 0 }}
+                />
+                <span style={{
+                  position: 'absolute',
+                  cursor: 'pointer',
+                  top: 0, left: 0, right: 0, bottom: 0,
+                  backgroundColor: (formData.kitty_graphics?.enabled ?? true) ? 'var(--accent)' : 'rgba(255, 255, 255, 0.2)',
+                  borderRadius: '24px',
+                  transition: '0.2s',
+                }}>
+                  <span style={{
+                    position: 'absolute',
+                    height: '18px',
+                    width: '18px',
+                    left: (formData.kitty_graphics?.enabled ?? true) ? '23px' : '3px',
+                    bottom: '3px',
+                    backgroundColor: '#fff',
+                    borderRadius: '50%',
+                    transition: '0.2s',
+                  }} />
+                </span>
+              </label>
+            </div>
+
+            {/* Performance & Security Limits Grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px', marginBottom: '12px' }}>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label" style={{ color: '#94a3b8', fontSize: '11px', display: 'flex', justifyContent: 'space-between' }}>
+                  <span>{t.settings.kittyMaxDimensionLabel}</span>
+                  <span style={{ color: 'var(--accent-blue)', fontWeight: 600 }}>{formData.kitty_graphics?.max_dimension ?? 4096}px</span>
+                </label>
+                <input
+                  type="number"
+                  id="input-kitty-max-dimension"
+                  style={inputStyle}
+                  min={1024}
+                  max={8192}
+                  step={512}
+                  value={formData.kitty_graphics?.max_dimension ?? 4096}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      kitty_graphics: {
+                        enabled: formData.kitty_graphics?.enabled ?? true,
+                        max_dimension: Math.max(1024, Math.min(8192, parseInt(e.target.value) || 4096)),
+                        max_payload_mb: formData.kitty_graphics?.max_payload_mb ?? 16,
+                        cache_limit_mb: formData.kitty_graphics?.cache_limit_mb ?? 256,
+                        allowed_dir: formData.kitty_graphics?.allowed_dir ?? '$HOME/Pictures',
+                      },
+                    })
+                  }
+                />
+              </div>
+
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label" style={{ color: '#94a3b8', fontSize: '11px', display: 'flex', justifyContent: 'space-between' }}>
+                  <span>{t.settings.kittyMaxPayloadLabel}</span>
+                  <span style={{ color: 'var(--accent-blue)', fontWeight: 600 }}>{formData.kitty_graphics?.max_payload_mb ?? 16}MB</span>
+                </label>
+                <input
+                  type="number"
+                  id="input-kitty-max-payload"
+                  style={inputStyle}
+                  min={4}
+                  max={64}
+                  step={4}
+                  value={formData.kitty_graphics?.max_payload_mb ?? 16}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      kitty_graphics: {
+                        enabled: formData.kitty_graphics?.enabled ?? true,
+                        max_dimension: formData.kitty_graphics?.max_dimension ?? 4096,
+                        max_payload_mb: Math.max(4, Math.min(64, parseInt(e.target.value) || 16)),
+                        cache_limit_mb: formData.kitty_graphics?.cache_limit_mb ?? 256,
+                        allowed_dir: formData.kitty_graphics?.allowed_dir ?? '$HOME/Pictures',
+                      },
+                    })
+                  }
+                />
+              </div>
+
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label" style={{ color: '#94a3b8', fontSize: '11px', display: 'flex', justifyContent: 'space-between' }}>
+                  <span>{t.settings.kittyCacheLimitLabel}</span>
+                  <span style={{ color: 'var(--accent-blue)', fontWeight: 600 }}>{formData.kitty_graphics?.cache_limit_mb ?? 256}MB</span>
+                </label>
+                <input
+                  type="number"
+                  id="input-kitty-cache-limit"
+                  style={inputStyle}
+                  min={64}
+                  max={1024}
+                  step={64}
+                  value={formData.kitty_graphics?.cache_limit_mb ?? 256}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      kitty_graphics: {
+                        enabled: formData.kitty_graphics?.enabled ?? true,
+                        max_dimension: formData.kitty_graphics?.max_dimension ?? 4096,
+                        max_payload_mb: formData.kitty_graphics?.max_payload_mb ?? 16,
+                        cache_limit_mb: Math.max(64, Math.min(1024, parseInt(e.target.value) || 256)),
+                        allowed_dir: formData.kitty_graphics?.allowed_dir ?? '$HOME/Pictures',
+                      },
+                    })
+                  }
+                />
+              </div>
+            </div>
+
+            {/* Allowed Directory Sandbox */}
+            <div className="form-group" style={{ marginBottom: '8px' }}>
+              <label className="form-label" style={{ color: '#94a3b8' }}>
+                {t.settings.kittyAllowedDirLabel}
+              </label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input
+                  type="text"
+                  id="input-kitty-allowed-dir"
+                  style={inputStyle}
+                  placeholder="$HOME/Pictures"
+                  value={formData.kitty_graphics?.allowed_dir ?? '$HOME/Pictures'}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      kitty_graphics: {
+                        enabled: formData.kitty_graphics?.enabled ?? true,
+                        max_dimension: formData.kitty_graphics?.max_dimension ?? 4096,
+                        max_payload_mb: formData.kitty_graphics?.max_payload_mb ?? 16,
+                        cache_limit_mb: formData.kitty_graphics?.cache_limit_mb ?? 256,
+                        allowed_dir: e.target.value,
+                      },
+                    })
+                  }
+                />
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  style={{ padding: '6px 10px', fontSize: '11px', whiteSpace: 'nowrap', background: '#1b2234', color: '#f8fafc' }}
+                  onClick={() =>
+                    setFormData({
+                      ...formData,
+                      kitty_graphics: {
+                        enabled: formData.kitty_graphics?.enabled ?? true,
+                        max_dimension: formData.kitty_graphics?.max_dimension ?? 4096,
+                        max_payload_mb: formData.kitty_graphics?.max_payload_mb ?? 16,
+                        cache_limit_mb: formData.kitty_graphics?.cache_limit_mb ?? 256,
+                        allowed_dir: '$HOME/Pictures',
+                      },
+                    })
+                  }
+                >
+                  {t.common.clear || 'Reset'}
+                </button>
+              </div>
+              <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
+                {t.settings.kittyAllowedDirDesc}
+              </div>
+
+              {/* Safety Warning for dangerous system paths */}
+              {((dir: string) => {
+                const trimmed = dir.trim();
+                const isDangerous =
+                  trimmed === '/' ||
+                  trimmed === '/etc' ||
+                  trimmed === '/usr' ||
+                  trimmed === '/bin' ||
+                  trimmed === '/sbin' ||
+                  trimmed === '/lib' ||
+                  trimmed === '/dev' ||
+                  trimmed === '/proc' ||
+                  trimmed === '/sys' ||
+                  trimmed.includes('.ssh');
+                return isDangerous;
+              })(formData.kitty_graphics?.allowed_dir ?? '') && (
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    marginTop: '8px',
+                    padding: '6px 10px',
+                    background: 'rgba(239, 68, 68, 0.15)',
+                    border: '1px solid rgba(239, 68, 68, 0.3)',
+                    borderRadius: '6px',
+                    fontSize: '11px',
+                    color: '#f87171',
+                  }}
+                >
+                  <AlertTriangle size={14} style={{ flexShrink: 0 }} />
+                  <span>{t.settings.kittyAllowedDirWarning}</span>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
         <div className="modal-footer" style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
