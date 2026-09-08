@@ -1,8 +1,14 @@
 import { Terminal } from '@xterm/xterm';
-import { KittyCommand, KittyControlKeys, KittyPlacement, KittyAnimationFrame } from './types';
+import { KittyCommand, KittyControlKeys, KittyPlacement, KittyVirtualPlacement, KittyAnimationFrame } from './types';
 import { KittyApcParser } from './parser';
 import { KittyDecoder } from './decoder';
 import { KittyLruCache } from './lruCache';
+import {
+  isPlaceholderCell,
+  decodePlaceholderCell,
+  computePlaceholderUV,
+  DecodedPlaceholder,
+} from './unicodePlaceholder';
 import { TauriApi } from '../tauriApi';
 import { KittyGraphicsConfig } from '../../types';
 
@@ -13,6 +19,9 @@ export class KittyGraphicsManager {
   private decoder: KittyDecoder;
   private cache: KittyLruCache;
   private placements: Map<string, KittyPlacement> = new Map();
+  private virtualPlacements: Map<number, KittyVirtualPlacement> = new Map();
+  private lastTransmittedImageId: number = 0;
+  private lastDecodedPlaceholder: DecodedPlaceholder | null = null;
   private canvas: HTMLCanvasElement | null = null;
   private ctx: CanvasRenderingContext2D | null = null;
   private nextImageId: number = 1;
@@ -42,6 +51,7 @@ export class KittyGraphicsManager {
 
     this.mountCanvas(container);
     this.attachTerminalEvents();
+    this.installCanvasRendererHook();
   }
 
   public updateConfig(config?: KittyGraphicsConfig) {
@@ -108,6 +118,7 @@ export class KittyGraphicsManager {
     this.disposables.push(() => scrollDisp.dispose());
 
     const renderDisp = this.term.onRender(() => {
+      this.installCanvasRendererHook();
       this.render();
     });
     this.disposables.push(() => renderDisp.dispose());
@@ -117,6 +128,130 @@ export class KittyGraphicsManager {
       this.render();
     });
     this.disposables.push(() => resizeDisp.dispose());
+  }
+
+  private installCanvasRendererHook(): void {
+    try {
+      const core = (this.term as any)._core;
+      const renderer = core?._renderService?._renderer;
+      if (!renderer || !renderer._renderLayers) return;
+
+      const textLayer = renderer._renderLayers[0];
+      if (textLayer && !textLayer.__kittyHooked) {
+        textLayer.__kittyHooked = true;
+        const origDrawChars = textLayer._drawChars.bind(textLayer);
+        textLayer._drawChars = (cell: any, x: number, y: number) => {
+          if (isPlaceholderCell(cell)) {
+            // Suppress tofu glyph rendering by skipping origDrawChars
+            this.drawPlaceholderCell(
+              textLayer._ctx,
+              cell,
+              x,
+              y,
+              textLayer._deviceCellWidth,
+              textLayer._deviceCellHeight
+            );
+            return;
+          }
+          if (x === 0) {
+            this.lastDecodedPlaceholder = null;
+          }
+          return origDrawChars(cell, x, y);
+        };
+      }
+
+      const cursorLayer = renderer._renderLayers[3];
+      if (cursorLayer && !cursorLayer.__kittyHooked) {
+        cursorLayer.__kittyHooked = true;
+        const origFillCharTrueColor = cursorLayer._fillCharTrueColor.bind(cursorLayer);
+        cursorLayer._fillCharTrueColor = (cell: any, x: number, y: number) => {
+          if (isPlaceholderCell(cell)) {
+            // Suppress tofu glyph under cursor
+            return;
+          }
+          return origFillCharTrueColor(cell, x, y);
+        };
+      }
+    } catch (err) {
+      console.warn('Failed to install canvas renderer hook for Unicode placeholders:', err);
+    }
+  }
+
+  public drawPlaceholderCell(
+    ctx: CanvasRenderingContext2D,
+    cell: any,
+    col: number,
+    row: number,
+    cellWidth: number,
+    cellHeight: number
+  ): void {
+    if (col === 0) {
+      this.lastDecodedPlaceholder = null;
+    }
+
+    const decoded = decodePlaceholderCell(
+      cell,
+      this.lastDecodedPlaceholder,
+      this.lastTransmittedImageId
+    );
+    if (!decoded) {
+      this.lastDecodedPlaceholder = null;
+      return;
+    }
+    this.lastDecodedPlaceholder = decoded;
+
+    // Resolve target image from decoded image ID, falling back to active / last transmitted image
+    const img =
+      this.cache.get(decoded.imageId) ||
+      (this.lastTransmittedImageId ? this.cache.get(this.lastTransmittedImageId) : null);
+    if (!img) return;
+
+    const vp = this.virtualPlacements.get(decoded.imageId);
+    const dpr = window.devicePixelRatio || 1;
+    const effectiveCellW = cellWidth / dpr;
+    const effectiveCellH = cellHeight / dpr;
+
+    const totalCols = vp?.cols ?? Math.max(decoded.col + 1, Math.ceil(img.bitmap.width / effectiveCellW));
+    const totalRows = vp?.rows ?? Math.max(decoded.row + 1, Math.ceil(img.bitmap.height / effectiveCellH));
+
+    const srcX = vp?.srcX ?? 0;
+    const srcY = vp?.srcY ?? 0;
+    const srcWidth = vp?.srcWidth;
+    const srcHeight = vp?.srcHeight;
+
+    const uv = computePlaceholderUV(
+      decoded.row,
+      decoded.col,
+      totalRows,
+      totalCols,
+      img.bitmap.width,
+      img.bitmap.height,
+      srcX,
+      srcY,
+      srcWidth,
+      srcHeight
+    );
+
+    if (uv.sw <= 0 || uv.sh <= 0) return;
+
+    const dx = col * cellWidth;
+    const dy = row * cellHeight;
+
+    try {
+      ctx.drawImage(
+        img.bitmap,
+        uv.sx,
+        uv.sy,
+        uv.sw,
+        uv.sh,
+        dx,
+        dy,
+        cellWidth,
+        cellHeight
+      );
+    } catch {
+      // ignore draw error if bitmap closed
+    }
   }
 
   private queueCommand(cmd: KittyCommand): void {
@@ -203,6 +338,9 @@ export class KittyGraphicsManager {
     const cellWidth = this.getCellWidth();
     const cellHeight = this.getCellHeight();
 
+    const effectiveWidth = keys.w || pixelWidth;
+    const effectiveHeight = keys.h || pixelHeight;
+
     let cols = keys.c;
     let rows = keys.r;
 
@@ -211,25 +349,25 @@ export class KittyGraphicsManager {
       rows = Math.max(1, Math.min(termRows, rows));
     } else if (cols) {
       cols = Math.max(1, Math.min(termCols, cols));
-      if (pixelWidth && pixelHeight && pixelWidth > 0) {
+      if (effectiveWidth && effectiveHeight && effectiveWidth > 0) {
         const pixelSpanX = cols * cellWidth;
-        const pixelSpanY = (pixelSpanX / pixelWidth) * pixelHeight;
+        const pixelSpanY = (pixelSpanX / effectiveWidth) * effectiveHeight;
         rows = Math.max(1, Math.min(termRows, Math.round(pixelSpanY / cellHeight)));
       } else {
         rows = 1;
       }
     } else if (rows) {
       rows = Math.max(1, Math.min(termRows, rows));
-      if (pixelWidth && pixelHeight && pixelHeight > 0) {
+      if (effectiveWidth && effectiveHeight && effectiveWidth > 0) {
         const pixelSpanY = rows * cellHeight;
-        const pixelSpanX = (pixelSpanY / pixelHeight) * pixelWidth;
+        const pixelSpanX = (pixelSpanY / effectiveHeight) * effectiveWidth;
         cols = Math.max(1, Math.min(termCols, Math.round(pixelSpanX / cellWidth)));
       } else {
         cols = 1;
       }
-    } else if (pixelWidth && pixelHeight && pixelWidth > 0 && pixelHeight > 0) {
-      cols = Math.max(1, Math.min(termCols, Math.ceil(pixelWidth / cellWidth)));
-      rows = Math.max(1, Math.min(termRows, Math.ceil(pixelHeight / cellHeight)));
+    } else if (effectiveWidth && effectiveHeight && effectiveWidth > 0 && effectiveHeight > 0) {
+      cols = Math.max(1, Math.min(termCols, Math.ceil(effectiveWidth / cellWidth)));
+      rows = Math.max(1, Math.min(termRows, Math.ceil(effectiveHeight / cellHeight)));
     } else {
       cols = 1;
       rows = 1;
@@ -277,6 +415,12 @@ export class KittyGraphicsManager {
   private generatePlaceholderSequence(cmd: KittyCommand, textBefore: string): string {
     const action = cmd.keys.a || 't';
     if (action !== 'T' && action !== 'p') {
+      return '';
+    }
+
+    // Virtual placements (U=1) are referenced by explicit Unicode placeholders (U+10EEEE).
+    // Do not allocate empty space sequences in the text buffer for virtual placements.
+    if (cmd.keys.U === 1) {
       return '';
     }
 
@@ -366,6 +510,7 @@ export class KittyGraphicsManager {
       case 't': {
         // Transmit and store in cache
         const id = cmd.keys.i !== undefined ? cmd.keys.i : this.nextImageId++;
+        this.lastTransmittedImageId = id;
         let resolveLoad!: () => void;
         const loadPromise = new Promise<void>((resolve) => {
           resolveLoad = resolve;
@@ -399,6 +544,7 @@ export class KittyGraphicsManager {
               isPlaying: false,
             },
           });
+          this.term.refresh(0, this.term.rows - 1);
           this.sendPtyResponse(id, 'OK', cmd.keys.q);
         } catch (err: any) {
           this.sendPtyResponse(id, err.message || 'EBADMSG', cmd.keys.q);
@@ -412,6 +558,7 @@ export class KittyGraphicsManager {
       case 'T': {
         // Transmit and display immediately
         const id = cmd.keys.i !== undefined ? cmd.keys.i : this.nextImageId++;
+        this.lastTransmittedImageId = id;
         let resolveLoad!: () => void;
         const loadPromise = new Promise<void>((resolve) => {
           resolveLoad = resolve;
@@ -446,16 +593,35 @@ export class KittyGraphicsManager {
             },
           });
 
-          this.placeImage(
-            id,
-            cmd.keys,
-            decoded.width,
-            decoded.height,
-            cmd.startCol,
-            cmd.startBufferLine,
-            cmd.cols,
-            cmd.rows
-          );
+          if (cmd.keys.U === 1) {
+            // Virtual placement for Unicode placeholders (U+10EEEE)
+            const { cols, rows } = this.computeSpans(cmd.keys, decoded.width, decoded.height);
+            this.virtualPlacements.set(id, {
+              imageId: id,
+              cols: cmd.keys.c || cols,
+              rows: cmd.keys.r || rows,
+              srcX: cmd.keys.x,
+              srcY: cmd.keys.y,
+              srcWidth: cmd.keys.w,
+              srcHeight: cmd.keys.h,
+            });
+            const cachedRec = this.cache.get(id);
+            if (cachedRec?.frames && cachedRec.frames.length >= 2 && !cachedRec.animation?.isPlaying) {
+              this.startAnimation(id);
+            }
+          } else {
+            this.placeImage(
+              id,
+              cmd.keys,
+              decoded.width,
+              decoded.height,
+              cmd.startCol,
+              cmd.startBufferLine,
+              cmd.cols,
+              cmd.rows
+            );
+          }
+          this.term.refresh(0, this.term.rows - 1);
           this.sendPtyResponse(id, 'OK', cmd.keys.q);
         } catch (err: any) {
           this.sendPtyResponse(id, err.message || 'EBADMSG', cmd.keys.q);
@@ -486,16 +652,34 @@ export class KittyGraphicsManager {
           return;
         }
 
-        this.placeImage(
-          id,
-          cmd.keys,
-          cached.width,
-          cached.height,
-          cmd.startCol,
-          cmd.startBufferLine,
-          cmd.cols,
-          cmd.rows
-        );
+        if (cmd.keys.U === 1) {
+          // Virtual placement for Unicode placeholders (U+10EEEE)
+          const { cols, rows } = this.computeSpans(cmd.keys, cached.width, cached.height);
+          this.virtualPlacements.set(id, {
+            imageId: id,
+            cols: cmd.keys.c || cols,
+            rows: cmd.keys.r || rows,
+            srcX: cmd.keys.x,
+            srcY: cmd.keys.y,
+            srcWidth: cmd.keys.w,
+            srcHeight: cmd.keys.h,
+          });
+          if (cached?.frames && cached.frames.length >= 2 && !cached.animation?.isPlaying) {
+            this.startAnimation(id);
+          }
+        } else {
+          this.placeImage(
+            id,
+            cmd.keys,
+            cached.width,
+            cached.height,
+            cmd.startCol,
+            cmd.startBufferLine,
+            cmd.cols,
+            cmd.rows
+          );
+        }
+        this.term.refresh(0, this.term.rows - 1);
         this.sendPtyResponse(id, 'OK', cmd.keys.q);
         break;
       }
@@ -675,11 +859,13 @@ export class KittyGraphicsManager {
             this.stopAnimation(id);
           }
           this.placements.clear();
+          this.virtualPlacements.clear();
           this.cache.clear();
         } else if (cmd.keys.i !== undefined) {
           const id = cmd.keys.i;
           this.stopAnimation(id);
           this.cache.delete(id);
+          this.virtualPlacements.delete(id);
           for (const [key, p] of this.placements.entries()) {
             if (p.imageId === id) {
               this.placements.delete(key);
@@ -690,6 +876,7 @@ export class KittyGraphicsManager {
           this.placements.delete(pId);
         }
         this.render();
+        this.term.refresh(0, this.term.rows - 1);
         this.sendPtyResponse(cmd.keys.i ?? 0, 'OK', cmd.keys.q);
         break;
       }
@@ -785,6 +972,7 @@ export class KittyGraphicsManager {
 
     // Render updated frame
     this.render();
+    this.term.refresh(0, this.term.rows - 1);
 
     // Reschedule timer for subsequent frame (guaranteed to continue loop)
     this.scheduleNextFrame(imageId);
@@ -828,6 +1016,10 @@ export class KittyGraphicsManager {
       xOffset: keys.X || 0,
       yOffset: keys.Y || 0,
       z: keys.z || 0,
+      srcX: keys.x,
+      srcY: keys.y,
+      srcWidth: keys.w,
+      srcHeight: keys.h,
     };
 
     this.placements.set(placementId, placement);
@@ -843,6 +1035,7 @@ export class KittyGraphicsManager {
   public render() {
     if (this.isDisposed || !this.canvas || !this.ctx || !this.screenElement) return;
 
+    this.installCanvasRendererHook();
     this.syncCanvasSize();
 
     const dpr = window.devicePixelRatio || 1;
@@ -928,20 +1121,35 @@ export class KittyGraphicsManager {
 
       // 4. Approach B: Texture UV and Vertex Coordinate Offset Calculation
       // If k rows extend above the viewport (rawY < 0), destY clamps to 0,
-      // producing vertical UV offset v1 = -rawY / rawH = (k * cellHeight) / (rows * cellHeight) = k / rows.
-      const u1 = (destX - rawX) / rawW;
-      const u2 = (destRight - rawX) / rawW;
-      const v1 = (destY - rawY) / rawH;
-      const v2 = (destBottom - rawY) / rawH;
+      // producing vertical UV offset relV1 = -rawY / rawH = (k * cellHeight) / (rows * cellHeight) = k / rows.
+      const relU1 = (destX - rawX) / rawW;
+      const relU2 = (destRight - rawX) / rawW;
+      const relV1 = (destY - rawY) / rawH;
+      const relV2 = (destBottom - rawY) / rawH;
 
-      // Map UV fractions [0..1] to source bitmap pixel coordinates [0..bmpW, 0..bmpH]
+      // Map UV fractions to source sub-rectangle coordinates within the bitmap
       const bmpW = img.bitmap.width;
       const bmpH = img.bitmap.height;
 
-      const srcX = Math.max(0, Math.min(bmpW, u1 * bmpW));
-      const srcY = Math.max(0, Math.min(bmpH, v1 * bmpH));
-      const srcRight = Math.max(0, Math.min(bmpW, u2 * bmpW));
-      const srcBottom = Math.max(0, Math.min(bmpH, v2 * bmpH));
+      const subX = Math.max(0, Math.min(bmpW, p.srcX ?? 0));
+      const subY = Math.max(0, Math.min(bmpH, p.srcY ?? 0));
+      const subW = p.srcWidth !== undefined ? Math.max(0, Math.min(bmpW - subX, p.srcWidth)) : (bmpW - subX);
+      const subH = p.srcHeight !== undefined ? Math.max(0, Math.min(bmpH - subY, p.srcHeight)) : (bmpH - subY);
+
+      const u_min = subX / bmpW;
+      const v_min = subY / bmpH;
+      const u_max = (subX + subW) / bmpW;
+      const v_max = (subY + subH) / bmpH;
+
+      const finalU1 = u_min + relU1 * (u_max - u_min);
+      const finalU2 = u_min + relU2 * (u_max - u_min);
+      const finalV1 = v_min + relV1 * (v_max - v_min);
+      const finalV2 = v_min + relV2 * (v_max - v_min);
+
+      const srcX = Math.max(0, Math.min(bmpW, finalU1 * bmpW));
+      const srcY = Math.max(0, Math.min(bmpH, finalV1 * bmpH));
+      const srcRight = Math.max(0, Math.min(bmpW, finalU2 * bmpW));
+      const srcBottom = Math.max(0, Math.min(bmpH, finalV2 * bmpH));
 
       const srcW = srcRight - srcX;
       const srcH = srcBottom - srcY;
@@ -1031,6 +1239,8 @@ export class KittyGraphicsManager {
     this.disposables = [];
     this.cache.clear();
     this.placements.clear();
+    this.virtualPlacements.clear();
+    this.lastDecodedPlaceholder = null;
 
     if (this.canvas && this.canvas.parentElement) {
       this.canvas.parentElement.removeChild(this.canvas);

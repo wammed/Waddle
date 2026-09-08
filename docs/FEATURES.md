@@ -337,6 +337,15 @@ Welcome to the comprehensive feature guide for **Waddle**, the AI-integrated, pr
   - **Finite Count Playback (`v>0`)**: Accurately tracks completed cycles (`loopsCompleted`); when the requested loop count is reached, halts the timer and freezes on the final frame.
   - **Animation Control (`a=a`)**: Supports playback state (`s=1` stop, `s=3` run), seeking to designated frame (`r`), dynamic frame gap delay updates (`z`), and dynamic loop count reconfiguration (`v`).
   - **Resource Management**: Automatically cleans up and unregisters active animation timers upon LRU cache eviction, image deletion (`a=d`), or terminal disposal to prevent memory or timer leaks.
+- **Sub-Rectangle Source Clipping (`x, y, w, h`)**:
+  - Full support for source texture clipping parameters: `x` (source X offset in pixels), `y` (source Y offset in pixels), `w` (source rectangle width in pixels), and `h` (source rectangle height in pixels).
+  - Automatically calculates normalized UV bounds (`u_min = x / texture_width`, `v_min = y / texture_height`, `u_max = (x + w) / texture_width`, `v_max = (y + h) / texture_height`), seamlessly combining source sub-rectangles with viewport boundary scissoring.
+- **Unicode Graphic Placeholder (`U+10EEEE`) & Virtual Placements (`U=1`)**:
+  - Intercepts the private-use Unicode graphic placeholder codepoint `U+10EEEE` directly in character rendering, completely suppressing "tofu" (□) missing-glyph boxes.
+  - Automatically parses combining diacritic marks attached to `U+10EEEE` from the 297 standard combining marks defined by the Kitty Graphics Protocol to determine the grid row and column index of the slice.
+  - Supports diacritic omission with left-to-right inheritance and 3rd-diacritic high byte extension for 32-bit image IDs.
+  - Extracts image IDs from cell foreground colors (24-bit TrueColor RGB or 256-color palette index) with automatic fallback to the most recently transmitted image.
+  - Seamlessly handles virtual placements (`U=1`), suppressing buffer space reservation while holding placement dimensions and source sub-rectangles for Unicode placeholders.
 - **Layering Order**:
   - Render pipeline: **Terminal Background / Wallpaper → Kitty Graphics Canvas Layer → Text/Glyphs Layer → Cursor Layer**.
   - Text glyphs and the terminal cursor render crisp and clear on top of displayed graphics.

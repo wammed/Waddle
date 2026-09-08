@@ -227,6 +227,21 @@ export class KittyApcParser {
             result.d = val as any;
           }
           break;
+        case 'x':
+          result.x = parseInt(val, 10);
+          break;
+        case 'y':
+          result.y = parseInt(val, 10);
+          break;
+        case 'w':
+          result.w = parseInt(val, 10);
+          break;
+        case 'h':
+          result.h = parseInt(val, 10);
+          break;
+        case 'U':
+          result.U = parseInt(val, 10);
+          break;
       }
     }
 

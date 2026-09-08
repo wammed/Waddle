@@ -16,6 +16,11 @@ export interface KittyControlKeys {
   C?: 0 | 1; // Cursor movement policy (0=move, 1=do not move, default: 0)
   z?: number; // Z-index OR animation frame delay/gap in ms
   d?: 'a' | 'i' | 'c' | 'p'; // Delete action target
+  x?: number; // Sub-rectangle X offset in source image (pixels)
+  y?: number; // Sub-rectangle Y offset in source image (pixels)
+  w?: number; // Sub-rectangle width in source image (pixels)
+  h?: number; // Sub-rectangle height in source image (pixels)
+  U?: number; // Virtual placement flag (1 = virtual placement for Unicode placeholders)
   raw?: Record<string, string>;
 }
 
@@ -65,4 +70,18 @@ export interface KittyPlacement {
   xOffset: number; // Pixel X offset
   yOffset: number; // Pixel Y offset
   z: number; // Layering Z-index
+  srcX?: number; // Source sub-rectangle X (pixels)
+  srcY?: number; // Source sub-rectangle Y (pixels)
+  srcWidth?: number; // Source sub-rectangle width (pixels)
+  srcHeight?: number; // Source sub-rectangle height (pixels)
+}
+
+export interface KittyVirtualPlacement {
+  imageId: number;
+  cols: number;
+  rows: number;
+  srcX?: number;
+  srcY?: number;
+  srcWidth?: number;
+  srcHeight?: number;
 }
