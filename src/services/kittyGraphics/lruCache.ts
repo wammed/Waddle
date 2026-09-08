@@ -35,6 +35,22 @@ export class KittyLruCache {
     this.currentBytes += record.byteSize;
   }
 
+  public get size(): number {
+    return this.records.size;
+  }
+
+  public has(id: number): boolean {
+    return this.records.has(id);
+  }
+
+  public values(): IterableIterator<KittyImageRecord> {
+    return this.records.values();
+  }
+
+  public entries(): IterableIterator<[number, KittyImageRecord]> {
+    return this.records.entries();
+  }
+
   public keys(): IterableIterator<number> {
     return this.records.keys();
   }

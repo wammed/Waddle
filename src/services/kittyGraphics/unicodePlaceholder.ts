@@ -55,9 +55,14 @@ export interface DecodedPlaceholder {
   row: number;
   col: number;
   highByte: number;
+  hasDiacritics: boolean;
 }
 
 export interface PlaceholderUV {
+  u1: number;
+  v1: number;
+  u2: number;
+  v2: number;
   sx: number;
   sy: number;
   sw: number;
@@ -76,18 +81,39 @@ export const IS_GRAPHIC_PLACEHOLDER = Symbol('IS_GRAPHIC_PLACEHOLDER');
 export function isPlaceholderCell(cell: any): boolean {
   if (!cell) return false;
   if (cell[IS_GRAPHIC_PLACEHOLDER] === true || cell.isGraphicPlaceholder === true) return true;
-  const code = typeof cell.getCode === 'function' ? cell.getCode() : 0;
+
+  const code =
+    typeof cell.getCode === 'function'
+      ? cell.getCode()
+      : typeof cell.code === 'number'
+      ? cell.code
+      : Array.isArray(cell) && typeof cell[3] === 'number'
+      ? cell[3]
+      : 0;
+
   if (code === PLACEHOLDER_CODEPOINT) {
-    cell[IS_GRAPHIC_PLACEHOLDER] = true;
-    cell.isGraphicPlaceholder = true;
     return true;
   }
-  const chars = typeof cell.getChars === 'function' ? cell.getChars() : '';
-  if (chars && chars.codePointAt(0) === PLACEHOLDER_CODEPOINT) {
-    cell[IS_GRAPHIC_PLACEHOLDER] = true;
-    cell.isGraphicPlaceholder = true;
+
+  const chars =
+    typeof cell.getChars === 'function'
+      ? cell.getChars()
+      : typeof cell.chars === 'string'
+      ? cell.chars
+      : typeof cell.char === 'string'
+      ? cell.char
+      : Array.isArray(cell) && typeof cell[1] === 'string'
+      ? cell[1]
+      : '';
+
+  if (chars && (chars.codePointAt(0) === PLACEHOLDER_CODEPOINT || chars.includes('\u{10EEEE}'))) {
     return true;
   }
+
+  if (typeof cell.combinedData === 'string' && (cell.combinedData.codePointAt(0) === PLACEHOLDER_CODEPOINT || cell.combinedData.includes('\u{10EEEE}'))) {
+    return true;
+  }
+
   return false;
 }
 
@@ -131,8 +157,10 @@ export function decodePlaceholderCell(
   const hasD0 = d0 !== undefined && DIACRITIC_TO_INDEX.has(d0);
   const hasD1 = d1 !== undefined && DIACRITIC_TO_INDEX.has(d1);
   const hasD2 = d2 !== undefined && DIACRITIC_TO_INDEX.has(d2);
+  let hasDiacritics = false;
 
   if (hasD0 && hasD1) {
+    hasDiacritics = true;
     row = DIACRITIC_TO_INDEX.get(d0)!;
     col = DIACRITIC_TO_INDEX.get(d1)!;
     if (hasD2) {
@@ -146,6 +174,7 @@ export function decodePlaceholderCell(
       highByte = prevPlaceholder.highByte;
     }
   } else if (hasD0) {
+    hasDiacritics = true;
     // Only row diacritic is present
     row = DIACRITIC_TO_INDEX.get(d0)!;
     if (
@@ -165,10 +194,12 @@ export function decodePlaceholderCell(
       row = prevPlaceholder.row;
       col = prevPlaceholder.col + 1;
       highByte = prevPlaceholder.highByte;
+      hasDiacritics = prevPlaceholder.hasDiacritics;
     } else {
       row = 0;
       col = 0;
       highByte = 0;
+      hasDiacritics = false;
     }
   }
 
@@ -183,12 +214,88 @@ export function decodePlaceholderCell(
     row,
     col,
     highByte,
+    hasDiacritics,
   };
+}
+
+export interface GraphicCacheLike {
+  get(id: number): any;
+  has?(id: number): boolean;
+  size?: number;
+  values?(): IterableIterator<any>;
+}
+
+/**
+ * Resolves a cached image record from graphic cache using extracted image ID,
+ * cell SGR foreground colors, and fallbacks.
+ */
+export function resolveImageFromCache(
+  cache: GraphicCacheLike,
+  imageId: number,
+  cell?: any,
+  lastTransmittedImageId?: number
+): any | null {
+  const hasFn = (id: number): boolean => {
+    if (typeof cache.has === 'function') return cache.has(id);
+    return cache.get(id) !== undefined;
+  };
+
+  // 1. Direct match by decoded imageId
+  if (imageId > 0 && hasFn(imageId)) {
+    return cache.get(imageId);
+  }
+
+  // 2. Decode from cell foreground color if cell provided
+  if (cell) {
+    if (typeof cell.isFgRGB === 'function' && cell.isFgRGB()) {
+      const fg = cell.getFgColor();
+      const r = (fg >> 16) & 0xff;
+      const g = (fg >> 8) & 0xff;
+      const b = fg & 0xff;
+      const kittyId = r | (g << 8) | (b << 16);
+
+      if (kittyId > 0 && hasFn(kittyId)) return cache.get(kittyId);
+      if (fg > 0 && hasFn(fg)) return cache.get(fg);
+      if (r > 0 && hasFn(r)) return cache.get(r);
+      if (b > 0 && hasFn(b)) return cache.get(b);
+      if (g > 0 && hasFn(g)) return cache.get(g);
+    } else if (typeof cell.isFgPalette === 'function' && cell.isFgPalette()) {
+      const palIdx = cell.getFgColor();
+      if (palIdx > 0 && hasFn(palIdx)) return cache.get(palIdx);
+    }
+  }
+
+  // 3. Check channel transformations if imageId > 0
+  if (imageId > 0) {
+    const r = (imageId >> 16) & 0xff;
+    const g = (imageId >> 8) & 0xff;
+    const b = imageId & 0xff;
+    const swapped = r | (g << 8) | (b << 16);
+    if (hasFn(swapped)) return cache.get(swapped);
+    if (r > 0 && hasFn(r)) return cache.get(r);
+    if (b > 0 && hasFn(b)) return cache.get(b);
+    const lower24 = imageId & 0xffffff;
+    if (hasFn(lower24)) return cache.get(lower24);
+  }
+
+  // 4. Fallback to lastTransmittedImageId
+  if (lastTransmittedImageId !== undefined && lastTransmittedImageId > 0 && hasFn(lastTransmittedImageId)) {
+    return cache.get(lastTransmittedImageId);
+  }
+
+  // 5. Fallback if single image in cache
+  if (cache.size === 1 && typeof cache.values === 'function') {
+    return cache.values().next().value || null;
+  }
+
+  return null;
 }
 
 /**
  * Computes source bitmap pixel coordinates for a specific placeholder tile cell (col, row)
  * taking into account total grid rows/cols and any sub-rectangle clipping (srcX, srcY, srcWidth, srcHeight).
+ *
+ * For single-cell placeholders (isSingleCell = true), UV coordinates map to full (0.0, 0.0) .. (1.0, 1.0).
  */
 export function computePlaceholderUV(
   row: number,
@@ -200,7 +307,8 @@ export function computePlaceholderUV(
   srcX: number = 0,
   srcY: number = 0,
   srcWidth?: number,
-  srcHeight?: number
+  srcHeight?: number,
+  isSingleCell: boolean = false
 ): PlaceholderUV {
   const effectiveSrcW =
     srcWidth !== undefined && srcWidth > 0
@@ -210,6 +318,19 @@ export function computePlaceholderUV(
     srcHeight !== undefined && srcHeight > 0
       ? Math.min(bmpHeight - srcY, srcHeight)
       : Math.max(1, bmpHeight - srcY);
+
+  if (isSingleCell) {
+    return {
+      u1: 0.0,
+      v1: 0.0,
+      u2: 1.0,
+      v2: 1.0,
+      sx: srcX,
+      sy: srcY,
+      sw: effectiveSrcW,
+      sh: effectiveSrcH,
+    };
+  }
 
   const numCols = Math.max(1, totalCols);
   const numRows = Math.max(1, totalRows);
@@ -224,5 +345,5 @@ export function computePlaceholderUV(
   const sw = Math.max(0, Math.min(bmpWidth - sx, (u2 - u1) * effectiveSrcW));
   const sh = Math.max(0, Math.min(bmpHeight - sy, (v2 - v1) * effectiveSrcH));
 
-  return { sx, sy, sw, sh };
+  return { u1, v1, u2, v2, sx, sy, sw, sh };
 }

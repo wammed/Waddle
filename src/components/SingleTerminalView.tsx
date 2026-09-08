@@ -183,8 +183,9 @@ export const SingleTerminalView: React.FC<SingleTerminalViewProps> = ({
     term.open(containerRef.current);
 
     // Hardware accelerated Canvas rendering (instant 0ms init, full transparency support)
+    let canvasAddon: CanvasAddon | null = null;
     try {
-      const canvasAddon = new CanvasAddon();
+      canvasAddon = new CanvasAddon();
       term.loadAddon(canvasAddon);
     } catch (e) {
       console.warn('CanvasAddon fallback:', e);
@@ -201,9 +202,11 @@ export const SingleTerminalView: React.FC<SingleTerminalViewProps> = ({
           term,
           containerRef.current,
           pane.sessionId,
-          config.kitty_graphics
+          config.kitty_graphics,
+          canvasAddon || undefined
         );
         kittyManagerRef.current = kittyManager;
+        kittyManager.installCanvasRendererHook();
       } catch (err) {
         console.warn('Failed to initialize KittyGraphicsManager:', err);
       }

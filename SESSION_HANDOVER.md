@@ -116,6 +116,18 @@
       - 仮想配置 (`U=1`) 時はテキストバッファへの空白シーケンス出力を抑止し、プレースホルダー用スライス情報のメタデータ（寸法・切り抜き）を管理。
       - 画像デコード完了時およびフレーム更新時に `term.refresh()` を発火し、遅延なく瞬時にプレースホルダーセルへ画像を同期レンダリング。
     - **統合テスト・ビルド検証**: `scratch/test_sub_clipping.mjs`（全件合格）、`scratch/test_unicode_placeholder.mjs`（全7項目合格）、Rust テスト 21 件合格、TypeScript/Vite ビルド 0 エラー。
+23. **Kitty Graphics Protocol の Unicode プレースホルダー (`U+10EEEE`) 未定義グリフ（豆腐）上書き防止 & レンダラーフック完全対応**:
+    - **原因究明**: xterm.js (v5) の `_renderService._renderer` が `MutableDisposable` ラッパーオブジェクトであるため、従来のフック取得処理で `renderer._renderLayers` が `undefined` となり登録処理が毎回早期リターンしていた根本原因を解明。`core._renderService._renderer.value` および `CanvasAddon._renderer` から真の `CanvasRenderer` を確実に解決する多重解決機構へ刷新。
+    - **テキスト描画ループ (Font/Glyph Render Pass: `_drawForeground`) のスキップ & 排他制御**:
+      - `TextRenderLayer.prototype._drawForeground` およびインスタンスフックにおいて、セルが `0x10EEEE` またはプレースホルダーフラグを持つ場合、プレースホルダーテクスチャ（`drawPlaceholderCell`）を描画した上で、`_drawChars`（フォントグリフ検索・アトラスラスタライズ・文字描画）を完全に `return`（セル走査ループ内での `continue`）してバイパス。
+    - **多層防御フック**:
+      - `BaseRenderLayer.prototype._drawChars` および `BaseRenderLayer.prototype._fillCharTrueColor` においても、`0x10EEEE` を検知した場合はグリフ検索や `fillText` を行わず早期リターン。
+      - `TextRenderLayer.prototype._isOverlapping` を常に `false` とし、外字による 2 セル幅誤認や隣接セル破壊を防止。
+      - `CursorRenderLayer` において、プレースホルダーセルの上にカーソルが重なった場合でもテクスチャを消去する不透明ベタ塗りや豆腐文字 `fillText` を行わず、アウトラインカーソルのみを描画。
+      - DOM レンダラーフォールバック時も `DomRendererRowFactory.prototype.createRow` で `U+10EEEE` を含む span のテキストを透明スペースに置換し豆腐の露出を完全遮断。
+    - **セルデータの純粋性**:
+      - `isPlaceholderCell` で再利用される共有 `CellData`（`_workCell`）に対する破壊的フラグ代入を排除し、後続通常セルへの誤伝播を解消。
+    - **統合テスト・ビルド検証**: `scratch/test_unicode_placeholder.mjs`（全11項目合格、xterm v5 MutableDisposable 構造に対する `_drawForeground` スキップ検証を含む）、Rust 単体テスト 21 件合格、TypeScript/Vite ビルド 0 エラー。
 
 ---
 
