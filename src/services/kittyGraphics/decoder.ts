@@ -36,9 +36,9 @@ export class KittyDecoder {
   public async decode(keys: KittyControlKeys, payload: string): Promise<DecodedImage> {
     const medium = keys.t || 'd';
 
-    // 1. Local file path reference (t=f)
-    if (medium === 'f') {
-      return await this.decodeFile(payload);
+    // 1. Local file path reference (t=f) or temporary file (t=t)
+    if (medium === 'f' || medium === 't') {
+      return await this.decodeFile(payload, medium === 't');
     }
 
     // 2. Direct Base64 transfer (t=d)
@@ -58,7 +58,7 @@ export class KittyDecoder {
     }
   }
 
-  private async decodeFile(base64Path: string): Promise<DecodedImage> {
+  private async decodeFile(base64Path: string, isTemp: boolean = false): Promise<DecodedImage> {
     // Decode file path string from Base64
     let filePath: string;
     try {
@@ -67,12 +67,13 @@ export class KittyDecoder {
       filePath = base64Path.trim();
     }
 
-    // Call secure Tauri backend command which enforces $HOME/Pictures sandbox & canonicalization
+    // Call secure Tauri backend command which enforces sandbox & canonicalization (auto-unlinks if isTemp)
     const fileResult = await TauriApi.kittyReadFile(
       filePath,
       this.allowedDir,
       this.maxPayloadBytes,
-      this.maxDimension
+      this.maxDimension,
+      isTemp
     );
 
     const binary = this.base64ToBytes(fileResult.data);

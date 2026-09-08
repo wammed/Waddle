@@ -434,7 +434,8 @@ export const TauriApi = {
     path: string,
     allowedDir?: string,
     maxBytes?: number,
-    maxDimension?: number
+    maxDimension?: number,
+    isTemp?: boolean
   ): Promise<{ data: string; mime: string; width?: number; height?: number }> {
     if (!isTauri()) {
       throw new Error('kittyReadFile is only available in Tauri environment');
@@ -446,6 +447,7 @@ export const TauriApi = {
         allowedDir: allowedDir || null,
         maxBytes: maxBytes || null,
         maxDimension: maxDimension || null,
+        isTemp: isTemp ?? false,
       }
     );
   },

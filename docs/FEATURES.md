@@ -289,6 +289,19 @@ Welcome to the comprehensive feature guide for **Waddle**, the AI-integrated, pr
   - Strips megabytes of Base64 graphics data from the PTY stream before reaching `@xterm/xterm`, preventing terminal freezing or DEC parser degradation.
   - Chunked transfer support: smoothly reassembles multi-chunk transmissions (`m=1` followed by `m=0`).
   - Handshake & Query support (`a=q`): immediately answers protocol detection queries with `\x1b_Gi=<id>;OK\x1b\` without terminal stutter.
+- **Quiet (`q`) Parameter Specification Compliance**:
+  - Full compliance with the Kitty Graphics quiet response protocol to prevent PTY escape sequence leakage into the user's shell:
+    - `q=0` or omitted: Completely silent. No ACK/NAK or error response is written back to PTY stdin.
+    - `q=1`: Errors only. Failures (`EBADMSG`, `ENOENT`, `EACCES`, `EFBIG`) return diagnostic responses; successful operations (`OK`) remain silent.
+    - `q=2`: Verbose. Both `OK` and error responses are written back.
+    - Capability query probe (`a=q`): Always sends `\x1b_Gi=<id>;OK\x1b\` regardless of quiet level to ensure proper tool handshake.
+- **Temporary File Auto-Deletion & Sandboxing (`t=t`)**:
+  - CLI/TUI tools (such as Yazi and Neovim) transmit temporary files via `t=t`.
+  - Waddle loads the file into memory and immediately unlinks it from disk (`std::fs::remove_file`) before dimension verification, preventing disk space accumulation or resource leaks even if decompression bomb limits fail.
+  - Temporary files are securely restricted to system temp directories (`std::env::temp_dir()`, `/tmp`, `/var/tmp`) and the configured allowed directory, with sensitive system locations (`/etc`, `/root`, `~/.ssh`) strictly blocked.
+- **Asynchronous Race Condition Elimination (`a=t` vs `a=p`)**:
+  - Serialized command execution via a FIFO Promise queue (`commandQueue`) ensures commands from PTY streams are processed in strict chronological order.
+  - In-flight image loading tracking (`loadingImages: Map<number, Promise<void>>`) ensures that immediate placement commands (`a=p`) cleanly await pending image decoding (`a=t`) before cache inspection, eliminating race-induced `ENOENT: Image ID not found in cache` errors.
 - **Strict Security Sandboxing & Directory Jail (`t=f`)**:
   - Local file reading via `t=f` is strictly restricted to `$HOME/Pictures` (and its subdirectories) by default.
   - Rust backend enforces path canonicalization (`std::fs::canonicalize`).
@@ -302,10 +315,28 @@ Welcome to the comprehensive feature guide for **Waddle**, the AI-integrated, pr
   - Cache size is capped at 256 MB (configurable 64–1024 MB).
   - When the upper limit is reached, least recently used textures are evicted.
   - Explicitly invokes `ImageBitmap.close()` upon eviction or image deletion (`a=d`), preventing GPU/VRAM and WebKitGTK memory leaks.
-- **Cell Occupancy & Scrollback Synchronization**:
-  - Automatically maps pixel graphics to character grid cells (`c` cols and `r` rows) with terminal aspect-ratio scaling.
-  - Accurately tracks absolute line numbers in the scrollback buffer (`term.buffer.active.baseY + cursorY`), seamlessly updating positions during terminal scrolling.
-  - Scrolled-out images beyond maximum scrollback history are automatically pruned.
+- **Cursor Advance & Buffer Space Allocation (`C` Key)**:
+  - Full compliance with the Kitty Graphics cursor movement policy:
+    - `C=0` (or omitted, default): Cursor advances to the right edge of the image on its final row (`start_col + cols` at row `start_row + rows - 1`). If the image reaches or exceeds terminal width, it wraps to column 0 on the line below. Text following the image (e.g. `<- TEXT HERE`) renders at the right of the image on the last row without overlapping image pixels, and shell prompts drop cleanly below the image area.
+    - `C=1`: Cursor does not move; its position is preserved at `(start_col, start_row)`, with scroll compensation applied.
+- **Placeholder Cell Allocation & Automatic Bottom Scrolling**:
+  - Automatically allocates the `cols x rows` grid in xterm's buffer at the exact stream position of `\x1b_G...` using space characters and linefeeds (`\r\n`).
+  - When an image is placed near the bottom of the screen (`start_row + rows > termRows`), linefeeds trigger native terminal scrolling, shifting preceding lines into scrollback and ensuring the full image height is visible without clipping.
+- **Partial Clipping & Scissoring (AABB Intersection & UV Mapping)**:
+  - Supports smooth partial rendering when multi-row images cross the top or bottom viewport boundaries:
+    - **AABB Intersection**: Checks overlap between the image bounds `[col..col+c, row..row+r]` and the visible terminal viewport `[0..termCols, 0..termRows]`. If even a single row or column is visible, the image remains actively rendered rather than popping out of existence.
+    - **Viewport Scissoring (Approach A)**: Applies hardware-accelerated clipping bounds matching viewport dimensions `[0..width, 0..height]`.
+- **Anchor Cell Synchronization & Animation Frame Retention (`a=f`)**:
+  - Maintains zero-latency synchronous PTY streaming (`term.write`), guaranteeing instantaneous 0ms rendering for shell startup, `fish_greetings`, and terminal prompts.
+  - Precisely captures true anchor coordinates `(start_col, start_row)` even when preceded by text in the same chunk via `calculateCursorOffset(textBefore)`.
+  - Renderer coordinates adhere strictly to `render_x = padding_left + col * cell_width` and `render_y = padding_top + (row - scroll_offset) * cell_height`, preventing default (0, 0) collisions over previous output.
+  - Animation frame transmissions (`a=f`) update frame textures in cache while strictly inheriting and preserving the placement anchor coordinates established during initial placement.
+- **Animation Loop Count (`v`) Specification Compliance & Resilient Timer Scheduling**:
+  - **Loop Count Default**: Parameter `v` defaults to `0` (Infinite Loop) per Kitty Graphics Protocol specification.
+  - **Infinite Playback (`v=0`)**: Automatically loops back to frame 1 (index 0) upon expiration of the final frame's delay (`z` ms), continually rescheduling the frame timer to sustain perpetual animation.
+  - **Finite Count Playback (`v>0`)**: Accurately tracks completed cycles (`loopsCompleted`); when the requested loop count is reached, halts the timer and freezes on the final frame.
+  - **Animation Control (`a=a`)**: Supports playback state (`s=1` stop, `s=3` run), seeking to designated frame (`r`), dynamic frame gap delay updates (`z`), and dynamic loop count reconfiguration (`v`).
+  - **Resource Management**: Automatically cleans up and unregisters active animation timers upon LRU cache eviction, image deletion (`a=d`), or terminal disposal to prevent memory or timer leaks.
 - **Layering Order**:
   - Render pipeline: **Terminal Background / Wallpaper → Kitty Graphics Canvas Layer → Text/Glyphs Layer → Cursor Layer**.
   - Text glyphs and the terminal cursor render crisp and clear on top of displayed graphics.

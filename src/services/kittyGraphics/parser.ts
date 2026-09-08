@@ -17,9 +17,13 @@ export class KittyApcParser {
   /**
    * Processes an incoming raw chunk from PTY.
    * Strips all Kitty APC sequences so the terminal doesn't choke on Base64,
+   * invokes optional onCommand hook (which can supply replacement escape sequences, e.g. for placeholders),
    * and yields parsed, reassembled Kitty commands.
    */
-  public parse(chunk: string): { cleanText: string; commands: KittyCommand[] } {
+  public parse(
+    chunk: string,
+    onCommand?: (cmd: KittyCommand, textBefore: string) => string | void
+  ): { cleanText: string; commands: KittyCommand[] } {
     let input = this.buffer + chunk;
     this.buffer = '';
 
@@ -109,6 +113,8 @@ export class KittyApcParser {
         }
       } else {
         // Final or unchunked payload
+        let completedCmd: KittyCommand | null = null;
+
         if (this.pendingChunkKeys) {
           const mergedKeys: KittyControlKeys = {
             ...this.pendingChunkKeys,
@@ -120,15 +126,25 @@ export class KittyApcParser {
           this.pendingChunkPayload = '';
 
           if (fullPayload.length <= this.maxPayloadBytes) {
-            commands.push({ keys: mergedKeys, payload: fullPayload });
+            completedCmd = { keys: mergedKeys, payload: fullPayload };
           } else {
             console.warn('Kitty payload exceeded max allowed size on completion, dropping');
           }
         } else {
           if (payload.length <= this.maxPayloadBytes) {
-            commands.push({ keys, payload });
+            completedCmd = { keys, payload };
           } else {
             console.warn('Kitty direct payload exceeded max allowed size, dropping');
+          }
+        }
+
+        if (completedCmd) {
+          commands.push(completedCmd);
+          if (onCommand) {
+            const replacement = onCommand(completedCmd, cleanText);
+            if (replacement) {
+              cleanText += replacement;
+            }
           }
         }
       }
@@ -152,7 +168,7 @@ export class KittyApcParser {
 
       switch (key) {
         case 'a':
-          if (['t', 'T', 'p', 'd', 'q'].includes(val)) {
+          if (['t', 'T', 'p', 'd', 'q', 'f', 'a'].includes(val)) {
             result.a = val as any;
           }
           break;

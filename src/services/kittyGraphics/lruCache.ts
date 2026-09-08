@@ -35,13 +35,32 @@ export class KittyLruCache {
     this.currentBytes += record.byteSize;
   }
 
+  public keys(): IterableIterator<number> {
+    return this.records.keys();
+  }
+
   public delete(id: number): boolean {
     const record = this.records.get(id);
     if (!record) return false;
 
-    // Explicitly close ImageBitmap to release WebKitGTK and GPU VRAM
+    // Clear active animation timer if present
+    if (record.animation?.timer) {
+      clearTimeout(record.animation.timer);
+      record.animation.timer = undefined;
+    }
+    if (record.animation) {
+      record.animation.isPlaying = false;
+    }
+
+    // Explicitly close ImageBitmap(s) to release WebKitGTK and GPU VRAM
     try {
-      record.bitmap.close();
+      if (record.frames && record.frames.length > 0) {
+        for (const f of record.frames) {
+          f.bitmap.close?.();
+        }
+      } else {
+        record.bitmap.close?.();
+      }
     } catch {
       // ignore
     }
@@ -53,8 +72,22 @@ export class KittyLruCache {
 
   public clear(): void {
     for (const record of this.records.values()) {
+      if (record.animation?.timer) {
+        clearTimeout(record.animation.timer);
+        record.animation.timer = undefined;
+      }
+      if (record.animation) {
+        record.animation.isPlaying = false;
+      }
+
       try {
-        record.bitmap.close();
+        if (record.frames && record.frames.length > 0) {
+          for (const f of record.frames) {
+            f.bitmap.close?.();
+          }
+        } else {
+          record.bitmap.close?.();
+        }
       } catch {
         // ignore
       }

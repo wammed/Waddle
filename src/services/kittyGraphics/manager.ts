@@ -1,5 +1,5 @@
 import { Terminal } from '@xterm/xterm';
-import { KittyCommand, KittyControlKeys, KittyPlacement } from './types';
+import { KittyCommand, KittyControlKeys, KittyPlacement, KittyAnimationFrame } from './types';
 import { KittyApcParser } from './parser';
 import { KittyDecoder } from './decoder';
 import { KittyLruCache } from './lruCache';
@@ -16,6 +16,8 @@ export class KittyGraphicsManager {
   private canvas: HTMLCanvasElement | null = null;
   private ctx: CanvasRenderingContext2D | null = null;
   private nextImageId: number = 1;
+  private commandQueue: Promise<void> = Promise.resolve();
+  private loadingImages: Map<number, Promise<void>> = new Map();
   private disposables: (() => void)[] = [];
   private isDisposed: boolean = false;
   private screenElement: HTMLElement | null = null;
@@ -117,25 +119,236 @@ export class KittyGraphicsManager {
     this.disposables.push(() => resizeDisp.dispose());
   }
 
+  private queueCommand(cmd: KittyCommand): void {
+    this.commandQueue = this.commandQueue
+      .then(async () => {
+        if (this.isDisposed) return;
+        await this.handleCommand(cmd);
+      })
+      .catch((err) => {
+        console.warn('Error handling Kitty command:', err);
+      });
+  }
+
   /**
    * Filters incoming PTY stream text through the streaming APC parser.
-   * Returns clean text suitable for term.write().
+   * Returns clean text suitable for term.write(), with placeholder sequences
+   * for inline images to advance the cursor and allocate buffer lines.
    */
   public filterPtyOutput(chunk: string): string {
     if (this.isDisposed) return chunk;
 
-    const { cleanText, commands } = this.parser.parse(chunk);
+    const { cleanText, commands } = this.parser.parse(chunk, (cmd, textBefore) => {
+      return this.generatePlaceholderSequence(cmd, textBefore);
+    });
 
     if (commands.length > 0) {
-      // Process extracted Kitty commands asynchronously
+      // Process extracted Kitty commands strictly in order via FIFO command queue
       for (const cmd of commands) {
-        this.handleCommand(cmd).catch((err) => {
-          console.warn('Error handling Kitty command:', err);
-        });
+        this.queueCommand(cmd);
       }
     }
 
     return cleanText;
+  }
+
+  private calculateCursorOffset(text: string): { deltaCol: number; deltaLine: number } {
+    if (!text) return { deltaCol: 0, deltaLine: 0 };
+    let deltaLine = 0;
+    let lastLineLen = 0;
+    for (let i = 0; i < text.length; i++) {
+      if (text[i] === '\n') {
+        deltaLine++;
+        lastLineLen = 0;
+      } else if (text[i] === '\r') {
+        lastLineLen = 0;
+      } else {
+        // Skip ANSI escape codes if present (e.g. colors \x1b[...m)
+        if (text[i] === '\x1b' && text[i + 1] === '[') {
+          const mIdx = text.indexOf('m', i);
+          if (mIdx !== -1 && mIdx - i < 16) {
+            i = mIdx;
+            continue;
+          }
+        }
+        lastLineLen++;
+      }
+    }
+    return { deltaCol: lastLineLen, deltaLine };
+  }
+
+  /**
+   * Synchronously flushes any pending writes in xterm's internal parser buffer
+   * so that buffer.active.cursorX / cursorY and baseY reflect all preceding stream output.
+   */
+  private flushTerminalBuffer(): void {
+    try {
+      const core = (this.term as any)._core;
+      if (core?._writeBuffer && typeof core._writeBuffer._innerWrite === 'function') {
+        core._writeBuffer._innerWrite();
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  private computeSpans(
+    keys: KittyControlKeys,
+    pixelWidth?: number,
+    pixelHeight?: number
+  ): { cols: number; rows: number } {
+    const termCols = this.term.cols || 80;
+    const termRows = this.term.rows || 24;
+
+    const cellWidth = this.getCellWidth();
+    const cellHeight = this.getCellHeight();
+
+    let cols = keys.c;
+    let rows = keys.r;
+
+    if (cols && rows) {
+      cols = Math.max(1, Math.min(termCols, cols));
+      rows = Math.max(1, Math.min(termRows, rows));
+    } else if (cols) {
+      cols = Math.max(1, Math.min(termCols, cols));
+      if (pixelWidth && pixelHeight && pixelWidth > 0) {
+        const pixelSpanX = cols * cellWidth;
+        const pixelSpanY = (pixelSpanX / pixelWidth) * pixelHeight;
+        rows = Math.max(1, Math.min(termRows, Math.round(pixelSpanY / cellHeight)));
+      } else {
+        rows = 1;
+      }
+    } else if (rows) {
+      rows = Math.max(1, Math.min(termRows, rows));
+      if (pixelWidth && pixelHeight && pixelHeight > 0) {
+        const pixelSpanY = rows * cellHeight;
+        const pixelSpanX = (pixelSpanY / pixelHeight) * pixelWidth;
+        cols = Math.max(1, Math.min(termCols, Math.round(pixelSpanX / cellWidth)));
+      } else {
+        cols = 1;
+      }
+    } else if (pixelWidth && pixelHeight && pixelWidth > 0 && pixelHeight > 0) {
+      cols = Math.max(1, Math.min(termCols, Math.ceil(pixelWidth / cellWidth)));
+      rows = Math.max(1, Math.min(termRows, Math.ceil(pixelHeight / cellHeight)));
+    } else {
+      cols = 1;
+      rows = 1;
+    }
+
+    return { cols, rows };
+  }
+
+  private inspectDimensionsFromPayload(
+    keys: KittyControlKeys,
+    payload: string
+  ): { width: number; height: number } | null {
+    if (keys.s && keys.v) {
+      return { width: keys.s, height: keys.v };
+    }
+
+    // Try fast PNG IHDR inspection from base64 payload
+    const format = keys.f ?? 32;
+    if ((format === 100 || payload.startsWith('iVBORw0KGgo')) && payload.length >= 32) {
+      try {
+        const binaryHeader = atob(payload.slice(0, 44));
+        if (binaryHeader.length >= 24 && binaryHeader.slice(12, 16) === 'IHDR') {
+          const w =
+            (binaryHeader.charCodeAt(16) << 24) |
+            (binaryHeader.charCodeAt(17) << 16) |
+            (binaryHeader.charCodeAt(18) << 8) |
+            binaryHeader.charCodeAt(19);
+          const h =
+            (binaryHeader.charCodeAt(20) << 24) |
+            (binaryHeader.charCodeAt(21) << 16) |
+            (binaryHeader.charCodeAt(22) << 8) |
+            binaryHeader.charCodeAt(23);
+          if (w > 0 && h > 0) {
+            return { width: w, height: h };
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    return null;
+  }
+
+  private generatePlaceholderSequence(cmd: KittyCommand, textBefore: string): string {
+    const action = cmd.keys.a || 't';
+    if (action !== 'T' && action !== 'p') {
+      return '';
+    }
+
+    // Determine dimensions if possible
+    let pixelDims: { width: number; height: number } | null = null;
+    if (action === 'p' && cmd.keys.i !== undefined) {
+      const cached = this.cache.get(cmd.keys.i);
+      if (cached) {
+        pixelDims = { width: cached.width, height: cached.height };
+      }
+    } else if (action === 'T') {
+      pixelDims = this.inspectDimensionsFromPayload(cmd.keys, cmd.payload);
+    }
+
+    const { cols, rows } = this.computeSpans(cmd.keys, pixelDims?.width, pixelDims?.height);
+    const termCols = this.term.cols || 80;
+
+    // Ensure any preceding writes in xterm's buffer are flushed synchronously before reading cursor
+    this.flushTerminalBuffer();
+
+    // Calculate anchor position taking into account any text preceding the image in the current chunk
+    const { deltaCol, deltaLine } = this.calculateCursorOffset(textBefore);
+    let startCol = this.term.buffer.active.cursorX;
+    let startBufferLine = this.term.buffer.active.baseY + this.term.buffer.active.cursorY;
+
+    if (deltaLine > 0) {
+      startCol = deltaCol % termCols;
+      startBufferLine += deltaLine;
+    } else if (deltaCol > 0) {
+      startCol = (startCol + deltaCol) % termCols;
+    }
+
+    // Store anchor and spans on command object for placeImage
+    cmd.startCol = startCol;
+    cmd.startBufferLine = startBufferLine;
+    cmd.cols = cols;
+    cmd.rows = rows;
+
+    const C = cmd.keys.C ?? 0; // 0=move, 1=do not move
+
+    let seq = '';
+
+    // If C=1, save cursor position (DECSC / xterm adjusts saved cursor on scroll)
+    if (C === 1) {
+      seq += '\x1b[s';
+    }
+
+    // Allocate placeholder cells and linefeeds across rows
+    // Row 0: cols spaces
+    // Rows 1 .. rows-1: \r\n + (if startCol > 0, move cursor to startCol) + cols spaces
+    const spaces = ' '.repeat(cols);
+    for (let r = 0; r < rows; r++) {
+      if (r > 0) {
+        seq += '\r\n';
+        if (startCol > 0) {
+          seq += `\x1b[${startCol}C`;
+        }
+      }
+      seq += spaces;
+    }
+
+    if (C === 1) {
+      // Restore cursor position to start cell (scroll-corrected by xterm)
+      seq += '\x1b[u';
+    } else {
+      // If the final row reaches or exceeds terminal right margin, wrap to next line
+      if (startCol + cols >= termCols) {
+        seq += '\r\n';
+      }
+    }
+
+    return seq;
   }
 
   private async handleCommand(cmd: KittyCommand): Promise<void> {
@@ -143,17 +356,34 @@ export class KittyGraphicsManager {
 
     switch (action) {
       case 'q': {
-        // Handshake query probe (e.g. from fastfetch)
+        // Capability query probe (e.g. from fastfetch)
+        // Protocol specifies that queries MUST receive a response regardless of quiet setting
         const id = cmd.keys.i !== undefined ? cmd.keys.i : 0;
-        this.sendPtyResponse(id, 'OK', cmd.keys.q);
+        this.sendPtyResponse(id, 'OK', cmd.keys.q, true);
         break;
       }
 
       case 't': {
         // Transmit and store in cache
+        const id = cmd.keys.i !== undefined ? cmd.keys.i : this.nextImageId++;
+        let resolveLoad!: () => void;
+        const loadPromise = new Promise<void>((resolve) => {
+          resolveLoad = resolve;
+        });
+        this.loadingImages.set(id, loadPromise);
+
         try {
           const decoded = await this.decoder.decode(cmd.keys, cmd.payload);
-          const id = cmd.keys.i !== undefined ? cmd.keys.i : this.nextImageId++;
+          const isHeight = (cmd.keys.f === 24 || cmd.keys.f === 32) && cmd.keys.s !== undefined;
+          const loopCount = (!isHeight && cmd.keys.v !== undefined) ? cmd.keys.v : 0;
+          const initialFrame: KittyAnimationFrame = {
+            bitmap: decoded.bitmap,
+            width: decoded.width,
+            height: decoded.height,
+            byteSize: decoded.byteSize,
+            delayMs: this.getFrameDelayMs(cmd.keys),
+          };
+
           this.cache.set(id, {
             id,
             bitmap: decoded.bitmap,
@@ -161,20 +391,45 @@ export class KittyGraphicsManager {
             height: decoded.height,
             byteSize: decoded.byteSize,
             lastUsed: Date.now(),
+            frames: [initialFrame],
+            animation: {
+              loopCount,
+              loopsCompleted: 0,
+              currentFrameIndex: 0,
+              isPlaying: false,
+            },
           });
           this.sendPtyResponse(id, 'OK', cmd.keys.q);
         } catch (err: any) {
-          const id = cmd.keys.i !== undefined ? cmd.keys.i : 0;
           this.sendPtyResponse(id, err.message || 'EBADMSG', cmd.keys.q);
+        } finally {
+          resolveLoad();
+          this.loadingImages.delete(id);
         }
         break;
       }
 
       case 'T': {
         // Transmit and display immediately
+        const id = cmd.keys.i !== undefined ? cmd.keys.i : this.nextImageId++;
+        let resolveLoad!: () => void;
+        const loadPromise = new Promise<void>((resolve) => {
+          resolveLoad = resolve;
+        });
+        this.loadingImages.set(id, loadPromise);
+
         try {
           const decoded = await this.decoder.decode(cmd.keys, cmd.payload);
-          const id = cmd.keys.i !== undefined ? cmd.keys.i : this.nextImageId++;
+          const isHeight = (cmd.keys.f === 24 || cmd.keys.f === 32) && cmd.keys.s !== undefined;
+          const loopCount = (!isHeight && cmd.keys.v !== undefined) ? cmd.keys.v : 0;
+          const initialFrame: KittyAnimationFrame = {
+            bitmap: decoded.bitmap,
+            width: decoded.width,
+            height: decoded.height,
+            byteSize: decoded.byteSize,
+            delayMs: this.getFrameDelayMs(cmd.keys),
+          };
+
           this.cache.set(id, {
             id,
             bitmap: decoded.bitmap,
@@ -182,13 +437,31 @@ export class KittyGraphicsManager {
             height: decoded.height,
             byteSize: decoded.byteSize,
             lastUsed: Date.now(),
+            frames: [initialFrame],
+            animation: {
+              loopCount,
+              loopsCompleted: 0,
+              currentFrameIndex: 0,
+              isPlaying: false,
+            },
           });
 
-          this.placeImage(id, cmd.keys, decoded.width, decoded.height);
+          this.placeImage(
+            id,
+            cmd.keys,
+            decoded.width,
+            decoded.height,
+            cmd.startCol,
+            cmd.startBufferLine,
+            cmd.cols,
+            cmd.rows
+          );
           this.sendPtyResponse(id, 'OK', cmd.keys.q);
         } catch (err: any) {
-          const id = cmd.keys.i !== undefined ? cmd.keys.i : 0;
           this.sendPtyResponse(id, err.message || 'EBADMSG', cmd.keys.q);
+        } finally {
+          resolveLoad();
+          this.loadingImages.delete(id);
         }
         break;
       }
@@ -201,13 +474,195 @@ export class KittyGraphicsManager {
           return;
         }
 
+        // If the image is currently being decoded asynchronously, await completion
+        const pendingLoad = this.loadingImages.get(id);
+        if (pendingLoad) {
+          await pendingLoad;
+        }
+
         const cached = this.cache.get(id);
         if (!cached) {
           this.sendPtyResponse(id, 'ENOENT: Image ID not found in cache', cmd.keys.q);
           return;
         }
 
-        this.placeImage(id, cmd.keys, cached.width, cached.height);
+        this.placeImage(
+          id,
+          cmd.keys,
+          cached.width,
+          cached.height,
+          cmd.startCol,
+          cmd.startBufferLine,
+          cmd.cols,
+          cmd.rows
+        );
+        this.sendPtyResponse(id, 'OK', cmd.keys.q);
+        break;
+      }
+
+      case 'f': {
+        // Animation frame transmission
+        const id = cmd.keys.i;
+        if (id === undefined) {
+          this.sendPtyResponse(0, 'ENOENT: Missing image ID for frame', cmd.keys.q);
+          return;
+        }
+
+        let resolveLoad!: () => void;
+        const loadPromise = new Promise<void>((resolve) => {
+          resolveLoad = resolve;
+        });
+        this.loadingImages.set(id, loadPromise);
+
+        try {
+          const decoded = await this.decoder.decode(cmd.keys, cmd.payload);
+          const delayMs = this.getFrameDelayMs(cmd.keys);
+          const isHeight = (cmd.keys.f === 24 || cmd.keys.f === 32) && cmd.keys.s !== undefined;
+          const loopCount = (!isHeight && cmd.keys.v !== undefined) ? cmd.keys.v : 0;
+
+          const newFrame: KittyAnimationFrame = {
+            bitmap: decoded.bitmap,
+            width: decoded.width,
+            height: decoded.height,
+            byteSize: decoded.byteSize,
+            delayMs,
+          };
+
+          const cached = this.cache.get(id);
+          if (cached) {
+            if (!cached.frames) {
+              cached.frames = [{
+                bitmap: cached.bitmap,
+                width: cached.width,
+                height: cached.height,
+                byteSize: cached.byteSize,
+                delayMs: 40,
+              }];
+            }
+            if (!cached.animation) {
+              cached.animation = {
+                loopCount,
+                loopsCompleted: 0,
+                currentFrameIndex: 0,
+                isPlaying: false,
+              };
+            } else if (!isHeight && cmd.keys.v !== undefined) {
+              cached.animation.loopCount = cmd.keys.v;
+            }
+
+            const targetFrameIndex = (cmd.keys.r !== undefined && cmd.keys.r > 0)
+              ? (cmd.keys.r - 1)
+              : cached.frames.length;
+
+            if (targetFrameIndex < cached.frames.length) {
+              const old = cached.frames[targetFrameIndex];
+              if (old.bitmap !== decoded.bitmap) {
+                old.bitmap.close?.();
+              }
+              cached.frames[targetFrameIndex] = newFrame;
+            } else {
+              cached.frames.push(newFrame);
+            }
+
+            cached.lastUsed = Date.now();
+
+            // Auto-start animation if multiple frames exist and not already playing
+            if (cached.frames.length >= 2 && !cached.animation.isPlaying) {
+              this.startAnimation(id);
+            } else {
+              this.render();
+            }
+          } else {
+            this.cache.set(id, {
+              id,
+              bitmap: decoded.bitmap,
+              width: decoded.width,
+              height: decoded.height,
+              byteSize: decoded.byteSize,
+              lastUsed: Date.now(),
+              frames: [newFrame],
+              animation: {
+                loopCount,
+                loopsCompleted: 0,
+                currentFrameIndex: 0,
+                isPlaying: false,
+              },
+            });
+            this.render();
+          }
+
+          this.sendPtyResponse(id, 'OK', cmd.keys.q);
+        } catch (err: any) {
+          this.sendPtyResponse(id, err.message || 'EBADMSG', cmd.keys.q);
+        } finally {
+          resolveLoad();
+          this.loadingImages.delete(id);
+        }
+        break;
+      }
+
+      case 'a': {
+        // Animation control
+        const id = cmd.keys.i;
+        if (id === undefined) {
+          this.sendPtyResponse(0, 'ENOENT: Missing image ID for animation control', cmd.keys.q);
+          return;
+        }
+
+        const cached = this.cache.get(id);
+        if (!cached) {
+          this.sendPtyResponse(id, 'ENOENT: Image not found in cache', cmd.keys.q);
+          return;
+        }
+
+        if (!cached.animation) {
+          cached.animation = {
+            loopCount: 0,
+            loopsCompleted: 0,
+            currentFrameIndex: 0,
+            isPlaying: false,
+          };
+        }
+
+        // Loop count v: default 0 (infinite loop), or explicit loop count
+        if (cmd.keys.v !== undefined) {
+          cached.animation.loopCount = cmd.keys.v;
+          cached.animation.loopsCompleted = 0;
+        }
+
+        // Frame jump: r or c (1-based frame number)
+        const jumpFrame = cmd.keys.r ?? cmd.keys.c;
+        if (jumpFrame !== undefined && cached.frames && cached.frames.length > 0) {
+          const idx = Math.max(0, Math.min(cached.frames.length - 1, jumpFrame - 1));
+          cached.animation.currentFrameIndex = idx;
+          const target = cached.frames[idx];
+          cached.bitmap = target.bitmap;
+          cached.width = target.width;
+          cached.height = target.height;
+          this.render();
+        }
+
+        // Gap/delay update: z
+        if (cmd.keys.z !== undefined && cached.frames) {
+          const delay = Math.max(10, cmd.keys.z);
+          const targetIdx = (jumpFrame !== undefined && jumpFrame >= 1 && jumpFrame <= cached.frames.length)
+            ? jumpFrame - 1
+            : cached.animation.currentFrameIndex;
+          if (cached.frames[targetIdx]) {
+            cached.frames[targetIdx].delayMs = delay;
+          }
+        }
+
+        // State control: s (1=stop, 2=loading, 3=run)
+        const s = cmd.keys.s;
+        if (s === 1) {
+          this.stopAnimation(id);
+        } else if (s === 3 || s === undefined) {
+          if (cached.frames && cached.frames.length >= 2) {
+            this.startAnimation(id);
+          }
+        }
+
         this.sendPtyResponse(id, 'OK', cmd.keys.q);
         break;
       }
@@ -216,10 +671,14 @@ export class KittyGraphicsManager {
         // Delete images / placements
         const target = cmd.keys.d || 'a';
         if (target === 'a') {
+          for (const id of this.cache.keys()) {
+            this.stopAnimation(id);
+          }
           this.placements.clear();
           this.cache.clear();
         } else if (cmd.keys.i !== undefined) {
           const id = cmd.keys.i;
+          this.stopAnimation(id);
           this.cache.delete(id);
           for (const [key, p] of this.placements.entries()) {
             if (p.imageId === id) {
@@ -231,48 +690,133 @@ export class KittyGraphicsManager {
           this.placements.delete(pId);
         }
         this.render();
+        this.sendPtyResponse(cmd.keys.i ?? 0, 'OK', cmd.keys.q);
         break;
       }
     }
+  }
+
+  private getFrameDelayMs(keys: KittyControlKeys): number {
+    return (keys.z !== undefined && keys.z > 0) ? keys.z : 40;
+  }
+
+  private startAnimation(imageId: number): void {
+    if (this.isDisposed) return;
+    const cached = this.cache.get(imageId);
+    if (!cached || !cached.frames || cached.frames.length < 2) return;
+
+    if (!cached.animation) {
+      cached.animation = {
+        loopCount: 0,
+        loopsCompleted: 0,
+        currentFrameIndex: 0,
+        isPlaying: false,
+      };
+    }
+
+    cached.animation.isPlaying = true;
+    this.scheduleNextFrame(imageId);
+  }
+
+  private stopAnimation(imageId: number): void {
+    const cached = this.cache.get(imageId);
+    if (cached?.animation) {
+      if (cached.animation.timer) {
+        clearTimeout(cached.animation.timer);
+        cached.animation.timer = undefined;
+      }
+      cached.animation.isPlaying = false;
+    }
+  }
+
+  private scheduleNextFrame(imageId: number): void {
+    if (this.isDisposed) return;
+    const cached = this.cache.get(imageId);
+    if (!cached || !cached.frames || cached.frames.length < 2 || !cached.animation || !cached.animation.isPlaying) {
+      return;
+    }
+
+    if (cached.animation.timer) {
+      clearTimeout(cached.animation.timer);
+      cached.animation.timer = undefined;
+    }
+
+    const currentFrame = cached.frames[cached.animation.currentFrameIndex];
+    const delay = Math.max(10, currentFrame?.delayMs || 40);
+
+    cached.animation.timer = setTimeout(() => {
+      this.advanceFrame(imageId);
+    }, delay);
+  }
+
+  private advanceFrame(imageId: number): void {
+    if (this.isDisposed) return;
+    const cached = this.cache.get(imageId);
+    if (!cached || !cached.frames || cached.frames.length < 2 || !cached.animation || !cached.animation.isPlaying) {
+      return;
+    }
+
+    const anim = cached.animation;
+    const totalFrames = cached.frames.length;
+    const nextIndex = anim.currentFrameIndex + 1;
+
+    if (nextIndex >= totalFrames) {
+      // Completed one full loop
+      anim.loopsCompleted++;
+
+      if (anim.loopCount > 0 && anim.loopsCompleted >= anim.loopCount) {
+        // Finished designated loop count: stop and freeze on final frame
+        this.stopAnimation(imageId);
+        return;
+      }
+
+      // v == 0 (Infinite loop) or loopsCompleted < loopCount:
+      // Loop back to first frame (frame 1, index 0)
+      anim.currentFrameIndex = 0;
+    } else {
+      anim.currentFrameIndex = nextIndex;
+    }
+
+    // Switch active texture to current frame
+    const activeFrame = cached.frames[anim.currentFrameIndex];
+    cached.bitmap = activeFrame.bitmap;
+    cached.width = activeFrame.width;
+    cached.height = activeFrame.height;
+
+    // Render updated frame
+    this.render();
+
+    // Reschedule timer for subsequent frame (guaranteed to continue loop)
+    this.scheduleNextFrame(imageId);
   }
 
   private placeImage(
     imageId: number,
     keys: KittyControlKeys,
     pixelWidth: number,
-    pixelHeight: number
+    pixelHeight: number,
+    anchorCol?: number,
+    anchorBufferLine?: number,
+    spanCols?: number,
+    spanRows?: number
   ) {
-    const { cols: termCols, rows: termRows } = this.term;
     const { baseY, cursorY, cursorX } = this.term.buffer.active;
 
-    const cellWidth = this.getCellWidth();
-    const cellHeight = this.getCellHeight();
-
-    // Compute column and row spans with safety clamping
-    let cols = keys.c;
-    let rows = keys.r;
-
-    if (cols && rows) {
-      cols = Math.max(1, Math.min(termCols * 2, cols));
-      rows = Math.max(1, Math.min(termRows * 2, rows));
-    } else if (cols) {
-      cols = Math.max(1, Math.min(termCols * 2, cols));
-      const pixelSpanX = cols * cellWidth;
-      const pixelSpanY = (pixelSpanX / pixelWidth) * pixelHeight;
-      rows = Math.max(1, Math.min(termRows * 2, Math.round(pixelSpanY / cellHeight)));
-    } else if (rows) {
-      rows = Math.max(1, Math.min(termRows * 2, rows));
-      const pixelSpanY = rows * cellHeight;
-      const pixelSpanX = (pixelSpanY / pixelHeight) * pixelWidth;
-      cols = Math.max(1, Math.min(termCols * 2, Math.round(pixelSpanX / cellWidth)));
-    } else {
-      cols = Math.max(1, Math.min(termCols * 2, Math.ceil(pixelWidth / cellWidth)));
-      rows = Math.max(1, Math.min(termRows * 2, Math.ceil(pixelHeight / cellHeight)));
-    }
+    // Use pre-computed spans or compute them
+    const { cols, rows } = (spanCols && spanRows)
+      ? { cols: spanCols, rows: spanRows }
+      : this.computeSpans(keys, pixelWidth, pixelHeight);
 
     const placementId = keys.p ? String(keys.p) : `img-${imageId}-${Date.now()}`;
-    const bufferLine = baseY + cursorY;
-    const col = cursorX;
+    const existingPlacement = this.placements.get(placementId);
+
+    // Anchor coordinates: strictly prioritize captured anchor -> existing placement anchor -> current cursor
+    const bufferLine = anchorBufferLine !== undefined
+      ? anchorBufferLine
+      : (existingPlacement ? existingPlacement.bufferLine : (baseY + cursorY));
+    const col = anchorCol !== undefined
+      ? anchorCol
+      : (existingPlacement ? existingPlacement.col : cursorX);
 
     const placement: KittyPlacement = {
       id: placementId,
@@ -287,7 +831,13 @@ export class KittyGraphicsManager {
     };
 
     this.placements.set(placementId, placement);
-    this.render();
+
+    const cached = this.cache.get(imageId);
+    if (cached?.frames && cached.frames.length >= 2 && !cached.animation?.isPlaying) {
+      this.startAnimation(imageId);
+    } else {
+      this.render();
+    }
   }
 
   public render() {
@@ -309,10 +859,19 @@ export class KittyGraphicsManager {
     const viewportY = this.term.buffer.active.viewportY;
     const maxScrollback = this.term.options.scrollback || 10000;
     const oldestAllowedLine = Math.max(0, this.term.buffer.active.baseY - maxScrollback);
+    const termCols = this.term.cols || 80;
+    const termRows = this.term.rows || 24;
+
+    // Approach A: Scissoring / Viewport Clipping Region
+    // Constrains rasterization strictly within terminal viewport dimensions [0..width, 0..height]
+    this.ctx.save();
+    this.ctx.beginPath();
+    this.ctx.rect(0, 0, width, height);
+    this.ctx.clip();
 
     for (const [key, p] of this.placements.entries()) {
-      // Memory pruning: if the image line is scrolled beyond the maximum scrollback buffer, discard placement
-      if (p.bufferLine < oldestAllowedLine) {
+      // Memory pruning: discard placement only when the entire image span has scrolled past max scrollback
+      if (p.bufferLine + p.rows <= oldestAllowedLine) {
         this.placements.delete(key);
         continue;
       }
@@ -320,8 +879,21 @@ export class KittyGraphicsManager {
       // Calculate screen row relative to current viewport
       const screenRow = p.bufferLine - viewportY;
 
-      // Offscreen clipping check: if completely outside visible terminal rows, skip drawing
-      if (screenRow + p.rows < 0 || screenRow > this.term.rows) {
+      const imgColStart = p.col;
+      const imgColEnd = p.col + p.cols;
+      const imgRowStart = screenRow;
+      const imgRowEnd = screenRow + p.rows;
+
+      // 1. AABB Intersection Check:
+      // Verify overlap between image rectangle [imgColStart..imgColEnd, imgRowStart..imgRowEnd]
+      // and viewport visible grid [0..termCols, 0..termRows].
+      // If completely outside (no overlap), cull immediately.
+      if (
+        imgRowEnd <= 0 ||
+        imgRowStart >= termRows ||
+        imgColEnd <= 0 ||
+        imgColStart >= termCols
+      ) {
         continue;
       }
 
@@ -331,17 +903,88 @@ export class KittyGraphicsManager {
         continue;
       }
 
-      const drawX = p.col * cellWidth + p.xOffset;
-      const drawY = screenRow * cellHeight + p.yOffset;
-      const drawW = p.cols * cellWidth;
-      const drawH = p.rows * cellHeight;
+      const padding = this.getTerminalPadding();
+
+      // 2. Continuous Target Geometry in Screen Pixel Space
+      // render_x = padding_left + col * cell_width (+ xOffset)
+      // render_y = padding_top + (row - scroll_offset) * cell_height (+ yOffset)
+      const rawX = padding.left + p.col * cellWidth + p.xOffset;
+      const rawY = padding.top + screenRow * cellHeight + p.yOffset;
+      const rawW = p.cols * cellWidth;
+      const rawH = p.rows * cellHeight;
+
+      if (rawW <= 0 || rawH <= 0) continue;
+
+      // 3. Clamped Destination Rectangle within Viewport [0..width, 0..height]
+      const destX = Math.max(0, Math.min(width, rawX));
+      const destY = Math.max(0, Math.min(height, rawY));
+      const destRight = Math.max(0, Math.min(width, rawX + rawW));
+      const destBottom = Math.max(0, Math.min(height, rawY + rawH));
+
+      const destW = destRight - destX;
+      const destH = destBottom - destY;
+
+      if (destW <= 0 || destH <= 0) continue;
+
+      // 4. Approach B: Texture UV and Vertex Coordinate Offset Calculation
+      // If k rows extend above the viewport (rawY < 0), destY clamps to 0,
+      // producing vertical UV offset v1 = -rawY / rawH = (k * cellHeight) / (rows * cellHeight) = k / rows.
+      const u1 = (destX - rawX) / rawW;
+      const u2 = (destRight - rawX) / rawW;
+      const v1 = (destY - rawY) / rawH;
+      const v2 = (destBottom - rawY) / rawH;
+
+      // Map UV fractions [0..1] to source bitmap pixel coordinates [0..bmpW, 0..bmpH]
+      const bmpW = img.bitmap.width;
+      const bmpH = img.bitmap.height;
+
+      const srcX = Math.max(0, Math.min(bmpW, u1 * bmpW));
+      const srcY = Math.max(0, Math.min(bmpH, v1 * bmpH));
+      const srcRight = Math.max(0, Math.min(bmpW, u2 * bmpW));
+      const srcBottom = Math.max(0, Math.min(bmpH, v2 * bmpH));
+
+      const srcW = srcRight - srcX;
+      const srcH = srcBottom - srcY;
+
+      if (srcW <= 0 || srcH <= 0) continue;
 
       try {
-        this.ctx.drawImage(img.bitmap, drawX, drawY, drawW, drawH);
+        this.ctx.drawImage(
+          img.bitmap,
+          srcX,
+          srcY,
+          srcW,
+          srcH,
+          destX,
+          destY,
+          destW,
+          destH
+        );
       } catch (err) {
-        console.warn('Failed to draw image placement:', err);
+        console.warn('Failed to draw partially clipped image placement:', err);
       }
     }
+
+    this.ctx.restore();
+  }
+
+  private getTerminalPadding(): { left: number; top: number } {
+    if (!this.screenElement) return { left: 0, top: 0 };
+
+    const termEl = (this.screenElement.closest?.('.xterm') || this.screenElement.querySelector?.('.xterm')) as HTMLElement | null;
+    if (termEl && this.canvas && this.canvas.parentElement !== this.screenElement) {
+      const style = window.getComputedStyle(termEl);
+      return {
+        left: parseFloat(style.paddingLeft) || 0,
+        top: parseFloat(style.paddingTop) || 0,
+      };
+    }
+
+    const style = window.getComputedStyle(this.screenElement);
+    return {
+      left: parseFloat(style.paddingLeft) || 0,
+      top: parseFloat(style.paddingTop) || 0,
+    };
   }
 
   private getCellWidth(): number {
@@ -358,9 +1001,13 @@ export class KittyGraphicsManager {
     return 18; // default fallback cell height
   }
 
-  private sendPtyResponse(id: number, message: string, quiet?: number) {
-    if (message === 'OK' && quiet === 1) return;
-    if (message !== 'OK' && quiet === 2) return;
+  private sendPtyResponse(id: number, message: string, quiet?: number, force: boolean = false) {
+    const q = quiet ?? 0;
+    if (!force) {
+      if (q === 0) return; // Default: silent, suppress all responses
+      if (q === 1 && message === 'OK') return; // q=1: errors only, suppress OK
+      // q=2: respond to everything (both OK and errors)
+    }
 
     const resp = id > 0 ? `\x1b_Gi=${id};${message}\x1b\\` : `\x1b_G;${message}\x1b\\`;
     TauriApi.writePty(this.sessionId, resp).catch(() => {
@@ -370,6 +1017,10 @@ export class KittyGraphicsManager {
 
   public dispose() {
     this.isDisposed = true;
+    for (const id of this.cache.keys()) {
+      this.stopAnimation(id);
+    }
+    this.loadingImages.clear();
     for (const d of this.disposables) {
       try {
         d();

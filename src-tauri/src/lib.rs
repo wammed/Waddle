@@ -722,10 +722,17 @@ fn kitty_read_file(
     allowed_dir: Option<String>,
     max_bytes: Option<usize>,
     max_dimension: Option<u32>,
+    is_temp: Option<bool>,
 ) -> Result<kitty::KittyFileData, String> {
     let limit_bytes = max_bytes.unwrap_or(16 * 1024 * 1024);
     let limit_dim = max_dimension.unwrap_or(4096);
-    kitty::read_kitty_file(&path, allowed_dir.as_deref(), limit_bytes, limit_dim)
+    kitty::read_kitty_file(
+        &path,
+        allowed_dir.as_deref(),
+        limit_bytes,
+        limit_dim,
+        is_temp.unwrap_or(false),
+    )
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

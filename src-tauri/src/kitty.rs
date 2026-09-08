@@ -64,6 +64,65 @@ fn is_dangerous_dir(path: &Path) -> bool {
     false
 }
 
+/// Validates whether a file or directory path is located in a sensitive system directory.
+fn is_dangerous_path(path: &Path) -> bool {
+    let s = path.to_string_lossy();
+    let normalized = s.trim_end_matches('/');
+
+    if normalized.is_empty()
+        || normalized == "/"
+        || normalized == "/etc"
+        || normalized.starts_with("/etc/")
+        || normalized == "/usr"
+        || normalized.starts_with("/usr/")
+        || normalized == "/bin"
+        || normalized.starts_with("/bin/")
+        || normalized == "/sbin"
+        || normalized.starts_with("/sbin/")
+        || normalized == "/lib"
+        || normalized.starts_with("/lib/")
+        || normalized == "/lib64"
+        || normalized.starts_with("/lib64/")
+        || normalized == "/dev"
+        || normalized.starts_with("/dev/")
+        || normalized == "/proc"
+        || normalized.starts_with("/proc/")
+        || normalized == "/sys"
+        || normalized.starts_with("/sys/")
+        || normalized == "/root"
+        || normalized.starts_with("/root/")
+        || normalized == "/boot"
+        || normalized.starts_with("/boot/")
+    {
+        return true;
+    }
+
+    if normalized.ends_with("/.ssh")
+        || normalized.ends_with("/.gnupg")
+        || normalized.contains("/.ssh/")
+        || normalized.contains("/.gnupg/")
+    {
+        return true;
+    }
+
+    false
+}
+
+/// Checks whether a canonical path is located inside a system temporary directory.
+fn is_in_temp_dir(path: &Path) -> bool {
+    let mut temp_roots = Vec::new();
+    if let Ok(sys_temp) = fs::canonicalize(std::env::temp_dir()) {
+        temp_roots.push(sys_temp);
+    }
+    if let Ok(tmp) = fs::canonicalize("/tmp") {
+        temp_roots.push(tmp);
+    }
+    if let Ok(var_tmp) = fs::canonicalize("/var/tmp") {
+        temp_roots.push(var_tmp);
+    }
+    temp_roots.iter().any(|root| path.starts_with(root))
+}
+
 /// Inspects image header to detect MIME type and extract image dimensions.
 /// Prevents decompression bombs before images are passed to frontend.
 fn inspect_image_dimensions(data: &[u8]) -> Result<(String, Option<u32>, Option<u32>), String> {
@@ -134,11 +193,13 @@ fn inspect_image_dimensions(data: &[u8]) -> Result<(String, Option<u32>, Option<
 }
 
 /// Reads an image file with strict directory sandboxing and decompression bomb validation.
+/// If `is_temp` is true (Kitty `t=t`), allows system temp directories and immediately unlinks the file after reading.
 pub fn read_kitty_file(
     path: &str,
     allowed_dir: Option<&str>,
     max_bytes: usize,
     max_dimension: u32,
+    is_temp: bool,
 ) -> Result<KittyFileData, String> {
     // 1. Resolve and validate allowed directory
     let raw_allowed = match allowed_dir {
@@ -155,10 +216,19 @@ pub fn read_kitty_file(
         return Err("EACCES: Target directory is restricted by security policy".to_string());
     }
 
-    // 2. Resolve target path relative to allowed directory or absolute
+    // 2. Resolve target path relative to allowed directory or system temp directory
     let raw_target = expand_path(path.trim());
     let target_to_check = if raw_target.is_relative() {
-        canonical_allowed.join(raw_target)
+        if is_temp {
+            let in_temp = std::env::temp_dir().join(&raw_target);
+            if in_temp.exists() {
+                in_temp
+            } else {
+                canonical_allowed.join(&raw_target)
+            }
+        } else {
+            canonical_allowed.join(raw_target)
+        }
     } else {
         raw_target
     };
@@ -167,17 +237,27 @@ pub fn read_kitty_file(
     let canonical_target = fs::canonicalize(&target_to_check)
         .map_err(|e| format!("ENOENT: Cannot resolve file path: {}", e))?;
 
-    // 4. STRICT SANDBOX ENFORCEMENT: canonical target MUST start with canonical allowed dir
-    if !canonical_target.starts_with(&canonical_allowed) {
+    // 4. Strict dangerous system path check
+    if is_dangerous_path(&canonical_target) {
+        return Err("EACCES: Target path is restricted by security policy".to_string());
+    }
+
+    // 5. Sandbox enforcement:
+    // If temporary file (is_temp = true): must be in system temp directory or allowed directory.
+    // If standard file: must be in allowed directory.
+    let in_allowed = canonical_target.starts_with(&canonical_allowed);
+    let in_temp = is_temp && is_in_temp_dir(&canonical_target);
+
+    if !in_allowed && !in_temp {
         return Err("EACCES: Path traversal or symlink escape detected. File is outside the allowed directory.".to_string());
     }
 
-    // 5. Must be a regular file
+    // 6. Must be a regular file
     if !canonical_target.is_file() {
         return Err("ENOENT: Path is not a regular file".to_string());
     }
 
-    // 6. Check file size against max_bytes
+    // 7. Check file size against max_bytes
     let metadata = fs::metadata(&canonical_target)
         .map_err(|e| format!("ENOENT: Failed to read file metadata: {}", e))?;
 
@@ -189,11 +269,17 @@ pub fn read_kitty_file(
         ));
     }
 
-    // 7. Read file contents
+    // 8. Read file contents into memory
     let bytes = fs::read(&canonical_target)
         .map_err(|e| format!("EIO: Failed to read file: {}", e))?;
 
-    // 8. Inspect dimensions to prevent decompression bombs
+    // 9. If temporary file (t=t), automatically delete it immediately after reading to avoid disk leaks
+    if is_temp {
+        fs::remove_file(&canonical_target)
+            .map_err(|e| format!("EIO: Failed to remove temporary file: {}", e))?;
+    }
+
+    // 10. Inspect dimensions to prevent decompression bombs
     let (mime, width, height) = inspect_image_dimensions(&bytes)?;
 
     if let (Some(w), Some(h)) = (width, height) {
@@ -205,7 +291,7 @@ pub fn read_kitty_file(
         }
     }
 
-    // 9. Return Base64 payload with metadata
+    // 11. Return Base64 payload with metadata
     let base64_payload = BASE64_STANDARD.encode(&bytes);
 
     Ok(KittyFileData {
@@ -253,6 +339,7 @@ mod tests {
             Some(dir.to_str().unwrap()),
             1024 * 1024,
             4096,
+            false,
         );
         assert!(res.is_ok(), "Expected valid file read to succeed: {:?}", res);
         let data = res.unwrap();
@@ -279,6 +366,7 @@ mod tests {
             Some(sandbox.to_str().unwrap()),
             1024 * 1024,
             4096,
+            false,
         );
         assert!(res.is_err());
         let err = res.unwrap_err();
@@ -307,6 +395,7 @@ mod tests {
                     Some(sandbox.to_str().unwrap()),
                     1024 * 1024,
                     4096,
+                    false,
                 );
                 assert!(res.is_err(), "Symlink escape outside sandbox must be rejected!");
                 let err = res.unwrap_err();
@@ -320,7 +409,7 @@ mod tests {
 
     #[test]
     fn test_reject_dangerous_allowed_dir() {
-        let res = read_kitty_file("/etc/passwd", Some("/etc"), 1024 * 1024, 4096);
+        let res = read_kitty_file("/etc/passwd", Some("/etc"), 1024 * 1024, 4096, false);
         assert!(res.is_err());
         assert!(res.unwrap_err().contains("EACCES"));
     }
@@ -337,6 +426,7 @@ mod tests {
             Some(dir.to_str().unwrap()),
             10,
             4096,
+            false,
         );
         assert!(res.is_err());
         assert!(res.unwrap_err().contains("EFBIG"));
@@ -356,11 +446,65 @@ mod tests {
             Some(dir.to_str().unwrap()),
             1024 * 1024,
             4096,
+            false,
         );
         assert!(res.is_err());
         let err = res.unwrap_err();
         assert!(err.contains("EBADMSG"), "Expected EBADMSG error: {}", err);
 
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_temp_file_auto_deletion() {
+        let temp_dir = std::env::temp_dir();
+        let file_path = temp_dir.join(format!("waddle_test_temp_autodel_{}.png", std::process::id()));
+        create_dummy_png(&file_path, 80, 80);
+        assert!(file_path.exists(), "Temp test file should exist before read");
+
+        let res = read_kitty_file(
+            file_path.to_str().unwrap(),
+            None,
+            1024 * 1024,
+            4096,
+            true, // is_temp
+        );
+        assert!(res.is_ok(), "Expected temp file read to succeed: {:?}", res);
+        let data = res.unwrap();
+        assert_eq!(data.width, Some(80));
+        assert_eq!(data.height, Some(80));
+
+        // CRITICAL: File must be deleted immediately after reading!
+        assert!(!file_path.exists(), "Temp file MUST be deleted after reading!");
+    }
+
+    #[test]
+    fn test_temp_file_sandbox_rejection() {
+        // Attempting to read a sensitive system file even with is_temp=true must be rejected
+        let res = read_kitty_file("/etc/passwd", None, 1024 * 1024, 4096, true);
+        assert!(res.is_err());
+        let err = res.unwrap_err();
+        assert!(err.contains("EACCES"), "Expected EACCES error: {}", err);
+    }
+
+    #[test]
+    fn test_temp_file_deletion_on_invalid_dimensions() {
+        let temp_dir = std::env::temp_dir();
+        let file_path = temp_dir.join(format!("waddle_test_temp_bomb_{}.png", std::process::id()));
+        create_dummy_png(&file_path, 5000, 5000);
+        assert!(file_path.exists(), "Temp bomb file should exist before read");
+
+        let res = read_kitty_file(
+            file_path.to_str().unwrap(),
+            None,
+            1024 * 1024,
+            4096,
+            true, // is_temp
+        );
+        assert!(res.is_err(), "Expected decompression bomb check to fail");
+        assert!(res.unwrap_err().contains("EBADMSG"));
+
+        // File must still be deleted despite dimension check failure
+        assert!(!file_path.exists(), "Temp file MUST be deleted even if validation fails!");
     }
 }

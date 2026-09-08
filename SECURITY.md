@@ -140,11 +140,12 @@ Executable scripts, shell payloads, or ELF binaries disguised with image extensi
 
 The Kitty Graphics Protocol subsystem is hardened with multiple layers of sandboxing and resource limiters to prevent arbitrary file access, terminal denial-of-service, and GPU memory exhaustion:
 
-### 1. Local File Reference Sandboxing (`t=f`)
-- **Restricted Sandbox Directory**: Local file loading via `t=f` is strictly restricted to **`$HOME/Pictures`** (and its subdirectories) by default.
+### 1. Local & Temporary File Sandboxing (`t=f`, `t=t`)
+- **Restricted Sandbox Directory (`t=f`)**: Local file loading via `t=f` is strictly restricted to **`$HOME/Pictures`** (and its subdirectories) by default.
+- **Temporary File Isolation & Auto-Deletion (`t=t`)**: Temporary file transmission via `t=t` is permitted only within system temp directories (`std::env::temp_dir()`, `/tmp`, `/var/tmp`) and the allowed directory. Files are read into memory and immediately unlinked from disk (`std::fs::remove_file`) before dimension validation, preventing disk exhaustion attacks and temporary file accumulation.
 - **Backend Path Canonicalization**: Enforced exclusively in Rust (`src-tauri/src/kitty.rs`) using `std::fs::canonicalize`.
-- **Symlink & Traversal Escape Prevention**: Path traversal attempts using relative segments (`../`) or symlinks pointing outside the sandbox (such as `~/.ssh`, `/etc`, `/usr`) are strictly rejected with `EACCES` or `ENOENT`.
-- **System Root Protection**: The configuration manager actively disallows selecting system-critical directories (`/`, `/etc`, `/usr`, `/dev`, `/proc`, `/sys`, `~/.ssh`) as the allowed directory.
+- **Symlink & Traversal Escape Prevention**: Path traversal attempts using relative segments (`../`) or symlinks pointing outside the sandbox or into sensitive directories (such as `~/.ssh`, `/etc`, `/usr`, `/root`) are strictly rejected with `EACCES` or `ENOENT`.
+- **System Root Protection**: The configuration manager and backend actively disallow selecting system-critical directories (`/`, `/etc`, `/usr`, `/dev`, `/proc`, `/sys`, `~/.ssh`) as the allowed directory.
 
 ### 2. Decompression Bomb & Resolution Limits
 - **Max Image Dimensions**: Single image resolution is capped at **4096 × 4096 px** by default (configurable between 1024 and 8192 px).
@@ -156,8 +157,16 @@ The Kitty Graphics Protocol subsystem is hardened with multiple layers of sandbo
 - **LRU Eviction**: Oldest textures are automatically evicted when cache limits are reached.
 - **Explicit Memory Reclamation**: On eviction or image deletion (`a=d`), `ImageBitmap.close()` is explicitly invoked to immediately release GPU VRAM and WebKitGTK graphics buffers, preventing memory leaks.
 
-### 4. PTY Stream Isolation
-- APC escape sequences (`\x1b_G...`) are intercepted by a streaming parser before terminal rendering. Cleaned terminal output is delivered to xterm, preventing megabytes of Base64 text from degrading the terminal parser.
+### 4. PTY Stream Isolation & Command Serialization
+- **PTY Stream Separation**: APC escape sequences (`\x1b_G...`) are intercepted by a streaming parser before terminal rendering. Cleaned terminal output is delivered to xterm, preventing megabytes of Base64 text from degrading the terminal parser.
+- **Terminal Shell Escape Protection (`q` Quiet Parameter)**: Adheres strictly to the Kitty quiet protocol. By default (`q=0` or omitted), no ACK/NAK/error responses are sent back to PTY stdin, preventing escape sequence leakage and arbitrary command execution in the shell after client tools terminate.
+- **FIFO Command Serialization & In-Flight Tracking**: Commands are processed sequentially via a FIFO Promise queue, and placement commands (`a=p`) await in-flight decodes (`a=t`), preventing race conditions, cache desynchronization, and state manipulation vulnerabilities.
+
+### 5. Buffer Occupancy Bounds & Cursor Integrity
+- **Cell Dimension Clamping**: Allocated placeholder grid spans (`cols`, `rows`) are bounded against terminal geometries (`cols <= termCols`, `rows <= termRows * 2`). Images requesting excessive dimensions cannot cause out-of-bounds cursor jumps, integer overflow, or runaway line allocation.
+- **Scrollback Buffer Stability**: Grid placeholder cells (`\r\n` and spaces) are driven through standard terminal VT linefeeds without artificial buffer displacement, maintaining stable scrollback indices (`baseY + cursorY`) and preventing screen corruption or desynchronization between canvas overlay rendering and terminal text.
+- **Saved Cursor Isolation (`C=1`)**: When `C=1` is specified, the terminal cursor is protected via standard VT save/restore sequences (`\x1b[s` / `\x1b[u`), preventing runaway cursor positioning and arbitrary screen state corruption across command outputs.
+- **Bounded Viewport Clipping & Zero Out-of-Bounds GPU Calls**: Partial clipping computes clamped destination coordinates (`destX, destY, destW, destH` in `[0..width, 0..height]`) and normalized source UV coordinates (`srcX, srcY, srcW, srcH` in `[0..bitmap.width, 0..bitmap.height]`), backed by 2D canvas hardware scissoring. Never dispatches negative dimensions or out-of-bounds memory buffers to WebKitGTK/Cairo graphics drivers, preventing crashes, driver memory corruption, and rendering anomalies.
 
 ---
 
