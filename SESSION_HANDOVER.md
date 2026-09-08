@@ -128,6 +128,10 @@
     - **セルデータの純粋性**:
       - `isPlaceholderCell` で再利用される共有 `CellData`（`_workCell`）に対する破壊的フラグ代入を排除し、後続通常セルへの誤伝播を解消。
     - **統合テスト・ビルド検証**: `scratch/test_unicode_placeholder.mjs`（全11項目合格、xterm v5 MutableDisposable 構造に対する `_drawForeground` スキップ検証を含む）、Rust 単体テスト 21 件合格、TypeScript/Vite ビルド 0 エラー。
+24. **完成前検証用 包括的テスト計画書 (77項目) の策定**:
+    - 初期から実装されたコア PTY・UI から Kitty Graphics Protocol、多層防御セキュリティガードレールに至る全機能を完成前に検証するための包括的テスト計画を策定。
+    - 9 つのテストスイート（PTY基盤 10項目、タブ・分割 8項目、ファイルツリー・エディタ 8項目、AI連携 6項目、Git連携 8項目、テーマ・UI 6項目、Kitty画像 14項目、セキュリティ 12項目、パフォーマンス 5項目、計 77項目）に分類し、各項目に対してテスト手順・期待される結果・判定基準・自動/手動種別を網羅。
+    - 日英ドキュメント（[`docs/TEST_PLAN.md`](file:///home/susie/GitHUB/wammed/Waddle/docs/TEST_PLAN.md) & [`docs/TEST_PLAN.ja.md`](file:///home/susie/GitHUB/wammed/Waddle/docs/TEST_PLAN.ja.md)）および専用アーティファクトとして体系化。
 
 ---
 
@@ -204,6 +208,7 @@
 | `src/i18n/translations.ts` | 日英多言語辞書（Kitty 画像プロトコル設定文言・説明・警告） |
 | `docs/FEATURES.md` & `.ja.md` | 機能仕様書への第16項「Kitty Graphics Protocol」詳細解説の追加 |
 | `docs/ARCHITECTURE.md` & `.ja.md` | アーキテクチャ図および第5項「Kitty Graphics Subsystem & Pipeline」設計の追加 |
+| `docs/TEST_PLAN.md` & `.ja.md` | 完成前検証用 包括的テスト計画書（全77テストケース・期待結果・検証手順） |
 | `SECURITY.md` & `.ja.md` | セキュリティ仕様書への「Kitty Graphics Protocol Security & Resource Guards」の追加 |
 | `README.md` & `.ja.md` | ルート README への Kitty Graphics Protocol ハイライト追加 |
 
@@ -215,7 +220,7 @@
 # フロントエンドの型検査 & 本番ビルド (Vite + TypeScript) - 警告/エラー0件でビルド完了
 npm run build
 
-# Rust バックエンドの単体テスト (全18件すべてパス、うち Kitty セキュリティテスト6件)
+# Rust バックエンドの単体テスト (全21件すべてパス、うち Kitty セキュリティテスト6件)
 cargo test --manifest-path src-tauri/Cargo.toml
 
 # Rust の Clippy 静的解析 (警告0件)
