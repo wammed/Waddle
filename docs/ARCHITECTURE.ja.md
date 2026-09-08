@@ -194,9 +194,10 @@ Waddle は、高速・堅牢な **Rust バックエンド** と、最新の **Re
 - **LRU テクスチャキャッシュ & GPU VRAM 管理**:
   - キャッシュ総枠を 256 MB (RGBA 4bytes/px 換算) で管理し、超過時は古い画像から退避。
   - WebKitGTK および GPU メモリリークを防止するため、破棄時および削除時 (`a=d`) に必ず明示的に `ImageBitmap.close()` を呼び出し。
-- **レイヤー合成順序**:
+- **レイヤー合成順序 & Canvas レンダラーインターセプト**:
   - `.xterm-screen` 内の最背面（TextRenderLayer の手前）にキャンバスをマウント。
   - 合成順序: **ターミナル背景/壁紙 → Kitty 画像レイヤー → セルテキスト/グリフレイヤー → カーソルレイヤー**。
+  - **Unicode プレースホルダー排他描画パス (`U+10EEEE`)**: xterm v5 の `MutableDisposable` 構造（`_renderer.value`）から真の `CanvasRenderer` を解決し、`TextRenderLayer.prototype._drawForeground` をインターセプト。セル走査ループ内でプレースホルダーテクスチャを直接描画し、フォントグリフ検索・アトラスラスタライズをスキップすることで豆腐文字の発生を完全に抑止。`BaseRenderLayer` や `CursorRenderLayer` との多層防御連携を実現。
 
 ---
 

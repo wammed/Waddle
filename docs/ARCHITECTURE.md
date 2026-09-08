@@ -211,9 +211,9 @@ Waddle is built on a hybrid architecture combining a high-performance **Rust bac
   - Cache size is tracked dynamically (`width * height * 4` bytes).
   - Old textures are evicted when cache exceeds 256 MB.
   - Crucially, `ImageBitmap.close()` is called on eviction or deletion (`a=d`) to immediately free WebKitGTK and GPU memory.
-- **Pipeline Layering Order**:
-  - Inside `.xterm-screen`, the graphics canvas is mounted beneath the text layer.
-  - Layer stack: **Terminal Background / Wallpaper → Kitty Graphics Canvas Layer → Text/Glyphs Layer → Cursor Layer**.
+- **Pipeline Layering Order & Canvas Renderer Intercepts**:
+  - Inside `.xterm-screen`, the graphics canvas is mounted beneath the text layer: **Terminal Background / Wallpaper → Kitty Graphics Canvas Layer → Text/Glyphs Layer → Cursor Layer**.
+  - **Exclusive Unicode Placeholder Pass (`U+10EEEE`)**: Resolves the true `CanvasRenderer` through xterm v5 `MutableDisposable` (`_renderer.value`), hooking `TextRenderLayer.prototype._drawForeground` to render placeholder texture quads directly at exact cell coordinates while skipping standard font glyph lookup and rasterization, completely suppressing missing-glyph "tofu" boxes with multi-layer defense in `BaseRenderLayer` and `CursorRenderLayer`.
 
 ---
 
