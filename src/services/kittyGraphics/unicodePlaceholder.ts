@@ -75,15 +75,17 @@ export const IS_GRAPHIC_PLACEHOLDER = Symbol('IS_GRAPHIC_PLACEHOLDER');
  */
 export function isPlaceholderCell(cell: any): boolean {
   if (!cell) return false;
-  if (cell[IS_GRAPHIC_PLACEHOLDER] === true) return true;
+  if (cell[IS_GRAPHIC_PLACEHOLDER] === true || cell.isGraphicPlaceholder === true) return true;
   const code = typeof cell.getCode === 'function' ? cell.getCode() : 0;
   if (code === PLACEHOLDER_CODEPOINT) {
     cell[IS_GRAPHIC_PLACEHOLDER] = true;
+    cell.isGraphicPlaceholder = true;
     return true;
   }
   const chars = typeof cell.getChars === 'function' ? cell.getChars() : '';
   if (chars && chars.codePointAt(0) === PLACEHOLDER_CODEPOINT) {
     cell[IS_GRAPHIC_PLACEHOLDER] = true;
+    cell.isGraphicPlaceholder = true;
     return true;
   }
   return false;
