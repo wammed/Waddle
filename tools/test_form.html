@@ -1,0 +1,1339 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Waddle 包括的検証テスト入力フォーム (Test Plan Verification Form)</title>
+  <style>
+    :root {
+      --bg-dark: #080c14;
+      --bg-card: rgba(17, 24, 39, 0.85);
+      --bg-card-hover: rgba(30, 41, 59, 0.9);
+      --border-color: rgba(56, 189, 248, 0.2);
+      --border-focus: #00f0ff;
+      --text-main: #f1f5f9;
+      --text-muted: #94a3b8;
+      --accent-cyan: #00f0ff;
+      --accent-glow: rgba(0, 240, 255, 0.4);
+      --accent-green: #10b981;
+      --accent-red: #f43f5e;
+      --accent-amber: #f59e0b;
+      --accent-purple: #a855f7;
+      --font-mono: 'JetBrains Mono', 'Fira Code', Menlo, Monaco, Consolas, monospace;
+      --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      background-image: 
+        radial-gradient(circle at 10% 20%, rgba(0, 240, 255, 0.08) 0%, transparent 40%),
+        radial-gradient(circle at 90% 80%, rgba(168, 85, 247, 0.08) 0%, transparent 40%);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      line-height: 1.5;
+      padding: 24px;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    /* Header */
+    header {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 20px;
+      backdrop-filter: blur(16px);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .header-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-badge {
+      background: linear-gradient(135deg, #00f0ff, #a855f7);
+      color: #080c14;
+      font-weight: 800;
+      font-size: 13px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      letter-spacing: 0.5px;
+    }
+
+    h1 {
+      font-size: 22px;
+      font-weight: 700;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px;
+      padding-top: 16px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .meta-field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .meta-field label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .meta-field input, .meta-field select {
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 8px;
+      color: #fff;
+      padding: 8px 12px;
+      font-size: 14px;
+      font-family: inherit;
+      outline: none;
+      transition: all 0.2s ease;
+    }
+
+    .meta-field input:focus, .meta-field select:focus {
+      border-color: var(--border-focus);
+      box-shadow: 0 0 10px var(--accent-glow);
+    }
+
+    /* Stats Dashboard */
+    .dashboard-bar {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 20px;
+      backdrop-filter: blur(16px);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .stat-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 14px;
+    }
+
+    .stat-card {
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .stat-card.total { border-color: rgba(56, 189, 248, 0.3); }
+    .stat-card.passed { border-color: rgba(16, 185, 129, 0.4); }
+    .stat-card.failed { border-color: rgba(244, 63, 94, 0.4); }
+    .stat-card.skipped { border-color: rgba(245, 158, 11, 0.4); }
+    .stat-card.untested { border-color: rgba(148, 163, 184, 0.3); }
+
+    .stat-val {
+      font-size: 28px;
+      font-weight: 800;
+      font-family: var(--font-mono);
+      line-height: 1;
+      margin-bottom: 6px;
+    }
+
+    .stat-card.total .stat-val { color: var(--accent-cyan); }
+    .stat-card.passed .stat-val { color: var(--accent-green); }
+    .stat-card.failed .stat-val { color: var(--accent-red); }
+    .stat-card.skipped .stat-val { color: var(--accent-amber); }
+    .stat-card.untested .stat-val { color: var(--text-muted); }
+
+    .stat-label {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .progress-track {
+      width: 100%;
+      height: 12px;
+      background: rgba(15, 23, 42, 0.9);
+      border-radius: 999px;
+      overflow: hidden;
+      display: flex;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .progress-fill {
+      height: 100%;
+      transition: width 0.3s ease;
+    }
+
+    .progress-fill.pass { background: var(--accent-green); }
+    .progress-fill.fail { background: var(--accent-red); }
+    .progress-fill.skip { background: var(--accent-amber); }
+    .progress-fill.untested { background: rgba(148, 163, 184, 0.2); }
+
+    /* Action bar */
+    .controls-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .search-box {
+      flex: 1;
+      min-width: 280px;
+      position: relative;
+    }
+
+    .search-box input {
+      width: 100%;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 10px 16px;
+      color: #fff;
+      font-size: 14px;
+      outline: none;
+      transition: all 0.2s ease;
+    }
+
+    .search-box input:focus {
+      border-color: var(--border-focus);
+      box-shadow: 0 0 12px var(--accent-glow);
+    }
+
+    .button-group {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      background: rgba(30, 41, 59, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 8px;
+      color: #fff;
+      padding: 9px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+      user-select: none;
+    }
+
+    .btn:hover {
+      background: rgba(51, 65, 85, 0.95);
+      border-color: var(--border-focus);
+      box-shadow: 0 0 8px var(--accent-glow);
+    }
+
+    .btn.primary {
+      background: linear-gradient(135deg, #00f0ff, #0284c7);
+      color: #080c14;
+      border: none;
+      font-weight: 700;
+    }
+
+    .btn.primary:hover {
+      box-shadow: 0 0 16px var(--accent-glow);
+      filter: brightness(1.1);
+    }
+
+    .btn.danger {
+      background: rgba(244, 63, 94, 0.15);
+      border-color: rgba(244, 63, 94, 0.4);
+      color: #fca5a5;
+    }
+
+    .btn.danger:hover {
+      background: rgba(244, 63, 94, 0.3);
+      border-color: #f43f5e;
+    }
+
+    /* Suite Tabs */
+    .suite-tabs {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      padding-bottom: 8px;
+      margin-bottom: 16px;
+      scrollbar-width: thin;
+    }
+
+    .suite-tab {
+      background: rgba(17, 24, 39, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      color: var(--text-muted);
+      padding: 8px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      white-space: nowrap;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .suite-tab:hover {
+      background: rgba(30, 41, 59, 0.8);
+      color: #fff;
+    }
+
+    .suite-tab.active {
+      background: rgba(0, 240, 255, 0.15);
+      border-color: var(--accent-cyan);
+      color: var(--accent-cyan);
+      box-shadow: 0 0 10px rgba(0, 240, 255, 0.25);
+    }
+
+    .tab-badge {
+      background: rgba(255, 255, 255, 0.1);
+      padding: 2px 6px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-family: var(--font-mono);
+    }
+
+    .suite-tab.active .tab-badge {
+      background: var(--accent-cyan);
+      color: #080c14;
+      font-weight: 700;
+    }
+
+    /* Test Case List */
+    .test-list {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .test-card {
+      background: var(--bg-card);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      backdrop-filter: blur(12px);
+      transition: all 0.2s ease;
+    }
+
+    .test-card:hover {
+      background: var(--bg-card-hover);
+      border-color: rgba(56, 189, 248, 0.3);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    }
+
+    .test-card.status-pass { border-left: 4px solid var(--accent-green); }
+    .test-card.status-fail { border-left: 4px solid var(--accent-red); }
+    .test-card.status-skip { border-left: 4px solid var(--accent-amber); }
+    .test-card.status-untested { border-left: 4px solid rgba(148, 163, 184, 0.4); }
+
+    .card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .card-title-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .tc-id {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-weight: 700;
+      background: rgba(0, 240, 255, 0.12);
+      color: var(--accent-cyan);
+      padding: 4px 8px;
+      border-radius: 6px;
+      border: 1px solid rgba(0, 240, 255, 0.3);
+    }
+
+    .tc-type {
+      font-size: 11px;
+      font-weight: 600;
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text-muted);
+      padding: 3px 8px;
+      border-radius: 999px;
+    }
+
+    .tc-type.automated {
+      background: rgba(168, 85, 247, 0.15);
+      color: #d8b4fe;
+      border: 1px solid rgba(168, 85, 247, 0.3);
+    }
+
+    .tc-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: #fff;
+    }
+
+    .tc-title-en {
+      font-size: 13px;
+      color: var(--text-muted);
+      font-weight: normal;
+    }
+
+    /* Status Buttons */
+    .status-buttons {
+      display: flex;
+      gap: 4px;
+      background: rgba(15, 23, 42, 0.8);
+      padding: 4px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .status-btn {
+      background: transparent;
+      border: none;
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.15s ease;
+    }
+
+    .status-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
+    }
+
+    .status-btn.active-pass {
+      background: var(--accent-green);
+      color: #080c14;
+      font-weight: 700;
+      box-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
+    }
+
+    .status-btn.active-fail {
+      background: var(--accent-red);
+      color: #fff;
+      font-weight: 700;
+      box-shadow: 0 0 10px rgba(244, 63, 94, 0.4);
+    }
+
+    .status-btn.active-skip {
+      background: var(--accent-amber);
+      color: #080c14;
+      font-weight: 700;
+      box-shadow: 0 0 10px rgba(245, 158, 11, 0.4);
+    }
+
+    .status-btn.active-untested {
+      background: rgba(255, 255, 255, 0.2);
+      color: #fff;
+    }
+
+    /* Procedure & Expected Grid */
+    .card-body-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      font-size: 13px;
+      background: rgba(15, 23, 42, 0.5);
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    @media (max-width: 800px) {
+      .card-body-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .grid-col {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .grid-col-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .grid-col-content {
+      color: #e2e8f0;
+    }
+
+    .command-box {
+      margin-top: 6px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #04060a;
+      border: 1px solid rgba(56, 189, 248, 0.2);
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: #38bdf8;
+    }
+
+    .command-text {
+      flex: 1;
+      overflow-x: auto;
+      white-space: nowrap;
+    }
+
+    .btn-copy {
+      background: rgba(255, 255, 255, 0.1);
+      border: none;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background 0.2s ease;
+      white-space: nowrap;
+    }
+
+    .btn-copy:hover {
+      background: var(--accent-cyan);
+      color: #080c14;
+    }
+
+    /* Note Input */
+    .note-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .note-input {
+      flex: 1;
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 6px;
+      color: #fff;
+      padding: 8px 12px;
+      font-size: 13px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.2s ease;
+    }
+
+    .note-input:focus {
+      border-color: var(--border-focus);
+    }
+
+    /* Modal for Markdown preview */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(8px);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+      padding: 20px;
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .modal-box {
+      background: #0f172a;
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      width: 100%;
+      max-width: 900px;
+      max-height: 85vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.7);
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 20px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .modal-body {
+      padding: 20px;
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .modal-textarea {
+      width: 100%;
+      height: 380px;
+      background: #080c14;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 8px;
+      color: #38bdf8;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      padding: 12px;
+      resize: vertical;
+      outline: none;
+    }
+
+    .modal-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      padding: 16px 20px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    /* Toast notification */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: var(--accent-cyan);
+      color: #080c14;
+      font-weight: 700;
+      padding: 12px 20px;
+      border-radius: 8px;
+      box-shadow: 0 4px 20px rgba(0, 240, 255, 0.5);
+      transform: translateY(100px);
+      opacity: 0;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      z-index: 2000;
+    }
+
+    .toast.show {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <!-- Header -->
+    <header>
+      <div class="header-top">
+        <div class="brand">
+          <span class="brand-badge">WADDLE QA</span>
+          <h1>🧪 包括的テスト検証入力フォーム (Test Plan Verification)</h1>
+        </div>
+        <div class="button-group">
+          <button class="btn primary" id="btn-export-md">📋 Markdown レポート出力</button>
+          <button class="btn" id="btn-export-json">💾 JSON 保存</button>
+          <button class="btn" id="btn-import-json">📂 JSON 復元</button>
+          <button class="btn danger" id="btn-reset-all">⚠️ 全リセット</button>
+          <input type="file" id="json-file-input" accept=".json" style="display: none;">
+        </div>
+      </div>
+
+      <div class="meta-grid">
+        <div class="meta-field">
+          <label for="exec-date">検証日 (Execution Date)</label>
+          <input type="date" id="exec-date">
+        </div>
+        <div class="meta-field">
+          <label for="tester-name">テスター (Tester Name)</label>
+          <input type="text" id="tester-name" placeholder="例: Waddle QA Lead">
+        </div>
+        <div class="meta-field">
+          <label for="env-info">検証環境 (Environment)</label>
+          <input type="text" id="env-info" placeholder="例: Linux (Ubuntu 22.04, WebKitGTK 4.1, Node 20, Rust 1.75)">
+        </div>
+        <div class="meta-field">
+          <label for="overall-result">総合判定 (Overall Result)</label>
+          <select id="overall-result">
+            <option value="IN PROGRESS">⏳ 検証中 (IN PROGRESS)</option>
+            <option value="PASS">🟢 合格 (PASS - 全件クリア)</option>
+            <option value="FAIL">🔴 不合格 (FAIL - 課題あり)</option>
+          </select>
+        </div>
+      </div>
+    </header>
+
+    <!-- Dashboard Bar -->
+    <div class="dashboard-bar">
+      <div class="stat-cards">
+        <div class="stat-card total">
+          <span class="stat-val" id="stat-total">80</span>
+          <span class="stat-label">総テスト件数</span>
+        </div>
+        <div class="stat-card passed">
+          <span class="stat-val" id="stat-passed">0</span>
+          <span class="stat-label">合格 (PASS)</span>
+        </div>
+        <div class="stat-card failed">
+          <span class="stat-val" id="stat-failed">0</span>
+          <span class="stat-label">不合格 (FAIL)</span>
+        </div>
+        <div class="stat-card skipped">
+          <span class="stat-val" id="stat-skipped">0</span>
+          <span class="stat-label">保留 / スキップ</span>
+        </div>
+        <div class="stat-card untested">
+          <span class="stat-val" id="stat-untested">80</span>
+          <span class="stat-label">未検証 (PENDING)</span>
+        </div>
+        <div class="stat-card total">
+          <span class="stat-val" id="stat-rate">0%</span>
+          <span class="stat-label">合格率 (Pass Rate)</span>
+        </div>
+      </div>
+
+      <div class="progress-track">
+        <div class="progress-fill pass" id="bar-pass" style="width: 0%;"></div>
+        <div class="progress-fill fail" id="bar-fail" style="width: 0%;"></div>
+        <div class="progress-fill skip" id="bar-skip" style="width: 0%;"></div>
+        <div class="progress-fill untested" id="bar-untested" style="width: 100%;"></div>
+      </div>
+    </div>
+
+    <!-- Controls Bar -->
+    <div class="controls-bar">
+      <div class="search-box">
+        <input type="text" id="search-input" placeholder="🔍 テストID、機能名、検証手順をリアルタイム検索...">
+      </div>
+      <div class="button-group">
+        <button class="btn" id="btn-mark-all-pass">✅ 表示中の全項目を「合格」に設定</button>
+      </div>
+    </div>
+
+    <!-- Suite Tabs -->
+    <div class="suite-tabs" id="suite-tabs">
+      <!-- Generated via JS -->
+    </div>
+
+    <!-- Test List -->
+    <div class="test-list" id="test-list">
+      <!-- Generated via JS -->
+    </div>
+  </div>
+
+  <!-- Markdown Modal -->
+  <div class="modal-overlay" id="md-modal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h2 style="font-size: 16px; color: #fff;">📋 エビデンス記録 Markdown レポートプレビュー</h2>
+        <button class="btn" id="btn-close-modal" style="padding: 4px 8px;">✕</button>
+      </div>
+      <div class="modal-body">
+        <textarea class="modal-textarea" id="md-preview-text" readonly></textarea>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" id="btn-download-md">💾 .md ファイルをダウンロード</button>
+        <button class="btn primary" id="btn-copy-md">📋 クリップボードにコピー</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast">メッセージ</div>
+
+  <!-- Shared Test Data & Logic -->
+  <script>
+    const TEST_SUITES = [
+      { id: 0, nameJa: '全スイート (All Suites)' },
+      { id: 1, nameJa: 'Suite 1: PTY & コアターミナル基盤' },
+      { id: 2, nameJa: 'Suite 2: タブ・10種分割ペイン・セッション永続化' },
+      { id: 3, nameJa: 'Suite 3: ファイルツリー & 簡易エディタ' },
+      { id: 4, nameJa: 'Suite 4: AI アシスタント & プロンプト連携' },
+      { id: 5, nameJa: 'Suite 5: Git 連携 & リモート接続制限' },
+      { id: 6, nameJa: 'Suite 6: テーマ・UI・壁紙・アイコン' },
+      { id: 7, nameJa: 'Suite 7: Kitty Graphics Protocol' },
+      { id: 8, nameJa: 'Suite 8: セキュリティ & 多層防御ガードレール' },
+      { id: 9, nameJa: 'Suite 9: パフォーマンス & リソースリーク耐性' },
+    ];
+
+    const TEST_CASES = [
+      // Suite 1: PTY & Terminal Core (10)
+      { id: 'TC-PTY-01', suiteId: 1, titleJa: '0ms 同期起動ハンドシェイク (start_pty)', titleEn: '0ms Synchronous Startup Handshake', type: 'Manual', procedureJa: 'アプリ起動時および新規タブ作成時の画面表示速度を目視・ログ検証。', expectedJa: 'レースコンディションや初期ブランク画面がなく、Frame 0 でプロンプトや fish_greeting が瞬時に表示される。' },
+      { id: 'TC-PTY-02', suiteId: 1, titleJa: '高スループットストリーミング & 32KB コアレッシング', titleEn: 'High-Throughput Streaming & 32KB Coalescing', type: 'Manual', command: 'yes "Waddle High Speed Output Test 1234567890"', procedureJa: 'ターミナルで `yes "Waddle High Speed Output Test 1234567890"` を実行し、Ctrl+C で停止。', expectedJa: '32KB ごとにコアレッシングされ UI がフリーズせず滑らかに描画される。Ctrl+C で遅延なく即時停止する。' },
+      { id: 'TC-PTY-03', suiteId: 1, titleJa: 'UTF-8 マルチバイト境界処理', titleEn: 'UTF-8 Multibyte Boundary Slicing', type: 'Manual', command: 'python3 -c "print(\'🦀ターミナル🚀日本語テスト\'*500)"', procedureJa: 'python3 -c "print(\'🦀ターミナル🚀日本語テスト\'*500)" を実行。', expectedJa: 'チャンク境界での文字分断による文字化け（）が一切発生せず、日本語・絵文字が正常に描画される。' },
+      { id: 'TC-PTY-04', suiteId: 1, titleJa: 'CanvasAddon ハードウェア描画', titleEn: 'CanvasAddon Hardware Rendering', type: 'Manual', procedureJa: 'レンダラー初期化状態および透過背景上のテキスト描画を確認。', expectedJa: 'WebGL コンパイルブロックなく、CanvasAddon により高速かつ鮮明にフォントがレンダリングされる。' },
+      { id: 'TC-PTY-05', suiteId: 1, titleJa: 'フリッカーフリーなリサイズ & FitAddon', titleEn: 'Flicker-Free Resizing & FitAddon', type: 'Manual', procedureJa: 'ウィンドウの端を素早くドラッグしてサイズ変更を繰り返す。', expectedJa: 'Canvas の不必要な破棄・再生成による黒画面の点滅がなく、瞬時に行・列数が追従して再計算される。' },
+      { id: 'TC-PTY-06', suiteId: 1, titleJa: 'プロセスグループ完全終了 (POSIX)', titleEn: 'Process Group Termination (POSIX killpg)', type: 'Automated / Manual', command: 'sleep 500 &', procedureJa: 'sleep 500 & を実行した状態でタブまたはアプリを閉じる。ps aux | grep sleep で確認。', expectedJa: 'libc::killpg によるシグナル送信でプロセスグループ全体が確実にクリーンアップされ、ゾンビプロセスが残らない。' },
+      { id: 'TC-PTY-07', suiteId: 1, titleJa: 'インターミナル内ログ検索 (Ctrl+F)', titleEn: 'In-Terminal Log Search (Ctrl+F)', type: 'Manual', procedureJa: 'Ctrl+F で検索バーを開き、文字列を入力。Enter / Shift+Enter で前後移動。', expectedJa: 'スクロールバックバッファ内の一致箇所が黄色でハイライトされ、件数（例: 2 / 8）が正確に表示される。' },
+      { id: 'TC-PTY-08', suiteId: 1, titleJa: 'ハイパーリンク自動検出 (WebLinksAddon)', titleEn: 'Clickable Hyperlinks (WebLinksAddon)', type: 'Manual', command: 'echo "https://github.com/wammed/Waddle"', procedureJa: 'https://github.com/wammed/Waddle をターミナルに表示し、Ctrl+Click。', expectedJa: 'マウスホバーで下線が表示され、OS の既定ブラウザで URL が正しく開く。' },
+      { id: 'TC-PTY-09', suiteId: 1, titleJa: 'タイトルバー全リフレッシュ (#btn-refresh-all)', titleEn: 'Titlebar Refresh All (#btn-refresh-all)', type: 'Manual', procedureJa: '複数タブ・ペイン稼働中に #btn-refresh-all を押下。確認ダイアログで実行。', expectedJa: '確認ダイアログが最前面に表示される。実行時、全 PTY が終了され、初期ホームディレクトリの単一ペインに完全リセットされる。' },
+      { id: 'TC-PTY-10', suiteId: 1, titleJa: 'カレントディレクトリ (CWD) 追跡', titleEn: 'Working Directory (CWD) Tracking', type: 'Manual', command: 'cd /var/log && pwd', procedureJa: 'ターミナルで cd /var/log などを実行。', expectedJa: 'タブ名、ファイルツリー、AI コンテキストへの反映ディレクトリが即座に同期される。' },
+
+      // Suite 2: Tabs, Panes & Session (8)
+      { id: 'TC-TAB-01', suiteId: 2, titleJa: 'タブの追加・閉じる・切り替え', titleEn: 'Tab Creation, Closing & Navigation', type: 'Manual', procedureJa: 'Ctrl+T で 5 個のタブを作成し巡回、Ctrl+W でアクティブタブを閉じる。', expectedJa: 'タブごとの独立したセッションが保持され、閉じたタブの PTY のみが安全に破棄される。' },
+      { id: 'TC-TAB-02', suiteId: 2, titleJa: '全 10 種の分割レイアウト切り替え', titleEn: 'All 10 Split Layout Modes', type: 'Manual', procedureJa: '単一、2分割（左右/上下）、3分割（4種）、4分割（3種）をツールバーから順次切り替え。', expectedJa: '全レイアウトでペインの寸法が正確に配分され、全画面で個別にシェル操作が可能。' },
+      { id: 'TC-TAB-03', suiteId: 2, titleJa: '16px 広域当たり判定ディバイダーのリサイズ', titleEn: '16px Wide Split Divider Mouse Resizing', type: 'Manual', procedureJa: 'ペイン境界にマウスを合わせドラッグ（左右・上下）。', expectedJa: '16px の広い判定で確実に掴め、0.15〜0.85 の範囲でフリッカーなくスムーズに比率が変更できる。' },
+      { id: 'TC-TAB-04', suiteId: 2, titleJa: 'キーボード比率リサイズ (Ctrl+Alt+Arrows)', titleEn: 'Keyboard Ratio Adjustment (Ctrl+Alt+Arrows)', type: 'Manual', procedureJa: '分割ペイン内で Ctrl+Alt+Left/Right/Up/Down を押下。', expectedJa: '1 回のキー押下ごとに 5% 刻みで直感的にペインサイズが拡縮する。' },
+      { id: 'TC-TAB-05', suiteId: 2, titleJa: 'ペインスワップ (Ctrl+Shift+S)', titleEn: 'Pane Swapping (Ctrl+Shift+S)', type: 'Manual', procedureJa: '2 分割以上のタブで Ctrl+Shift+S を押下。', expectedJa: '実行中の PTY セッションと内容を保持したまま、ペインの配置位置が瞬時に入れ替わる。' },
+      { id: 'TC-TAB-06', suiteId: 2, titleJa: '分割ペインの個別終了 (Ctrl+Shift+W)', titleEn: 'Individual Pane Termination (Ctrl+Shift+W)', type: 'Manual', procedureJa: '分割ペインのうち 1 つをアクティブにして Ctrl+Shift+W。', expectedJa: '対象ペインの PTY のみが終了し、残りのペインが親領域を均等または前比率で埋める。' },
+      { id: 'TC-TAB-07', suiteId: 2, titleJa: 'セッション自動保存 & 起動時復元', titleEn: 'Session Auto-Save & Startup Restore', type: 'Manual', procedureJa: '複数タブ・3分割レイアウト・異なる CWD の状態でアプリを終了し再起動。', expectedJa: 'localStorage から全タブ、分割構成、比率、CWD が完全に復元され、即時 PTY が再生成される。' },
+      { id: 'TC-TAB-08', suiteId: 2, titleJa: '単一ペイン復帰ショートカット (Alt+1)', titleEn: 'Single Pane Reset Shortcut (Alt+1)', type: 'Manual', procedureJa: '分割レイアウト中に Alt+1 を押下。', expectedJa: '即座にアクティブペインを最大化した単一ペインレイアウトへ復帰する。' },
+
+      // Suite 3: File Tree & Editor (8)
+      { id: 'TC-FILE-01', suiteId: 3, titleJa: 'サイドバー開閉 & ブレッドクラム (Ctrl+B)', titleEn: 'Sidebar Toggle & Breadcrumbs (Ctrl+B)', type: 'Manual', procedureJa: 'Ctrl+B で開閉。上部ブレッドクラムの親フォルダピルをクリック。', expectedJa: 'アニメーション付きで開閉し、ブレッドクラムクリックで目的の階層へ即時ジャンプする。' },
+      { id: 'TC-FILE-02', suiteId: 3, titleJa: '言語別カラーバッジ & アイコン', titleEn: 'Language-Specific Color Badges & Icons', type: 'Manual', procedureJa: 'TS, RS, PY, JSON, MD, SH, CSS, HTML ファイルの表示を確認。', expectedJa: '拡張子に応じた専用色バッジ（例: TS=青, RS=橙）とアイコンが正しく表示される。' },
+      { id: 'TC-FILE-03', suiteId: 3, titleJa: 'ファイルサイズ・要素数バッジ & インデント線', titleEn: 'File Size & Item Count Badges with Indent Guides', type: 'Manual', procedureJa: 'ネストしたフォルダを展開。', expectedJa: 'ファイル行にサイズ（例: 4.2 KB）、フォルダ行に要素数（例: (12)）が表示され、縦ガイド線が揃う。' },
+      { id: 'TC-FILE-04', suiteId: 3, titleJa: '巨大ディレクトリ 500 件制限ガード', titleEn: 'Huge Directory 500-Item Guard', type: 'Manual', procedureJa: '500 件超のファイルを含むフォルダ（node_modules 等）を展開。', expectedJa: 'UI がフリーズせず、最大 500 件で安全に上限表示されスクロール可能である。' },
+      { id: 'TC-FILE-05', suiteId: 3, titleJa: 'コンテキストメニュー & ホバーアクション', titleEn: 'Context Menu & Hover Actions', type: 'Manual', procedureJa: 'ファイルを右クリックして「ターミナルへパス挿入」「OSマネージャーで表示」等を選択。', expectedJa: '端末へのパス入力、OS ファイルマネージャー（Nautilus 等）の起動が正確に動作する。' },
+      { id: 'TC-FILE-06', suiteId: 3, titleJa: '新規作成 & インライン名前変更', titleEn: 'Create File/Folder & Inline Renaming', type: 'Manual', procedureJa: 'ツリー上で新規ファイル作成および名前変更を実行。', expectedJa: 'ディスク上の実ファイルとツリーが同期し、無効な文字や空文字列は弾かれる。' },
+      { id: 'TC-FILE-07', suiteId: 3, titleJa: '簡易エディタの開閉 & 保存 (Ctrl+E, Ctrl+S)', titleEn: 'Embedded Editor Toggle & Save (Ctrl+E, Ctrl+S)', type: 'Manual', procedureJa: 'ファイルをクリックして開き、編集後に Ctrl+S。', expectedJa: 'シンタックスハイライトが表示され、保存時に Rust 経由でディスクに正常反映される。' },
+      { id: 'TC-FILE-08', suiteId: 3, titleJa: 'AI コード編集・リファクタ (Ctrl+Shift+K)', titleEn: 'AI Code Edit & Refactor (Ctrl+Shift+K)', type: 'Manual', procedureJa: 'エディタ内でコードを選択し Ctrl+Shift+K でプロンプトを入力。', expectedJa: '提案差分（Diff）がプレビューされ、適用ボタンでコードが安全に置換される。' },
+
+      // Suite 4: AI & Context Integration (6)
+      { id: 'TC-AI-01', suiteId: 4, titleJa: '自然言語からのコマンド自動生成 (Ctrl+K)', titleEn: 'Natural Language Command Generation (Ctrl+K)', type: 'Manual', procedureJa: 'Ctrl+K で「ポート8080を使用しているプロセスを強制終了」と入力。', expectedJa: 'Ollama 経由で `fuser -k 8080/tcp` 等の適切なコマンドがストリーミング生成される。' },
+      { id: 'TC-AI-02', suiteId: 4, titleJa: 'コンテキスト認識 (CWD, コマンド履歴, Git)', titleEn: 'Context Awareness (CWD, History, Git State)', type: 'Manual', procedureJa: 'Git ブランチ上で「現在の変更を新しいコミットにして」と入力。', expectedJa: 'プロンプトに現在のブランチ・変更状態が正しく注入され、整合したコマンドが生成される。' },
+      { id: 'TC-AI-03', suiteId: 4, titleJa: '会話履歴エクスポート (Markdown / JSON)', titleEn: 'Conversation History Export (Markdown / JSON)', type: 'Manual', procedureJa: 'AI モーダルのエクスポートボタンから .md と .json を保存。', expectedJa: 'WebKitGTK で遮断されず、フォーマット通りのファイルがローカルに保存される。' },
+      { id: 'TC-AI-04', suiteId: 4, titleJa: '64KB メモリバッファガード', titleEn: '64KB Streaming Memory Buffer Guard', type: 'Automated', procedureJa: '改行のない長大な AI ストリーム出力を擬似的に受信させる。', expectedJa: '64KB を超えた時点でバッファが切り詰められ、メモリ枯渇 (DoS) が防止される。' },
+      { id: 'TC-AI-05', suiteId: 4, titleJa: 'リモート Ollama 警告バナー', titleEn: 'Remote Ollama Endpoint Warning Banner', type: 'Manual', procedureJa: '設定でホストを `http://192.168.1.50:11434` に変更。', expectedJa: 'アンバー色の警告バナーが表示され、通信が外部に流出するリスクが通知される。' },
+      { id: 'TC-AI-06', suiteId: 4, titleJa: 'オフライン・未接続時フォールバック', titleEn: 'Offline / Disconnected Graceful Fallback', type: 'Manual', procedureJa: 'Ollama を停止した状態で Ctrl+K を実行。', expectedJa: 'クラッシュせず、「Ollama サーバーに接続できません」と明確な案内が表示される。' },
+
+      // Suite 5: Git Integration & Guardrails (8)
+      { id: 'TC-GIT-01', suiteId: 5, titleJa: 'ステータスバー Git 表示 & ポップオーバー', titleEn: 'Status Bar Git Indicator & Quick Popover', type: 'Manual', procedureJa: '変更のある Git リポジトリでステータスバーのブランチをクリック。', expectedJa: '変更数、Ahead / Behind バッジが点灯し、Git クイックポップオーバーが開く。' },
+      { id: 'TC-GIT-02', suiteId: 5, titleJa: 'GUI 差分ビューワー (Diff Viewer)', titleEn: 'GUI Diff Viewer', type: 'Manual', procedureJa: '変更ファイルを選択して Diff を表示。', expectedJa: '追加行（緑）と削除行（赤）が正確にハイライト表示される。' },
+      { id: 'TC-GIT-03', suiteId: 5, titleJa: 'Conventional Commits 自動生成', titleEn: 'Conventional Commits Auto-Generation', type: 'Manual', procedureJa: '差分がある状態で「AI コミット生成」をクリック。', expectedJa: '`feat(scope): ...` 形式の適切なメッセージが入力欄に自動補完される。' },
+      { id: 'TC-GIT-04', suiteId: 5, titleJa: 'インタラクティブ git push & git pull', titleEn: 'Interactive Git Push & Git Pull', type: 'Manual', procedureJa: 'Ahead / Behind がある状態で Push / Pull ボタンを押下。', expectedJa: 'スピナーが回転し、成功時にトースト通知が表示され、Ahead/Behind 数が 0 に更新される。' },
+      { id: 'TC-GIT-05', suiteId: 5, titleJa: '認証エラーガイダンス (SSH / GitHub CLI)', titleEn: 'Auth Error Guidance (SSH / GitHub CLI)', type: 'Manual', procedureJa: '認証情報のない状態で Push を試行。', expectedJa: 'エラーバナーが表示され、gh auth login や SSH 鍵設定の解決方法が案内される。' },
+      { id: 'TC-GIT-06', suiteId: 5, titleJa: 'GitHub 限定ポリシー (restrict_to_github)', titleEn: 'GitHub-Only Remote Policy (restrict_to_github)', type: 'Automated / Manual', procedureJa: 'リモートが非 GitHub（GitLab 等）のリポジトリで Push/Pull を実行。', expectedJa: '操作が事前遮断され、GitHub 以外のリモートへの送信制限警告が表示される。' },
+      { id: 'TC-GIT-07', suiteId: 5, titleJa: 'Git パストラバーサル防止 (git_discard_file)', titleEn: 'Git Path Traversal Prevention (git_discard_file)', type: 'Automated', procedureJa: '../ を含むパスを指定してファイル破棄を要求。', expectedJa: 'Rust バックエンドでリポジトリ外への脱出が検知され EACCES で拒絶される。' },
+      { id: 'TC-GIT-08', suiteId: 5, titleJa: 'Git 設定トグル & 完全ローカル停止', titleEn: 'Git Settings Toggle & Full Local Stop', type: 'Manual', procedureJa: '設定画面で「Git 連携」を OFF に設定。', expectedJa: 'バックグラウンド Git ポーリングが全停止し、ステータスバーから表示が消える。' },
+
+      // Suite 6: Theming, UI & Wallpapers (6)
+      { id: 'TC-THM-01', suiteId: 6, titleJa: '22 種テーマ切り替え & 発光同期', titleEn: '22 Themes Switching & Glow Sync', type: 'Manual', procedureJa: '設定画面で 11 種の高電圧ネオンテーマを含む各テーマを選択。', expectedJa: '端末色だけでなく、枠線、タブ、ステータスバーの発光色（--accent-rgb）が瞬時に同期。' },
+      { id: 'TC-THM-02', suiteId: 6, titleJa: 'スウォッチリボン & ミニターミナルプレビュー', titleEn: 'Swatch Ribbon & Mini Terminal Preview', type: 'Manual', procedureJa: '設定画面のテーマ選択カードを表示。', expectedJa: 'ANSI 16 色スウォッチリボンとライブプレビューカードが正確に描画される。' },
+      { id: 'TC-THM-03', suiteId: 6, titleJa: 'カスタム壁紙のドラッグ＆ドロップ', titleEn: 'Custom Wallpaper Drag & Drop', type: 'Manual', procedureJa: '画像ファイルを壁紙設定エリアへドラッグ。', expectedJa: '~/.config/waddle/wallpapers/ に保存され、ターミナル背面に即時反映される。' },
+      { id: 'TC-THM-04', suiteId: 6, titleJa: '壁紙不透明度 & ブラー調整スライダー', titleEn: 'Wallpaper Opacity & Blur Sliders', type: 'Manual', procedureJa: '設定のスライダーを左右に動かす。', expectedJa: 'ターミナル背景画像の透明度およびぼかし（すりガラス効果）がリアルタイムに変化。' },
+      { id: 'TC-THM-05', suiteId: 6, titleJa: '壁紙バイナリヘッダー検証 (Magic Bytes)', titleEn: 'Wallpaper Binary Magic Bytes Validation', type: 'Automated / Manual', procedureJa: '.png に偽装したテキストファイルを壁紙に設定。', expectedJa: 'Rust 側のマジックバイト検証により拒否され、エラーが表示される。' },
+      { id: 'TC-THM-06', suiteId: 6, titleJa: 'アプリアイコンの統一性', titleEn: 'Application Icon Uniformity', type: 'Manual', procedureJa: 'デスクトップ環境のランチャー、タイトルバーのアイコンを確認。', expectedJa: 'waddle-matte-icon.svg に基づく高解像度アイコンが正常に表示される。' },
+
+      // Suite 7: Kitty Graphics Protocol (14)
+      { id: 'TC-KITTY-01', suiteId: 7, titleJa: 'APC エスケープシーケンス解析 & 0ms 分離', titleEn: 'APC Escape Parsing & 0ms Stream Separation', type: 'Manual', command: 'fastfetch --logo-type kitty', procedureJa: 'fastfetch --logo-type kitty などの画像出力を実行。', expectedJa: 'Base64 ペイロードが xterm 前に事前分離され、端末がフリーズせずプロンプトが 0ms 表示される。' },
+      { id: 'TC-KITTY-02', suiteId: 7, titleJa: '直接インライン描画 (f=100, f=32, f=24)', titleEn: 'Direct Inline Rendering (f=100, f=32, f=24)', type: 'Scripted / Manual', command: 'npx tsx scratch/test_sub_clipping.mjs', procedureJa: 'PNG, RGBA, RGB の各画像シーケンスを送信。', expectedJa: 'Canvas レイヤー上に歪みなくピクセルパーフェクトに描画される。' },
+      { id: 'TC-KITTY-03', suiteId: 7, titleJa: 'チャンク分割ストリーミング (m=1, m=0)', titleEn: 'Chunked Streaming Transmission (m=1, m=0)', type: 'Scripted', procedureJa: '4096 バイトごとに分割された画像シーケンスを受信。', expectedJa: 'メモリ内で結合され、m=0 で欠損なく単一画像としてデコード・描画される。' },
+      { id: 'TC-KITTY-04', suiteId: 7, titleJa: '即時クエリ応答 (a=q) & 静音モード (q)', titleEn: 'Instant Query Response (a=q) & Quiet Mode (q)', type: 'Scripted / Manual', procedureJa: 'a=q シーケンスを送信。また q=0 と q=2 で表示。', expectedJa: 'a=q に即座に OK 返信。q=0 で一切の不要エスケープ漏洩がなく、q=2 で常時応答。' },
+      { id: 'TC-KITTY-05', suiteId: 7, titleJa: '一時ファイル自動削除 (t=t)', titleEn: 'Temp File Auto-Deletion (t=t)', type: 'Automated', command: 'cargo test --manifest-path src-tauri/Cargo.toml test_temp_file_auto_deletion', procedureJa: '/tmp 配下に画像を書き出し、t=t で表示。', expectedJa: 'メモリデコード直後に Rust 側で remove_file され、ディスクに残骸が残らない。' },
+      { id: 'TC-KITTY-06', suiteId: 7, titleJa: '画像配置後のカーソル前進 (C=0 vs C=1)', titleEn: 'Cursor Advance Control (C=0 vs C=1)', type: 'Scripted', command: 'npx tsx scratch/test_cursor_advance.mjs', procedureJa: 'C=0 および C=1 で画像配置後にテキストを出力。', expectedJa: 'C=0 ではカーソルが画像最下行右端へ移動し直後テキストが下部に表示。C=1 では初期位置保持。' },
+      { id: 'TC-KITTY-07', suiteId: 7, titleJa: '画面最下部での自動改行スクロール', titleEn: 'Bottom-of-Screen Auto-Scroll', type: 'Scripted', procedureJa: '端末最終行付近で複数行を専有する画像を配置。', expectedJa: 'xterm 内部の自動スクロールが働き、画像全体が画面内に確実に収まる。' },
+      { id: 'TC-KITTY-08', suiteId: 7, titleJa: 'ビューポート境界部分描画 (Partial Clipping)', titleEn: 'Partial Viewport Clipping', type: 'Scripted', command: 'npx tsx scratch/test_partial_clipping.mjs', procedureJa: 'ターミナルをスクロールして画像の上端・下端を画面外へ出す。', expectedJa: 'AABB 交差判定と UV 計算により、可視領域のみが滑らかにシザー描画される。' },
+      { id: 'TC-KITTY-09', suiteId: 7, titleJa: 'テクスチャ座標アンカー連動', titleEn: 'Texture Coordinate Anchor Synchronization', type: 'Scripted', command: 'npx tsx scratch/test_anchor_coords.mjs', procedureJa: '同一 PTY チャンク内に先行テキストと画像シーケンスを出力。', expectedJa: '画像が画面左上 (0,0) に誤配置されず、先行テキスト直後のセル位置に正確に配置される。' },
+      { id: 'TC-KITTY-10', suiteId: 7, titleJa: 'アニメーション無限ループ (v=0) & 制御', titleEn: 'Infinite Animation Loop (v=0) & Control', type: 'Scripted', command: 'npx tsx scratch/test_animation_loop.mjs', procedureJa: 'Kitty アニメーション GIF を表示。a=a,s=1 等を発行。', expectedJa: 'デフォルトで無限ループ再生され、停止・再開制御が可能。LRU 退避時にタイマー破棄。' },
+      { id: 'TC-KITTY-11', suiteId: 7, titleJa: 'サブ矩形切り抜き (x, y, w, h)', titleEn: 'Sub-Rectangle Source Clipping (x, y, w, h)', type: 'Scripted', command: 'npx tsx scratch/test_sub_clipping.mjs', procedureJa: 'スプライト画像から一部を切り抜いて表示。', expectedJa: 'x,y,w,h で指定されたピクセル領域のみが正確に拡大縮小されてセル内に描画される。' },
+      { id: 'TC-KITTY-12', suiteId: 7, titleJa: '仮想配置 (U=1)', titleEn: 'Virtual Placement (U=1)', type: 'Scripted', procedureJa: 'U=1 で画像をロード。', expectedJa: 'テキストバッファの空白専有を行わずに仮想配置サイズ・切り抜き情報が保持される。' },
+      { id: 'TC-KITTY-13', suiteId: 7, titleJa: 'Unicode プレースホルダー (U+10EEEE) デコード', titleEn: 'Unicode Placeholder (U+10EEEE) Decoding', type: 'Scripted', command: 'npx tsx scratch/test_unicode_placeholder.mjs', procedureJa: 'U+10EEEE にダイアクリティカルマークや TrueColor 前景色の画像 ID を付与。', expectedJa: '行・列番号および画像 ID がデコードされ、プレースホルダーセルに画像がバインドされる。' },
+      { id: 'TC-KITTY-14', suiteId: 7, titleJa: 'プレースホルダーの未定義グリフ（豆腐・□）排他抑止', titleEn: 'Placeholder Tofu (□) Glyph Suppression', type: 'Scripted / Manual', command: 'npx tsx scratch/test_unicode_placeholder.mjs', procedureJa: 'U+10EEEE を画面に出力し、レンダリング結果を確認。', expectedJa: 'TextRenderLayer._drawForeground で文字描画がスキップされ、画像の上に豆腐が一切重ならない。' },
+
+      // Suite 8: Security & Defense-in-Depth (15)
+      { id: 'TC-SEC-01', suiteId: 8, titleJa: 'システム重要ディレクトリ前方一致保護', titleEn: 'System Directory Prefix Guard', type: 'Automated', command: 'cargo test --manifest-path src-tauri/Cargo.toml test_forbidden_write_prevention', procedureJa: '/etc/passwd, /usr/bin/, /boot/ への書き込み・削除を API 経由で要求。', expectedJa: 'canonical.starts_with により即時拒絶され、EACCES が返る。' },
+      { id: 'TC-SEC-02', suiteId: 8, titleJa: 'ユーザー認証情報 & 秘密鍵保護', titleEn: 'User Credential & Secret Protection', type: 'Automated', command: 'cargo test --manifest-path src-tauri/Cargo.toml test_safe_read_custom_ssh_keys_and_keyrings', procedureJa: '~/.ssh/id_rsa, ~/.ssh/my_deploy_key (任意の秘密鍵), ~/.gnupg/, ~/.local/share/keyrings/ の読み込みを要求。', expectedJa: '既知ファイル名だけでなく ~/.ssh/ 内の秘密鍵全般および keyring が事前バリデーションで弾かれ、config/known_hosts/*.pub のみ安全に閲覧可能。' },
+      { id: 'TC-SEC-03', suiteId: 8, titleJa: 'シェル起動設定ファイル保護', titleEn: 'Shell Profile Protection', type: 'Automated', command: 'cargo test --manifest-path src-tauri/Cargo.toml test_forbidden_write_prevention', procedureJa: '~/.bashrc, ~/.zshrc, ~/.profile の上書き・削除を要求。', expectedJa: '変更が完全に拒絶され、重要設定の改ざんが防止される。' },
+      { id: 'TC-SEC-04', suiteId: 8, titleJa: '単語境界による危険コマンド検知', titleEn: 'Word-Boundary Dangerous Command Interception', type: 'Automated / Manual', command: 'node scratch/test_security_enhancements.mjs', procedureJa: 'rm -rf /, mkfs, mkswap, cryptsetup, dd if=, git reset --hard, git push --force, git push --delete を実行指示。', expectedJa: 'DangerousCommandModal が Rust 側と完全同期して検知し即時実行を保留。format_disk 変数等では誤検知しない。' },
+      { id: 'TC-SEC-05', suiteId: 8, titleJa: 'パイプ経由スクリプト実行の検知', titleEn: 'Piped Script Execution Detection', type: 'Automated / Manual', command: 'cargo test --manifest-path src-tauri/Cargo.toml test_is_command_dangerous_detection', procedureJa: 'curl ... | bash, wget ... | python3, python <(...), bash <(...) を含むコマンドを発行。', expectedJa: '危険パターンとして検知され、警告ダイアログが表示される。' },
+      { id: 'TC-SEC-06', suiteId: 8, titleJa: 'AI プロンプトインジェクション防御', titleEn: 'AI Prompt Injection Defense', type: 'Automated', command: 'cargo test --manifest-path src-tauri/Cargo.toml test_sanitize_untrusted_output', procedureJa: '大文字小文字や空白を含む変形タグ `</ Untrusted_Terminal_Output >` を含む出力を生成し Ctrl+K を起動。', expectedJa: '正規表現 `(?i)</?\\s*untrusted_terminal_output\\s*>` により変形タグも完全に安全除去され、LLM へのプロンプト脱出が阻止される。' },
+      { id: 'TC-SEC-07', suiteId: 8, titleJa: 'Webview Content Security Policy (CSP)', titleEn: 'Webview Content Security Policy (CSP)', type: 'Manual', procedureJa: 'インスペクタコンソールから fetch(\'https://malicious-domain.com\') を実行。', expectedJa: 'CSP の connect-src 違反としてブラウザエンジンにより通信が遮断される。' },
+      { id: 'TC-SEC-08', suiteId: 8, titleJa: 'Tauri Scoped Asset Protocol', titleEn: 'Tauri Scoped Asset Protocol', type: 'Automated', procedureJa: 'asset://localhost/home/user/.ssh/id_rsa を読み込み要求。', expectedJa: 'アセットスコープ制限（$CONFIG/waddle, $PICTURE, $DOWNLOAD）によりアクセス拒絶。' },
+      { id: 'TC-SEC-09', suiteId: 8, titleJa: 'Kitty ローカルファイルサンドボックス', titleEn: 'Kitty Local File Sandbox ($HOME/Pictures)', type: 'Automated', command: 'cargo test --manifest-path src-tauri/Cargo.toml test_reject_path_traversal', procedureJa: 't=f で /etc/shadow や ~/.ssh/ を指定。', expectedJa: 'Rust の canonicalize 検証により EACCES で即時ブロックされる。' },
+      { id: 'TC-SEC-10', suiteId: 8, titleJa: 'Kitty シンボリックリンク脱出防止', titleEn: 'Kitty Symlink Escape Prevention', type: 'Automated', command: 'cargo test --manifest-path src-tauri/Cargo.toml test_reject_symlink_escape', procedureJa: '$HOME/Pictures/link -> /etc のシンボリックリンクを作成し t=f で参照。', expectedJa: '正準化後の実パスが許可ディレクトリ外と判定されアクセス拒絶される。' },
+      { id: 'TC-SEC-11', suiteId: 8, titleJa: 'Kitty 展開爆弾 (Decompression Bomb) 防護', titleEn: 'Kitty Decompression Bomb Defense', type: 'Automated', command: 'cargo test --manifest-path src-tauri/Cargo.toml test_reject_decompression_bomb_dimensions', procedureJa: '4096×4096 px 超過や不正な PNG IHDR / JPEG SOF 画像を送信。', expectedJa: 'メモリ展開前にヘッダー検査で検知され即時破棄される。' },
+      { id: 'TC-SEC-12', suiteId: 8, titleJa: 'Kitty 累積 Base64 ペイロード制限 (16MB)', titleEn: 'Kitty Cumulative Payload Limit (16MB)', type: 'Automated', command: 'node scratch/test_security_enhancements.mjs', procedureJa: '16MB を超える Base64 データを連続送信。', expectedJa: '上限超過時点でバッファが破棄され、メモリ DoS が阻止される。' },
+      { id: 'TC-SEC-13', suiteId: 8, titleJa: 'GitHub リモートホスト厳格検証 & サブドメイン偽装防御', titleEn: 'Strict GitHub Host Validation & Anti-Spoofing', type: 'Automated', command: 'cargo test --manifest-path src-tauri/Cargo.toml test_is_github_host_strict_domain_validation', procedureJa: 'attacker.com/user/github.com.git や github.com.attacker.com をリモートに設定し操作。', expectedJa: 'is_github_host による厳格なホスト正規化により偽装 URL が即座に拒絶され、不正リモートへのアクセスが遮断される。' },
+      { id: 'TC-SEC-14', suiteId: 8, titleJa: 'Kitty APC 未終端ストリームのメモリ上限防御', titleEn: 'Kitty APC Unfinished Stream Memory Buffer Cap', type: 'Automated', command: 'node scratch/test_security_enhancements.mjs', procedureJa: '終端文字（\\x1b\\ または \\x07）を含まない 16MB 超の未完成 APC グラフィックシーケンスを連続送信。', expectedJa: 'KittyApcParser の上限検査により 16MB 超過時にバッファが通常テキストとしてフラッシュ・リセットされ、メモリ枯渇 (DoS) が防止される。' },
+      { id: 'TC-SEC-15', suiteId: 8, titleJa: 'Kitty 一時ファイル (t=t) 超過時の自動削除・痕跡ゼロ化', titleEn: 'Kitty Temp File (t=t) Auto-Deletion on EFBIG', type: 'Automated', command: 'cargo test --manifest-path src-tauri/Cargo.toml test_temp_file_deletion_on_efbig', procedureJa: '100MB 超の巨大ファイルを t=t（一時ファイルフラグ）で指定して読み込み要求。', expectedJa: 'read_kitty_file が EFBIG エラー返却直前に一時ファイルをディスクから即時強制削除し、残留ファイルリークが発生しない。' },
+
+      // Suite 9: Performance & Resource Guards (5)
+      { id: 'TC-PERF-01', suiteId: 9, titleJa: 'GPU VRAM / 256MB LRU & bitmap.close()', titleEn: 'GPU VRAM / 256MB LRU & bitmap.close()', type: 'Automated / Manual', procedureJa: '合計 500MB 超の画像を連続表示しメモリを監視。', expectedJa: '256MB 超過時に古い画像が追い出され、ImageBitmap.close() によりメモリが解放される。' },
+      { id: 'TC-PERF-02', suiteId: 9, titleJa: 'PTY キー入力 0ms レイテンシ', titleEn: '0ms PTY Keystroke Latency', type: 'Manual', procedureJa: '高速タイピングおよびキーストローク計測を実施。', expectedJa: '入力遅延やフレーム落ちがなく、キーボード入力が即座に画面に反映される。' },
+      { id: 'TC-PERF-03', suiteId: 9, titleJa: '長時間セッションのメモリ安定性', titleEn: 'Long-Session Memory Stability', type: 'Manual', procedureJa: 'アプリを起動し、複数タブでスクロール・画像描画・Git 操作を継続。', expectedJa: 'メモリ使用量が一定範囲内に収まり、タイマーやリスナーの蓄積リークがない。' },
+      { id: 'TC-PERF-04', suiteId: 9, titleJa: 'アイドル時の CPU 消費電力 (0%)', titleEn: 'Idle CPU Consumption (0.0%)', type: 'Manual', procedureJa: 'ターミナルが無操作状態の際の CPU 使用率を top 等で監視。', expectedJa: '不要な常時ポーリングが存在せず、CPU 使用率が 0.0%〜0.1% で静止する。' },
+      { id: 'TC-PERF-05', suiteId: 9, titleJa: '静的解析 & 自動単体テスト全パス', titleEn: 'Automated Tests & Static Lints All Pass', type: 'Automated', command: 'cargo test --manifest-path src-tauri/Cargo.toml && cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets && npm run build', procedureJa: 'cargo test, cargo clippy --all-targets, npm run build を実行。', expectedJa: 'テスト全 24 件パス、Clippy 警告 0 件、TypeScript 型エラー 0 件で完了する。' },
+    ];
+
+    // State Management
+    const STORAGE_KEY = 'waddle_test_plan_results_v1';
+    let currentSuiteFilter = 0;
+    let currentStatusFilter = 'all';
+    let currentSearch = '';
+
+    let state = {
+      date: new Date().toISOString().split('T')[0],
+      tester: 'Waddle Quality Assurance Team',
+      environment: `Linux (${navigator.platform || 'x86_64'}, WebKitGTK / Webview, Node.js >= 20, Rust >= 1.75)`,
+      overallResult: 'IN PROGRESS',
+      results: {}
+    };
+
+    // Load from LocalStorage
+    function loadState() {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          state = { ...state, ...parsed };
+        }
+      } catch (e) {
+        console.error('Failed to load state from localStorage:', e);
+      }
+    }
+
+    function saveState() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      } catch (e) {
+        console.error('Failed to save state to localStorage:', e);
+      }
+      updateStats();
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      toast.textContent = msg;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 2500);
+    }
+
+    function copyToClipboard(text, successMsg = 'クリップボードにコピーしました！') {
+      navigator.clipboard.writeText(text).then(() => {
+        showToast(successMsg);
+      }).catch(() => {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        showToast(successMsg);
+      });
+    }
+
+    // Compute Stats
+    function updateStats() {
+      const total = TEST_CASES.length;
+      let passed = 0;
+      let failed = 0;
+      let skipped = 0;
+
+      for (const tc of TEST_CASES) {
+        const res = state.results[tc.id]?.status;
+        if (res === 'pass') passed++;
+        else if (res === 'fail') failed++;
+        else if (res === 'skip') skipped++;
+      }
+
+      const untested = total - (passed + failed + skipped);
+      const rate = total > 0 ? Math.round((passed / total) * 100) : 0;
+
+      document.getElementById('stat-total').textContent = total;
+      document.getElementById('stat-passed').textContent = passed;
+      document.getElementById('stat-failed').textContent = failed;
+      document.getElementById('stat-skipped').textContent = skipped;
+      document.getElementById('stat-untested').textContent = untested;
+      document.getElementById('stat-rate').textContent = `${rate}%`;
+
+      document.getElementById('bar-pass').style.width = `${(passed / total) * 100}%`;
+      document.getElementById('bar-fail').style.width = `${(failed / total) * 100}%`;
+      document.getElementById('bar-skip').style.width = `${(skipped / total) * 100}%`;
+      document.getElementById('bar-untested').style.width = `${(untested / total) * 100}%`;
+
+      // Auto update overall status if not manually locked
+      const overallSelect = document.getElementById('overall-result');
+      if (failed > 0) {
+        state.overallResult = 'FAIL';
+      } else if (passed === total) {
+        state.overallResult = 'PASS';
+      } else {
+        state.overallResult = 'IN PROGRESS';
+      }
+      overallSelect.value = state.overallResult;
+
+      // Update suite tab badges
+      document.querySelectorAll('.suite-tab').forEach(tab => {
+        const sId = parseInt(tab.dataset.suiteId, 10);
+        const count = sId === 0 ? total : TEST_CASES.filter(c => c.suiteId === sId).length;
+        const pCount = sId === 0 ? passed : TEST_CASES.filter(c => c.suiteId === sId && state.results[c.id]?.status === 'pass').length;
+        const badge = tab.querySelector('.tab-badge');
+        if (badge) {
+          badge.textContent = `${pCount}/${count}`;
+        }
+      });
+    }
+
+    // Render Suite Tabs
+    function renderSuiteTabs() {
+      const container = document.getElementById('suite-tabs');
+      container.innerHTML = '';
+
+      TEST_SUITES.forEach(s => {
+        const tab = document.createElement('div');
+        tab.className = `suite-tab ${s.id === currentSuiteFilter ? 'active' : ''}`;
+        tab.dataset.suiteId = s.id;
+        tab.innerHTML = `<span>${s.nameJa}</span> <span class="tab-badge">0/0</span>`;
+        tab.addEventListener('click', () => {
+          currentSuiteFilter = s.id;
+          document.querySelectorAll('.suite-tab').forEach(t => t.classList.remove('active'));
+          tab.classList.add('active');
+          renderTestList();
+        });
+        container.appendChild(tab);
+      });
+    }
+
+    // Render Test Cards
+    function renderTestList() {
+      const container = document.getElementById('test-list');
+      container.innerHTML = '';
+
+      const searchLower = currentSearch.toLowerCase().trim();
+
+      const filtered = TEST_CASES.filter(tc => {
+        if (currentSuiteFilter !== 0 && tc.suiteId !== currentSuiteFilter) return false;
+        const status = state.results[tc.id]?.status || 'untested';
+        if (currentStatusFilter !== 'all' && status !== currentStatusFilter) return false;
+
+        if (searchLower) {
+          const matchId = tc.id.toLowerCase().includes(searchLower);
+          const matchTitle = tc.titleJa.toLowerCase().includes(searchLower) || tc.titleEn.toLowerCase().includes(searchLower);
+          const matchProc = tc.procedureJa.toLowerCase().includes(searchLower);
+          const matchExp = tc.expectedJa.toLowerCase().includes(searchLower);
+          return matchId || matchTitle || matchProc || matchExp;
+        }
+        return true;
+      });
+
+      if (filtered.length === 0) {
+        container.innerHTML = `
+          <div style="text-align: center; padding: 48px; color: var(--text-muted); background: var(--bg-card); border-radius: 12px;">
+            条件に一致するテストケースが見つかりませんでした。
+          </div>
+        `;
+        return;
+      }
+
+      filtered.forEach(tc => {
+        const res = state.results[tc.id] || { status: 'untested', note: '' };
+        const statusClass = `status-${res.status}`;
+
+        const card = document.createElement('div');
+        card.className = `test-card ${statusClass}`;
+        card.id = `card-${tc.id}`;
+
+        const isAuto = tc.type.includes('Automated') || tc.type.includes('Scripted');
+
+        card.innerHTML = `
+          <div class="card-top">
+            <div class="card-title-group">
+              <span class="tc-id">${tc.id}</span>
+              <span class="tc-type ${isAuto ? 'automated' : ''}">${tc.type}</span>
+              <span class="tc-title">${tc.titleJa}</span>
+              <span class="tc-title-en">(${tc.titleEn})</span>
+            </div>
+            <div class="status-buttons">
+              <button class="status-btn ${res.status === 'pass' ? 'active-pass' : ''}" data-status="pass">🟢 合格</button>
+              <button class="status-btn ${res.status === 'fail' ? 'active-fail' : ''}" data-status="fail">🔴 不合格</button>
+              <button class="status-btn ${res.status === 'skip' ? 'active-skip' : ''}" data-status="skip">🟡 保留</button>
+              <button class="status-btn ${res.status === 'untested' ? 'active-untested' : ''}" data-status="untested">⚪ 未検証</button>
+            </div>
+          </div>
+
+          <div class="card-body-grid">
+            <div class="grid-col">
+              <span class="grid-col-label">検証手順 (Procedure)</span>
+              <div class="grid-col-content">${tc.procedureJa}</div>
+              ${tc.command ? `
+                <div class="command-box">
+                  <span class="command-text">${tc.command}</span>
+                  <button class="btn-copy" data-copy="${encodeURIComponent(tc.command)}">📋 コピー</button>
+                </div>
+              ` : ''}
+            </div>
+            <div class="grid-col">
+              <span class="grid-col-label">期待される結果 (Expected)</span>
+              <div class="grid-col-content">${tc.expectedJa}</div>
+            </div>
+          </div>
+
+          <div class="note-row">
+            <input type="text" class="note-input" placeholder="エビデンスメモ・特記事項・ログ (任意)..." value="${(res.note || '').replace(/"/g, '&quot;')}">
+          </div>
+        `;
+
+        // Event listeners for status buttons
+        card.querySelectorAll('.status-btn').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const newStatus = btn.dataset.status;
+            if (!state.results[tc.id]) state.results[tc.id] = { status: 'untested', note: '' };
+            state.results[tc.id].status = newStatus;
+            saveState();
+            renderTestList();
+          });
+        });
+
+        // Event listener for note input
+        const noteInput = card.querySelector('.note-input');
+        noteInput.addEventListener('input', (e) => {
+          if (!state.results[tc.id]) state.results[tc.id] = { status: 'untested', note: '' };
+          state.results[tc.id].note = e.target.value;
+          saveState();
+        });
+
+        // Copy button
+        const copyBtn = card.querySelector('.btn-copy');
+        if (copyBtn) {
+          copyBtn.addEventListener('click', () => {
+            const cmd = decodeURIComponent(copyBtn.dataset.copy);
+            copyToClipboard(cmd, `コマンドをコピーしました: ${cmd}`);
+          });
+        }
+
+        container.appendChild(card);
+      });
+    }
+
+    // Generate Markdown Report
+    function generateMarkdown() {
+      const totalCases = TEST_CASES.length;
+      let passed = 0;
+      let failed = 0;
+      let skipped = 0;
+
+      for (const tc of TEST_CASES) {
+        const res = state.results[tc.id]?.status;
+        if (res === 'pass') passed++;
+        else if (res === 'fail') failed++;
+        else if (res === 'skip') skipped++;
+      }
+      const untested = totalCases - (passed + failed + skipped);
+
+      const suiteRows = TEST_SUITES.filter(s => s.id > 0).map(suite => {
+        const cases = TEST_CASES.filter(c => c.suiteId === suite.id);
+        const pCount = cases.filter(c => state.results[c.id]?.status === 'pass').length;
+        const fCount = cases.filter(c => state.results[c.id]?.status === 'fail').length;
+        const notes = fCount > 0 ? `${fCount} 件の不合格あり` : '全項目合格確認済';
+        return `| ${suite.nameJa} | ${cases.length} | ${pCount} | ${fCount} | ${notes} |`;
+      }).join('\n');
+
+      let md = `### テスト実行記録 (Test Execution Evidence)
+- **実行日**: ${state.date}
+- **テスター**: ${state.tester || 'Waddle Quality Assurance Team'}
+- **環境**: ${state.environment}
+- **総合判定**: **[${state.overallResult}]** (合格: ${passed} / 不合格: ${failed} / 保留・スキップ: ${skipped} / 未検証: ${untested})
+
+| スイート | 項目数 | 合格数 | 不合格数 | 備考 |
+| :--- | :--- | :--- | :--- | :--- |
+${suiteRows}
+
+### 詳細エビデンス & 特記事項
+
+| ID | テスト対象 | 判定 | 種別 | エビデンス・特記事項 |
+| :--- | :--- | :--- | :--- | :--- |
+`;
+
+      const activeCases = TEST_CASES.filter(tc => {
+        const r = state.results[tc.id];
+        return r && (r.status === 'pass' || r.status === 'fail' || (r.note && r.note.trim().length > 0));
+      });
+
+      if (activeCases.length > 0) {
+        for (const tc of activeCases) {
+          const res = state.results[tc.id];
+          const icon = res.status === 'pass' ? '🟢 PASS' : res.status === 'fail' ? '🔴 FAIL' : res.status === 'skip' ? '🟡 SKIP' : '⚪ PENDING';
+          const safeNote = (res.note || '').replace(/\|/g, '\\|').replace(/\n/g, '<br/>') || '-';
+          md += `| **${tc.id}** | ${tc.titleJa} | ${icon} | ${tc.type} | ${safeNote} |\n`;
+        }
+      } else {
+        md += `_特記事項なし_\n`;
+      }
+
+      return md;
+    }
+
+    // Initialization
+    window.addEventListener('DOMContentLoaded', () => {
+      loadState();
+
+      // Bind Meta
+      const dateEl = document.getElementById('exec-date');
+      const testerEl = document.getElementById('tester-name');
+      const envEl = document.getElementById('env-info');
+      const overallEl = document.getElementById('overall-result');
+
+      dateEl.value = state.date;
+      testerEl.value = state.tester;
+      envEl.value = state.environment;
+      overallEl.value = state.overallResult;
+
+      dateEl.addEventListener('change', (e) => { state.date = e.target.value; saveState(); });
+      testerEl.addEventListener('input', (e) => { state.tester = e.target.value; saveState(); });
+      envEl.addEventListener('input', (e) => { state.environment = e.target.value; saveState(); });
+      overallEl.addEventListener('change', (e) => { state.overallResult = e.target.value; saveState(); });
+
+      // Search
+      document.getElementById('search-input').addEventListener('input', (e) => {
+        currentSearch = e.target.value;
+        renderTestList();
+      });
+
+      // Mark all filtered pass
+      document.getElementById('btn-mark-all-pass').addEventListener('click', () => {
+        const searchLower = currentSearch.toLowerCase().trim();
+        TEST_CASES.forEach(tc => {
+          if (currentSuiteFilter !== 0 && tc.suiteId !== currentSuiteFilter) return;
+          if (searchLower) {
+            const match = tc.id.toLowerCase().includes(searchLower) || tc.titleJa.toLowerCase().includes(searchLower);
+            if (!match) return;
+          }
+          if (!state.results[tc.id]) state.results[tc.id] = { status: 'untested', note: '' };
+          state.results[tc.id].status = 'pass';
+        });
+        saveState();
+        renderTestList();
+        showToast('表示中の全項目を「合格」に更新しました');
+      });
+
+      // Reset all
+      document.getElementById('btn-reset-all').addEventListener('click', () => {
+        if (confirm('すべてのテスト判定とメモを初期化（リセット）しますか？')) {
+          state.results = {};
+          saveState();
+          renderTestList();
+          showToast('全テスト結果をリセットしました');
+        }
+      });
+
+      // Export Markdown Modal
+      const mdModal = document.getElementById('md-modal');
+      const mdPreview = document.getElementById('md-preview-text');
+
+      document.getElementById('btn-export-md').addEventListener('click', () => {
+        mdPreview.value = generateMarkdown();
+        mdModal.classList.add('active');
+      });
+
+      document.getElementById('btn-close-modal').addEventListener('click', () => {
+        mdModal.classList.remove('active');
+      });
+
+      document.getElementById('btn-copy-md').addEventListener('click', () => {
+        copyToClipboard(mdPreview.value, 'Markdown レポートをクリップボードにコピーしました！');
+      });
+
+      document.getElementById('btn-download-md').addEventListener('click', () => {
+        const blob = new Blob([mdPreview.value], { type: 'text/markdown;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `WADDLE_TEST_REPORT_${state.date}.md`;
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast('Markdown レポートをダウンロードしました');
+      });
+
+      // JSON Export & Import
+      document.getElementById('btn-export-json').addEventListener('click', () => {
+        const jsonStr = JSON.stringify(state, null, 2);
+        const blob = new Blob([jsonStr], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `waddle_test_results_${state.date}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast('JSON データを保存しました');
+      });
+
+      const fileInput = document.getElementById('json-file-input');
+      document.getElementById('btn-import-json').addEventListener('click', () => {
+        fileInput.click();
+      });
+
+      fileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          try {
+            const parsed = JSON.parse(event.target.result);
+            state = { ...state, ...parsed };
+            saveState();
+            dateEl.value = state.date;
+            testerEl.value = state.tester;
+            envEl.value = state.environment;
+            overallEl.value = state.overallResult;
+            renderTestList();
+            showToast('JSON データを正常に復元しました！');
+          } catch (err) {
+            alert('JSON ファイルの読み込みに失敗しました: ' + err.message);
+          }
+        };
+        reader.readAsText(file);
+      });
+
+      renderSuiteTabs();
+      renderTestList();
+      updateStats();
+    });
+  </script>
+</body>
+</html>

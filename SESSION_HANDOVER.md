@@ -140,6 +140,12 @@
     - **秘密鍵・システムキーリング読取保護のスコープ拡充**: `validate_safe_read` において、`~/.ssh/` 配下の全秘密鍵（カスタム名含む）の直接読み出しを遮断（`config`, `known_hosts`, `authorized_keys`, `*.pub` のみ閲覧許可）。さらに `~/.local/share/keyrings/` の読み出しを完全遮断。
     - **AI プロンプトインジェクションの正規表現サニタイズ**: `sanitize_untrusted_output` において、大文字混在（`</UNTRUSTED_TERMINAL_OUTPUT>`）や空白混入（`</ untrusted_terminal_output >`）によるタグ脱出を正規表現 `(?i)</?\s*untrusted_terminal_output\s*>` で完全に無力化。
     - **単体テスト & ビルド検証**: Rust テスト 24 件全パス（+3件新規テスト追加）、TypeScript/Vite ビルド 0 エラー、Clippy 警告 0 件。
+26. **包括的テスト検証入力フォームの実装（スタンドアロン HTML ツール & Waddle アプリ内モーダル）**:
+    - ユーザー要望「テストの入力フォームを作って」に基づき、`docs/TEST_PLAN.ja.md` および `docs/TEST_PLAN.md` の全 80 項目（Suite 1〜9）を網羅するテスト入力フォームを 2 つの形態で実装。
+    - **スタンドアロン HTML ツール (`tools/test_form.html`)**: 外部サーバーやネットワーク接続不要で、ブラウザから直接開ける単一完結型 Web フォーム。全 80 項目の合否判定（PASS/FAIL/SKIP/PENDING）、エビデンスメモ入力、動的統計ダッシュボード（合格率・プログレスバー）、スイート/ステータス別フィルタ、全文検索、コマンドコピー、`localStorage` 自動保存、Markdown レポート（Section 5 準拠）および JSON のエクスポート・インポートを完備。
+    - **Waddle デスクトップ組み込みモーダル (`src/components/TestPlanModal.tsx`)**: タイトルバー右側のクイックボタン（`#btn-test-plan`）からワンクリックで呼び出せるサイバーパンク/ネオン調のフル機能検証モーダル。アプリを操作しながらリアルタイムに検証結果を記録可能。
+    - **共有テストデータ (`src/data/testPlanData.ts`)**: 全 80 テストケースの型定義・データセット・Markdown レポート生成ロジックを集約。
+    - **ビルド・検証**: `npm run build`（型エラー0件）、`cargo test`（24件全パス）、`cargo clippy`（警告0件）。
 
 ---
 
@@ -213,7 +219,10 @@
 | `src/services/kittyGraphics/manager.ts` | Kitty Graphics マネージャー（Canvasマウント、スクロール連動、クエリ即時応答、配置管理） |
 | `src/components/SingleTerminalView.tsx` | PTY ストリームの APC インターセプト、Canvas オーバーレイ統合、ライフサイクル管理 |
 | `src/components/SettingsModal.tsx` | Kitty Graphics 設定セクション（トグル、最大寸法、ペイロード、キャッシュ、許可パス、危険パス警告） |
-| `src/i18n/translations.ts` | 日英多言語辞書（Kitty 画像プロトコル設定文言・説明・警告） |
+| `src/components/TestPlanModal.tsx` | Waddle アプリ内組み込みテスト検証モーダル（全80項目、リアルタイム合否記録、コマンドコピー、localStorage連携） |
+| `src/data/testPlanData.ts` | テスト計画全80項目のデータ定義、集計、エビデンス Markdown レポート生成ユーティリティ |
+| `tools/test_form.html` | ブラウザで単体稼働するスタンドアロン包括的テスト検証 Web フォーム（全80項目、Markdown/JSONエクスポート） |
+| `src/i18n/translations.ts` | 日英多言語辞書（Kitty 画像プロトコル設定文言・テストフォーム文言） |
 | `docs/FEATURES.md` & `.ja.md` | 機能仕様書への第16項「Kitty Graphics Protocol」詳細解説の追加 |
 | `docs/ARCHITECTURE.md` & `.ja.md` | アーキテクチャ図および第5項「Kitty Graphics Subsystem & Pipeline」設計の追加 |
 | `docs/TEST_PLAN.md` & `.ja.md` | 完成前検証用 包括的テスト計画書（全80テストケース・期待結果・検証手順・セキュリティ強化項目） |

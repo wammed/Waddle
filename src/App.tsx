@@ -10,6 +10,7 @@ import { FileTreeSidebar } from './components/FileTreeSidebar';
 import { GitQuickPopover } from './components/GitQuickPopover';
 import { GitDiffModal } from './components/GitDiffModal';
 import { SettingsModal } from './components/SettingsModal';
+import { TestPlanModal } from './components/TestPlanModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { AppConfig, SystemInfo, TerminalContext } from './types';
 import { TauriApi } from './services/tauriApi';
@@ -81,6 +82,7 @@ export function App() {
   const [isAiSidebarOpen, setIsAiSidebarOpen] = useState(false);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isTestPlanOpen, setIsTestPlanOpen] = useState(false);
   const [isFileTreeOpen, setIsFileTreeOpen] = useState(true);
   const [targetEditorFile, setTargetEditorFile] = useState<string | null>(null);
 
@@ -295,6 +297,7 @@ export function App() {
           onToggleFileTree={() => setIsFileTreeOpen((prev) => !prev)}
           onOpenSettings={() => setIsSettingsOpen(true)}
           onRefreshAll={handleFullWorkspaceRefresh}
+          onOpenTestPlan={() => setIsTestPlanOpen(true)}
           isEditorOpen={isEditorOpen}
           isAiSidebarOpen={isAiSidebarOpen}
           isFileTreeOpen={isFileTreeOpen}
@@ -508,6 +511,12 @@ export function App() {
         onClose={() => setIsSettingsOpen(false)}
         config={config}
         onSaveConfig={handleUpdateConfig}
+      />
+
+      {/* Test Verification Form Modal */}
+      <TestPlanModal
+        isOpen={isTestPlanOpen}
+        onClose={() => setIsTestPlanOpen(false)}
       />
       </div>
     </I18nProvider>

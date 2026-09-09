@@ -13,6 +13,7 @@ import {
   LayoutGrid,
   Square,
   RotateCcw,
+  ClipboardCheck,
 } from 'lucide-react';
 import { PaneLayout, TerminalTab } from '../types';
 import waddleIcon from '../assets/waddle-icon.svg';
@@ -37,6 +38,7 @@ interface TitleBarProps {
   isFileTreeOpen: boolean;
   onToggleFileTree: () => void;
   onRefreshAll: () => void;
+  onOpenTestPlan: () => void;
 }
 
 export const TitleBar: React.FC<TitleBarProps> = ({
@@ -56,6 +58,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({
   isFileTreeOpen,
   onToggleFileTree,
   onRefreshAll,
+  onOpenTestPlan,
 }) => {
   const { t } = useI18n();
   const [isLayoutPopoverOpen, setIsLayoutPopoverOpen] = useState(false);
@@ -196,6 +199,16 @@ export const TitleBar: React.FC<TitleBarProps> = ({
         >
           <RotateCcw size={14} />
           <span>{t.titleBar.refreshAll}</span>
+        </button>
+
+        <button
+          id="btn-test-plan"
+          className="action-btn"
+          onClick={onOpenTestPlan}
+          title={t.titleBar.testPlanTooltip}
+        >
+          <ClipboardCheck size={14} color="#00f0ff" />
+          <span>{t.titleBar.testPlan}</span>
         </button>
 
         <button

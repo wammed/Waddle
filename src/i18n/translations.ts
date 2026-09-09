@@ -36,6 +36,8 @@ export interface Translations {
     closeTabTooltip: string;
     refreshAll: string;
     refreshAllTooltip: string;
+    testPlan: string;
+    testPlanTooltip: string;
     refreshModalTitle: string;
     refreshModalDesc: string;
     refreshModalBulletTabs: string;
@@ -315,6 +317,8 @@ export const translations: Record<Language, Translations> = {
       closeTabTooltip: 'Close tab',
       refreshAll: 'Refresh',
       refreshAllTooltip: 'Refresh workspace (tabs, panes, directory)',
+      testPlan: 'Test Plan',
+      testPlanTooltip: 'Open Comprehensive Test Verification Form',
       refreshModalTitle: 'Reset Entire Workspace?',
       refreshModalDesc: 'This will close all open tabs and split panes, terminate running processes, clear saved session state, and return to a fresh terminal in your home directory.',
       refreshModalBulletTabs: 'Close all tabs and split panes',
@@ -594,6 +598,8 @@ export const translations: Record<Language, Translations> = {
       closeTabTooltip: 'Close tab',
       refreshAll: 'Refresh',
       refreshAllTooltip: 'Refresh workspace (tabs, panes, directory)',
+      testPlan: 'Test Plan',
+      testPlanTooltip: 'Open Comprehensive Test Verification Form',
       refreshModalTitle: 'Reset Entire Workspace?',
       refreshModalDesc: 'This will close all open tabs and split panes, terminate running processes, clear saved session state, and return to a fresh terminal in your home directory.',
       refreshModalBulletTabs: 'Close all tabs and split panes',
@@ -873,6 +879,8 @@ export const translations: Record<Language, Translations> = {
       closeTabTooltip: 'タブを閉じる',
       refreshAll: 'リフレッシュ',
       refreshAllTooltip: '全タブ・ペイン・作業ディレクトリを初期状態にリフレッシュ',
+      testPlan: 'テスト検証',
+      testPlanTooltip: '包括的検証テスト入力フォームを開く',
       refreshModalTitle: 'ワークスペース全体をリフレッシュしますか？',
       refreshModalDesc: '開いているすべてのタブと分割ペインを閉じ、実行中のプロセスを終了して、セッション保存状態をクリアし、ホームディレクトリの新規単一ターミナルに戻します。',
       refreshModalBulletTabs: 'すべてのタブと分割ペインを閉じる',
