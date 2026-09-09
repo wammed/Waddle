@@ -156,17 +156,20 @@
 | ID | テスト対象 | 検証手順 | 期待される結果 | 種別 |
 | :--- | :--- | :--- | :--- | :--- |
 | **TC-SEC-01** | システム重要ディレクトリ前方一致保護 | `/etc/passwd`, `/usr/bin/`, `/boot/` への書き込み・削除を API 経由で要求。 | `canonical.starts_with` により即時拒絶され、`EACCES` が返る。 | Automated |
-| **TC-SEC-02** | ユーザー認証情報 & 秘密鍵保護 | `~/.ssh/id_rsa`, `~/.gnupg/`, `~/.local/share/keyrings/` の読み書き・削除を要求。 | ファイルの有無にかかわらず事前バリデーションで弾かれ、アクセス拒否される。 | Automated |
+| **TC-SEC-02** | ユーザー認証情報 & 秘密鍵保護 | `~/.ssh/id_rsa`, `~/.ssh/my_deploy_key` (任意の秘密鍵), `~/.gnupg/`, `~/.local/share/keyrings/` の読み込みを要求。 | 既知ファイル名だけでなく `~/.ssh/` 内の秘密鍵全般および keyring が事前バリデーションで弾かれ、`config`/`known_hosts`/`*.pub` のみ安全に閲覧可能。 | Automated |
 | **TC-SEC-03** | シェル起動設定ファイル保護 | `~/.bashrc`, `~/.zshrc`, `~/.profile` の上書き・削除を要求。 | 変更が完全に拒絶され、重要設定の改ざんが防止される。 | Automated |
-| **TC-SEC-04** | 単語境界による危険コマンド検知 | `rm -rf /`, `mkfs`, `dd if=`, `git reset --hard`, `git push --force` を実行指示。 | `DangerousCommandModal` が表示され即時実行を保留。`format_disk` 変数等では誤検知しない。 | Automated / Manual |
-| **TC-SEC-05** | パイプ経由スクリプト実行の検知 | `curl ... \| bash`, `wget ... \| python3` を含むコマンドを発行。 | 危険パターンとして検知され、警告ダイアログが表示される。 | Automated / Manual |
-| **TC-SEC-06** | AI プロンプトインジェクション防御 | `</untrusted_terminal_output>` を含む出力を生成し `Ctrl+K` を起動。 | デリミタが安全にエスケープされ、LLM がシステム命令として誤認識しない。 | Automated |
+| **TC-SEC-04** | 単語境界による危険コマンド検知 | `rm -rf /`, `mkfs`, `mkswap`, `cryptsetup`, `dd if=`, `git reset --hard`, `git push --force`, `git push --delete`, `git branch -D` を実行指示。 | `DangerousCommandModal` が Rust 側と完全同期して検知し即時実行を保留。`format_disk` 変数等では誤検知しない。 | Automated / Manual |
+| **TC-SEC-05** | パイプ経由スクリプト実行の検知 | `curl ... \| bash`, `wget ... \| python3`, `python <(...)`, `bash <(...)` を含むコマンドを発行。 | 危険パターンとして検知され、警告ダイアログが表示される。 | Automated / Manual |
+| **TC-SEC-06** | AI プロンプトインジェクション防御 | 大文字小文字や空白を含む変形タグ `</ Untrusted_Terminal_Output >` を含む出力を生成し `Ctrl+K` を起動。 | 正規表現 `(?i)</?\s*untrusted_terminal_output\s*>` により変形タグも完全に安全除去され、LLM へのプロンプト脱出が阻止される。 | Automated |
 | **TC-SEC-07** | Webview Content Security Policy (CSP) | インスペクタコンソールから `fetch('https://malicious-domain.com')` を実行。 | CSP の `connect-src` 違反としてブラウザエンジンにより通信が遮断される。 | Manual |
 | **TC-SEC-08** | Tauri Scoped Asset Protocol | `asset://localhost/home/user/.ssh/id_rsa` を読み込み要求。 | アセットスコープ制限（`$CONFIG/waddle`, `$PICTURE`, `$DOWNLOAD`）によりアクセス拒絶。 | Automated |
 | **TC-SEC-09** | Kitty ローカルファイルサンドボックス | `t=f` で `/etc/shadow` や `~/.ssh/` を指定。 | Rust の `canonicalize` 検証により `EACCES` で即時ブロックされる。 | Automated |
 | **TC-SEC-10** | Kitty シンボリックリンク脱出防止 | `$HOME/Pictures/link` -> `/etc` のシンボリックリンクを作成し `t=f` で参照。 | 正準化後の実パスが許可ディレクトリ外と判定されアクセス拒絶される。 | Automated |
 | **TC-SEC-11** | Kitty 展開爆弾 (Decompression Bomb) 防護 | 4096×4096 px 超過や不正な PNG IHDR / JPEG SOF 画像を送信。 | メモリ展開前にヘッダー検査で検知され即時破棄される。 | Automated |
 | **TC-SEC-12** | Kitty 累積 Base64 ペイロード制限 (16MB) | 16MB を超える Base64 データを連続送信。 | 上限超過時点でバッファが破棄され、メモリ DoS が阻止される。 | Automated |
+| **TC-SEC-13** | GitHub リモートホスト厳格検証 & サブドメイン偽装防御 | `attacker.com/user/github.com.git` や `github.com.attacker.com` をリモートに設定し操作。 | `is_github_host` による厳格なホスト正規化により偽装 URL が即座に拒絶され、不正リモートへのアクセスが遮断される。 | Automated |
+| **TC-SEC-14** | Kitty APC 未終端ストリームのメモリ上限防御 | 終端文字（`\x1b\` または `\x07`）を含まない 16MB 超の未完成 APC グラフィックシーケンスを連続送信。 | `KittyApcParser` の上限検査により 16MB 超過時にバッファが通常テキストとしてフラッシュ・リセットされ、メモリ枯渇 (DoS) が防止される。 | Automated |
+| **TC-SEC-15** | Kitty 一時ファイル (`t=t`) 超過時の自動削除・痕跡ゼロ化 | 100MB 超の巨大ファイルを `t=t`（一時ファイルフラグ）で指定して読み込み要求。 | `read_kitty_file` が `EFBIG` エラー返却直前に一時ファイルをディスクから即時強制削除し、残留ファイルリークが発生しない。 | Automated |
 
 ---
 
@@ -178,7 +181,7 @@
 | **TC-PERF-02** | PTY キー入力 0ms レイテンシ | 高速タイピングおよびキーストローク計測を実施。 | 入力遅延やフレーム落ちがなく、キーボード入力が即座に画面に反映される。 | Manual |
 | **TC-PERF-03** | 長時間セッションのメモリ安定性 | アプリを起動し、複数タブでスクロール・画像描画・Git 操作を継続。 | メモリ使用量が一定範囲内に収まり、タイマーやリスナーの蓄積リークがない。 | Manual |
 | **TC-PERF-04** | アイドル時の CPU 消費電力 (0%) | ターミナルが無操作状態の際の CPU 使用率を `top` 等で監視。 | 不要な常時ポーリングが存在せず、CPU 使用率が 0.0%〜0.1% で静止する。 | Manual |
-| **TC-PERF-05** | 静的解析 & 自動単体テスト全パス | `cargo test`, `cargo clippy --all-targets`, `npm run build` を実行。 | テスト全 21 件パス、Clippy 警告 0 件、TypeScript 型エラー 0 件で完了する。 | Automated |
+| **TC-PERF-05** | 静的解析 & 自動単体テスト全パス | `cargo test`, `cargo clippy --all-targets`, `npm run build` を実行。 | テスト全 24 件パス、Clippy 警告 0 件、TypeScript 型エラー 0 件で完了する。 | Automated |
 
 ---
 
@@ -229,6 +232,6 @@ npm run tauri dev
 | Suite 5: Git 連携 & リモート制限 | 8 | 8 | 0 | GitHub 限定ポリシー、Diff 表示確認済 |
 | Suite 6: テーマ・UI・壁紙 | 6 | 6 | 0 | 11種ネオン発光同期、MagicBytes確認済 |
 | Suite 7: Kitty Graphics Protocol | 14 | 14 | 0 | 豆腐抑止、クリッピング、アニメ確認済 |
-| Suite 8: セキュリティ & ガードレール | 12 | 12 | 0 | パストラバーサル、危険コマンド遮断確認済 |
+| Suite 8: セキュリティ & ガードレール | 15 | 15 | 0 | パストラバーサル、危険コマンド遮断確認済 |
 | Suite 9: パフォーマンス & リソース | 5 | 5 | 0 | 256MB LRU、0% アイドル、ビルド確認済 |
 ```

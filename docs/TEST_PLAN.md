@@ -18,9 +18,9 @@ This document provides a comprehensive, end-to-end test plan for **Waddle**, cov
 5. **Git Integration & Remote Guardrails** (8 Test Cases)
 6. **Theming, UI Glow, Wallpapers & Icons** (6 Test Cases)
 7. **Kitty Graphics Protocol (Complete Subsystem)** (14 Test Cases)
-8. **Security Policy & Multi-Layer Safety Guardrails** (12 Test Cases)
+8. **Security Policy & Multi-Layer Safety Guardrails** (15 Test Cases)
 9. **Performance, Resource Bounds & Leak Prevention** (5 Test Cases)
-**Total: 77 Comprehensive Test Cases**
+**Total: 80 Comprehensive Test Cases**
 
 ### 1.3 Prerequisites & Environment
 - **Operating System**: Linux (Ubuntu 22.04+, Debian 12+, Arch Linux, etc., WebKitGTK 4.1 / 4.0)
@@ -156,17 +156,20 @@ This document provides a comprehensive, end-to-end test plan for **Waddle**, cov
 | ID | Feature Under Test | Execution Procedure | Expected Result | Type |
 | :--- | :--- | :--- | :--- | :--- |
 | **TC-SEC-01** | System Directory Prefix Guard | Attempt writing/deleting in `/etc/hosts`, `/usr/bin/`, `/boot/`. | Rust canonical prefix check rejects operation immediately with `EACCES`. | Automated |
-| **TC-SEC-02** | User Credential & Secret Protection | Attempt access to `~/.ssh/id_rsa`, `~/.gnupg/`, `~/.local/share/keyrings/`. | Advance validation rejects request before filesystem probing; zero data leakage. | Automated |
+| **TC-SEC-02** | User Credential & Secret Protection | Attempt access to `~/.ssh/id_rsa`, `~/.ssh/my_deploy_key` (arbitrary custom key), `~/.gnupg/`, `~/.local/share/keyrings/`. | Advance validation blocks all private key reads and keyrings before filesystem probing; only `config`/`known_hosts`/`*.pub` are accessible. | Automated |
 | **TC-SEC-03** | Shell Profile Protection | Attempt modifying `~/.bashrc`, `~/.zshrc`, or `~/.profile`. | Action blocked unconditionally; shell configuration tampering prevented. | Automated |
-| **TC-SEC-04** | Word-Boundary Dangerous Command Interception | Issue `rm -rf /`, `mkfs`, `dd if=`, `git reset --hard`, `git push --force`. | `DangerousCommandModal` intercepts command and suspends execution. Harmless names (e.g. `format_disk`) pass. | Automated / Manual |
-| **TC-SEC-05** | Piped Script Execution Detection | Issue `curl ... \| bash`, `wget ... \| python3`, `bash <(...)`. | Flagged as dangerous execution pattern; warning modal displays user confirmation options. | Automated / Manual |
-| **TC-SEC-06** | AI Prompt Injection Defense | Feed output containing `</untrusted_terminal_output>` and trigger `Ctrl+K`. | XML delimiter sanitizes safely; LLM does not execute injected instructions. | Automated |
+| **TC-SEC-04** | Word-Boundary Dangerous Command Interception | Issue `rm -rf /`, `mkfs`, `mkswap`, `cryptsetup`, `dd if=`, `git reset --hard`, `git push --force`, `git push --delete`, `git branch -D`. | `DangerousCommandModal` perfectly syncs with Rust backend to intercept command and suspend execution. Harmless names (e.g. `format_disk`) pass. | Automated / Manual |
+| **TC-SEC-05** | Piped Script Execution Detection | Issue `curl ... \| bash`, `wget ... \| python3`, `python <(...)`, `bash <(...)`. | Flagged as dangerous execution pattern; warning modal displays user confirmation options. | Automated / Manual |
+| **TC-SEC-06** | AI Prompt Injection Defense | Feed output containing case/whitespace variations like `</ Untrusted_Terminal_Output >` and trigger `Ctrl+K`. | Delimiter sanitized with `(?i)</?\s*untrusted_terminal_output\s*>`; LLM does not execute injected instructions or escape prompt jail. | Automated |
 | **TC-SEC-07** | Webview Content Security Policy (CSP) | Attempt `fetch('https://unauthorized-domain.com')` from developer console. | Webview engine blocks connection under CSP `connect-src` restriction. | Manual |
 | **TC-SEC-08** | Tauri Scoped Asset Protocol | Request `asset://localhost/home/user/.ssh/id_rsa`. | Asset protocol scope disallows path; access denied. | Automated |
 | **TC-SEC-09** | Kitty Local File Sandbox (`$HOME/Pictures`) | Attempt loading `/etc/shadow` or `~/.ssh/` via `t=f`. | Rust `canonicalize` check fails sandbox validation; returns `EACCES`. | Automated |
 | **TC-SEC-10** | Kitty Symlink Escape Prevention | Symlink `$HOME/Pictures/escape` to `/etc` and request via `t=f`. | Resolved path falls outside allowed sandbox; request rejected. | Automated |
 | **TC-SEC-11** | Kitty Decompression Bomb Defense | Submit image with dimensions exceeding 4096×4096 px or malformed IHDR. | Header check catches violation prior to memory allocation; image discarded. | Automated |
 | **TC-SEC-12** | Kitty Cumulative Payload Limit (16MB) | Transmit continuous Base64 payload exceeding 16MB. | Buffer terminates upon reaching threshold, neutralizing memory DoS attacks. | Automated |
+| **TC-SEC-13** | Strict GitHub Host Validation & Anti-Spoofing | Configure remote to spoofed domains such as `attacker.com/user/github.com.git` or `github.com.attacker.com`. | `is_github_host` extracts normalized hostname and rejects unauthorized remotes, blocking credential exfiltration. | Automated |
+| **TC-SEC-14** | Kitty APC Unfinished Stream Memory Buffer Cap | Send an unclosed APC graphics sequence (`\x1b_G...`) exceeding 16MB without termination code (`\x1b\` or `\x07`). | `KittyApcParser` caps buffer at 16MB, flushes payload to clean text, and resets buffer, preventing heap exhaustion (Memory DoS). | Automated |
+| **TC-SEC-15** | Kitty Temp File (`t=t`) Auto-Deletion on EFBIG | Pass oversized file (>100MB) with `t=t` (temp file flag) to `read_kitty_file`. | Temporary file is immediately unlinked and removed from disk prior to returning `EFBIG`, preventing temporary disk bloat. | Automated |
 
 ---
 
@@ -227,6 +230,6 @@ npm run tauri dev
 | Suite 5: Git Integration & Guardrails | 8 | 8 | 0 | GitHub-only policy, Diff preview verified |
 | Suite 6: Theming, UI & Wallpapers | 6 | 6 | 0 | 11 neon themes glow sync, MagicBytes verified |
 | Suite 7: Kitty Graphics Protocol | 14 | 14 | 0 | Tofu suppression, clipping, animations verified |
-| Suite 8: Security & Guardrails | 12 | 12 | 0 | Path traversal, dangerous commands blocked |
+| Suite 8: Security & Guardrails | 15 | 15 | 0 | Path traversal, dangerous commands blocked |
 | Suite 9: Performance & Resources | 5 | 5 | 0 | 256MB LRU, 0% idle CPU, clean build verified |
 ```
