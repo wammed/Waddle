@@ -132,6 +132,14 @@
     - 初期から実装されたコア PTY・UI から Kitty Graphics Protocol、多層防御セキュリティガードレールに至る全機能を完成前に検証するための包括的テスト計画を策定。
     - 9 つのテストスイート（PTY基盤 10項目、タブ・分割 8項目、ファイルツリー・エディタ 8項目、AI連携 6項目、Git連携 8項目、テーマ・UI 6項目、Kitty画像 14項目、セキュリティ 12項目、パフォーマンス 5項目、計 77項目）に分類し、各項目に対してテスト手順・期待される結果・判定基準・自動/手動種別を網羅。
     - 日英ドキュメント（[`docs/TEST_PLAN.md`](file:///home/susie/GitHUB/wammed/Waddle/docs/TEST_PLAN.md) & [`docs/TEST_PLAN.ja.md`](file:///home/susie/GitHUB/wammed/Waddle/docs/TEST_PLAN.ja.md)）および専用アーティファクトとして体系化。
+25. **包括的セキュリティレビューに基づく多層防御の徹底強化（6項目全改修）**:
+    - **GitHub リモート厳格ホスト検証 (`is_github_host`)**: `inspect_github_remotes` の部分一致（`contains("github.com")`）を廃止し、ホスト名が `github.com`、`gist.github.com`、`*.github.io` に厳格一致するかを判定するパーサーを実装。サブドメイン詐称やパス埋め込み偽装（`attacker.com/user/github.com.git` 等）を完全遮断。
+    - **危険コマンド検知パターンのフロント/バックエンド完全同期**: `DangerousCommandModal.tsx` にバックエンド（`ai.rs`）の全最新パターン（`mkswap`, `cryptsetup`, `| python`, `| python3`, `| perl`, `| ruby`, `python <(`, `iptables -f`, `ufw disable`, `git push --delete`, `git branch -d` 等）を同期反映。
+    - **Kitty APC 未終端バッファ上限ガード (DoS防止)**: `KittyApcParser` において、終端子（`\x1b\` / `\x07`）が欠落した破損ストリームを受信した際に `this.buffer` が `maxPayloadBytes`（16MB）を超過した場合、バッファを破棄・強制フラッシュしてメモリ肥大化を防止。
+    - **Kitty 一時ファイル (`t=t`) の EFBIG 自動削除**: `read_kitty_file` において、一時ファイルが `max_bytes` を超過した場合でも直ちに `fs::remove_file` を呼び出してディスクから抹消し、`/tmp` のストレージ枯渇を阻止。
+    - **秘密鍵・システムキーリング読取保護のスコープ拡充**: `validate_safe_read` において、`~/.ssh/` 配下の全秘密鍵（カスタム名含む）の直接読み出しを遮断（`config`, `known_hosts`, `authorized_keys`, `*.pub` のみ閲覧許可）。さらに `~/.local/share/keyrings/` の読み出しを完全遮断。
+    - **AI プロンプトインジェクションの正規表現サニタイズ**: `sanitize_untrusted_output` において、大文字混在（`</UNTRUSTED_TERMINAL_OUTPUT>`）や空白混入（`</ untrusted_terminal_output >`）によるタグ脱出を正規表現 `(?i)</?\s*untrusted_terminal_output\s*>` で完全に無力化。
+    - **単体テスト & ビルド検証**: Rust テスト 24 件全パス（+3件新規テスト追加）、TypeScript/Vite ビルド 0 エラー、Clippy 警告 0 件。
 
 ---
 
@@ -220,7 +228,7 @@
 # フロントエンドの型検査 & 本番ビルド (Vite + TypeScript) - 警告/エラー0件でビルド完了
 npm run build
 
-# Rust バックエンドの単体テスト (全21件すべてパス、うち Kitty セキュリティテスト6件)
+# Rust バックエンドの単体テスト (全24件すべてパス、うち Kitty セキュリティテスト7件)
 cargo test --manifest-path src-tauri/Cargo.toml
 
 # Rust の Clippy 静的解析 (警告0件)

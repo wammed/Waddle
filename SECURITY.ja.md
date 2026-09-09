@@ -35,10 +35,10 @@ Waddle は正規化パスの前方一致検証（`canonical.starts_with(sys_dir)
 *※ 前方一致検証により、`/etc/nginx/nginx.conf` や `/usr/local/bin` のような配下のファイルや入れ子フォルダも確実に保護されます。*
 
 ### 2. ユーザー資格情報・重要設定の保護
-誤操作や悪意あるスクリプトによる認証情報の漏洩を防ぐため、以下の読み出し・書き込み・削除を完全に拒否します：
-- **SSH 秘密鍵**: `id_rsa`, `id_ed25519`, `id_ecdsa`, `id_dsa` および `~/.ssh/` 配下の秘密鍵
+誤操作や悪意あるスクリプトによる認証情報の漏洩を防ぐため、以下の読み出し・書き込み・削除を厳格に制御・拒否します：
+- **SSH 秘密鍵**: `~/.ssh/` 配下のすべての秘密鍵（標準名 `id_rsa`, `id_ed25519` 等だけでなく、カスタム名の鍵も含む）の直接読み出しを遮断。エディタでの安全な閲覧・編集は公開ファイル（`config`, `known_hosts*`, `authorized_keys*`, `*.pub`）のみに限定。書き込みおよび削除は `~/.ssh/` 全域で無条件禁止。
 - **GPG 秘密鍵**: `~/.gnupg/private-keys-v1.d/` およびキーリングファイル
-- **Linux キーリング**: `~/.local/share/keyrings/`
+- **Linux キーリング**: `~/.local/share/keyrings/`（読み出し・書き込み・削除すべて完全遮断）
 - **シェル設定ファイル**: `~/.bashrc`, `~/.bash_profile`, `~/.bash_login`, `~/.zshrc`, `~/.zprofile`, `~/.zshenv`, `~/.profile`
 - **設定ルートの保護**: `~/.config` 自体の削除を防止。
 
@@ -56,7 +56,7 @@ Waddle は正規化パスの前方一致検証（`canonical.starts_with(sys_dir)
 [エスケープ処理済みの端末出力]
 </untrusted_terminal_output>
 ```
-出力内の `<untrusted_terminal_output>` や `</untrusted_terminal_output>` は自動的にサニタイズ・エスケープされ、プロンプト脱出攻撃を無力化します。
+出力内の `<untrusted_terminal_output>` や `</untrusted_terminal_output>`（大文字混在 `</UNTRUSTED_TERMINAL_OUTPUT>` や空白混入 `</ untrusted_terminal_output >` などの亜種を含む）は、正規表現 `(?i)</?\s*untrusted_terminal_output\s*>` により自動的に `[untrusted_tag_escaped]` へサニタイズされ、プロンプト脱出攻撃を完全に無力化します。
 
 ### 2. コンテキストメタデータのサニタイズ
 Git ブランチ名、直前コマンド、カレントディレクトリに含まれる制御文字やエスケープシーケンスをサニタイズしてからプロンプトを構成します。
@@ -116,7 +116,10 @@ Tauri の `assetProtocol.scope` は以下に限定されています：
 外部エンドポイントが設定された場合、設定画面にアンバーの警告バナーを表示し、外部送信リスクを明示します。
 
 ### 4. GitHub 限定ポリシー
-非 GitHub リモートへの `git push` / `git pull` を事前検知して自動遮断します。
+GitHub 接続制限ポリシーが有効な場合、Waddle は `git push` / `git pull` の実行前に厳格なホスト検証（`is_github_host`）を実施します。
+- ホスト名が `github.com`、`gist.github.com`、または `*.github.io`（SSH `git@github.com:...` または HTTPS/SSH URL）に厳密に一致するかを検証。
+- サブドメイン詐称（例: `https://github.com.attacker.com/repo.git`）やパス偽装（例: `https://attacker.com/user/github.com.git`）などの細工 URL を確実に遮断。
+- GitLab、Bitbucket、自前のサーバーなど GitHub 以外のリモートに対する送信操作を未然に防止します。
 
 ---
 
@@ -140,15 +143,15 @@ Kitty Graphics Protocol の統合にあたり、不正ファイルアクセス�
 
 ### 1. ローカル・一時ファイル参照 (`t=f`, `t=t`) の厳格なサンドボックス
 - **許可ディレクトリの制限 (`t=f`)**: `t=f` によるローカルファイル読み取りは、初期設定で **`$HOME/Pictures`**（およびそのサブディレクトリ）に限定。
-- **一時ファイル隔離 & 自動即時削除 (`t=t`)**: `t=t` による一時ファイル転送は、システム一時ディレクトリ（`std::env::temp_dir()`, `/tmp`, `/var/tmp`）および許可ディレクトリのみに制限。ファイルをメモリに展開した直後に Rust 側で直ちに `std::fs::remove_file` を実行し、寸法検証エラー時も含めディスクに残骸を残さないゼロリーク設計で DoS/ディスク圧迫を防止。
+- **一時ファイル隔離 & ゼロリーク自動削除 (`t=t`)**: `t=t` による一時ファイル転送は、システム一時ディレクトリ（`std::env::temp_dir()`, `/tmp`, `/var/tmp`）および許可ディレクトリのみに制限。ファイルをメモリに展開した直後に Rust 側で直ちに `std::fs::remove_file` を実行。さらにファイルサイズが上限超過（`EFBIG`）した場合でも即座にディスクから物理削除し、巨大一時ファイルによるディスク枯渇を確実に防止。
 - **Rust バックエンドでのパス正規化**: フロントエンドに依存せず、Rust 側（`src-tauri/src/kitty.rs`）で `std::fs::canonicalize` による正規化チェックを実施。
 - **脱出攻撃の遮断**: `../` によるパストラバーサルや、サンドボックス外（`~/.ssh`, `/etc`, `/usr`, `/root` など）を指すシンボリックリンク経由のアクセスを検知し、`EACCES` または `ENOENT` で厳格に拒否。
 - **システム重要パスの防護**: 設定変更時にも、`/`, `/etc`, `/usr`, `/proc`, `/sys`, `~/.ssh` などの重要パスの選択は動的に警告・遮断。
 
-### 2. 展開爆弾 (Decompression Bomb) 対策 & ペイロード上限
+### 2. 展開爆弾 (Decompression Bomb) 対策 & ペイロード・バッファ上限
 - **最大解像度制限**: 単一画像の最大寸法を初期値 **4096 × 4096 px** (約16.7MP) に制限 (1024〜8192 px で調整可能)。
 - **ヘッダー事前検証**: PNG `IHDR` チャンクおよび JPEG `SOF` セグメントをバイナリ先頭から直接読み取り、ピクセルバッファ展開前に寸法を判定。上限超過時は即座に `EBADMSG` で破棄。
-- **Base64 ペイロード制限**: 単一リクエストおよびチャンク結合 (`m=1`) の累積サイズを **16 MB** に制限 (4〜64 MB で調整可能)。超過時はストリームを直ちに切断。
+- **Base64 ペイロード制限 & パーサーバッファ上限**: 単一リクエストおよびチャンク結合 (`m=1`) の累積サイズを **16 MB** に制限 (4〜64 MB で調整可能)。さらに終端子（`\x1b\` または `\x07`）を欠いた不正ストリームに対しても `maxPayloadBytes` でバッファ上限をかけ強制フラッシュすることで、メモリリークを防御。
 
 ### 3. テクスチャキャッシュ & GPU/VRAM 上限管理 (LRU)
 - **VRAM 上限枠**: キャッシュ総枠を **256 MB** (RGBA 4bytes/px 換算) に制限 (64〜1024 MB で調整可能)。

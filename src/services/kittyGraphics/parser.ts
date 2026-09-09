@@ -77,6 +77,12 @@ export class KittyApcParser {
       if (endIdx === -1) {
         // Sequence is incomplete across this chunk! Retain in buffer.
         this.buffer = input.slice(apcIdx);
+        // Guard against unbounded memory exhaustion if stream omits terminator
+        if (this.buffer.length > this.maxPayloadBytes) {
+          console.warn('Kitty APC buffer exceeded maxPayloadBytes without terminator, dropping');
+          cleanText += this.buffer;
+          this.buffer = '';
+        }
         break;
       }
 

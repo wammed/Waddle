@@ -208,20 +208,43 @@ fn resolve_canonical_path(path: &Path) -> PathBuf {
 fn validate_safe_read(path: &Path) -> Result<(), String> {
     let canonical = resolve_canonical_path(path);
 
-    // 1. Block reading private SSH keys
-    if let Some(file_name) = canonical.file_name().and_then(|n| n.to_str()) {
-        let sensitive_keys = ["id_rsa", "id_ed25519", "id_ecdsa", "id_dsa"];
-        if sensitive_keys.contains(&file_name) {
-            return Err("安全上の理由によりSSH秘密鍵の直接読み出しは禁止されています。".to_string());
-        }
-    }
-
-    // 2. Block reading sensitive GPG private keys
     if let Some(home) = dirs::home_dir() {
         let home_canon = home.canonicalize().unwrap_or(home);
+
+        // 1. Protect ~/.ssh directory secrets (allow only config, known_hosts, authorized_keys, *.pub)
+        let ssh_dir = home_canon.join(".ssh");
+        if canonical.starts_with(&ssh_dir) {
+            if let Some(file_name) = canonical.file_name().and_then(|n| n.to_str()) {
+                let is_safe_ssh_file = file_name == "config"
+                    || file_name.starts_with("known_hosts")
+                    || file_name.starts_with("authorized_keys")
+                    || file_name.ends_with(".pub");
+                if !is_safe_ssh_file {
+                    return Err("安全上の理由によりSSH秘密鍵・機密設定の直接読み出しは禁止されています。".to_string());
+                }
+            } else {
+                return Err("安全上の理由によりSSH設定ディレクトリの直接読み出しは禁止されています。".to_string());
+            }
+        }
+
+        // 2. Block reading sensitive private keys matching well-known names anywhere
+        if let Some(file_name) = canonical.file_name().and_then(|n| n.to_str()) {
+            let sensitive_keys = ["id_rsa", "id_ed25519", "id_ecdsa", "id_dsa"];
+            if sensitive_keys.contains(&file_name) {
+                return Err("安全上の理由によりSSH秘密鍵の直接読み出しは禁止されています。".to_string());
+            }
+        }
+
+        // 3. Block reading sensitive GPG private keys
         let gpg_private = home_canon.join(".gnupg").join("private-keys-v1.d");
         if canonical.starts_with(&gpg_private) {
             return Err("安全上の理由によりGPG秘密鍵領域の読み出しは禁止されています。".to_string());
+        }
+
+        // 4. Block reading system keyrings
+        let keyrings_dir = home_canon.join(".local").join("share").join("keyrings");
+        if canonical.starts_with(&keyrings_dir) {
+            return Err("安全上の理由によりシステムキーリング領域の読み出しは禁止されています。".to_string());
         }
     }
 
@@ -970,6 +993,51 @@ mod tests {
         assert!(pull_res.unwrap_err().contains("GitHub限定ポリシー"));
 
         let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_is_github_host_strict_domain_validation() {
+        // Valid GitHub endpoints
+        assert!(pty::is_github_host("git@github.com:wammed/Waddle.git"));
+        assert!(pty::is_github_host("https://github.com/wammed/Waddle.git"));
+        assert!(pty::is_github_host("https://user:ghp_123456789@github.com/wammed/Waddle.git"));
+        assert!(pty::is_github_host("https://gist.github.com/wammed/1234567.git"));
+        assert!(pty::is_github_host("https://wammed.github.io/blog.git"));
+        assert!(pty::is_github_host("ssh://git@github.com/wammed/Waddle.git"));
+
+        // Malicious or non-GitHub endpoints that attempt to trick substring checks
+        assert!(!pty::is_github_host("https://attacker.com/wammed/github.com.git"));
+        assert!(!pty::is_github_host("https://github.com.attacker.com/wammed/Waddle.git"));
+        assert!(!pty::is_github_host("git@attacker.com:github.com/Waddle.git"));
+        assert!(!pty::is_github_host("https://gitlab.com/wammed/Waddle.git"));
+        assert!(!pty::is_github_host("https://bitbucket.org/wammed/Waddle.git"));
+        assert!(!pty::is_github_host(""));
+        assert!(!pty::is_github_host("invalid-url"));
+    }
+
+    #[test]
+    fn test_safe_read_custom_ssh_keys_and_keyrings() {
+        if let Some(home) = dirs::home_dir() {
+            // Safe SSH files must be allowed
+            let safe_config = home.join(".ssh").join("config");
+            let safe_pub = home.join(".ssh").join("id_ed25519.pub");
+            let safe_hosts = home.join(".ssh").join("known_hosts");
+            assert!(validate_safe_read(&safe_config).is_ok());
+            assert!(validate_safe_read(&safe_pub).is_ok());
+            assert!(validate_safe_read(&safe_hosts).is_ok());
+
+            // Private keys (standard or custom named) must be rejected
+            let standard_key = home.join(".ssh").join("id_ed25519");
+            let custom_key = home.join(".ssh").join("my_custom_deploy_key");
+            let work_key = home.join(".ssh").join("work_rsa_backup");
+            assert!(validate_safe_read(&standard_key).is_err());
+            assert!(validate_safe_read(&custom_key).is_err());
+            assert!(validate_safe_read(&work_key).is_err());
+
+            // Keyrings must be rejected
+            let keyring = home.join(".local").join("share").join("keyrings").join("login.keyring");
+            assert!(validate_safe_read(&keyring).is_err());
+        }
     }
 }
 

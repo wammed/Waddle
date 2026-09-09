@@ -18,6 +18,8 @@ export function isDangerousCommand(cmd: string): boolean {
     'gdisk',
     'rmdir',
     'mkfs',
+    'mkswap',
+    'cryptsetup',
     'shred',
     'truncate',
   ];
@@ -48,9 +50,15 @@ export function isDangerousCommand(cmd: string): boolean {
     '| sh',
     '| bash',
     '| zsh',
+    '| python',
+    '| python3',
+    '| perl',
+    '| ruby',
     'bash <(',
     'sh <(',
     'zsh <(',
+    'python <(',
+    'python3 <(',
     'eval "$(',
     'sudo ',
     'su -',
@@ -61,10 +69,20 @@ export function isDangerousCommand(cmd: string): boolean {
     'git reset --hard',
     'git push --force',
     'git push -f',
+    'iptables -f',
+    'ufw disable',
     'shutil.rmtree',
   ];
 
   if (substringPatterns.some((p) => lower.includes(p))) {
+    return true;
+  }
+
+  if (lower.includes('git push') && (lower.includes('--delete') || lower.includes(' :'))) {
+    return true;
+  }
+
+  if (lower.includes('git branch') && (lower.includes('-d') || lower.includes('--delete'))) {
     return true;
   }
 

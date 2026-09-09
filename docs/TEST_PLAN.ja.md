@@ -185,7 +185,7 @@
 ## 4. テスト実行コマンドクイックリファレンス
 
 ```bash
-# 1. バックエンド全セキュリティ・Kitty 単体テストの実行 (21 件)
+# 1. バックエンド全セキュリティ・Kitty 単体テストの実行 (24 件全パス)
 cargo test --manifest-path src-tauri/Cargo.toml
 
 # 2. バックエンド静的コード解析 (警告 0 件確認)
@@ -200,7 +200,10 @@ npx tsx scratch/test_sub_clipping.mjs
 # 5. Kitty Graphics Unicode プレースホルダー (U+10EEEE) & 豆腐抑止自動テスト (11 項目)
 npx tsx scratch/test_unicode_placeholder.mjs
 
-# 6. アプリケーションの対話的デバッグ起動
+# 6. セキュリティ強化自動検証テスト (危険コマンド同期 & APC バッファ上限)
+npx tsx scratch/test_security_enhancements.mjs
+
+# 7. アプリケーションの対話的デバッグ起動
 npm run tauri dev
 ```
 

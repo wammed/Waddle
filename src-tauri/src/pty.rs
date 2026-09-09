@@ -342,6 +342,58 @@ pub fn resolve_repo_root(path_str: &str) -> Option<std::path::PathBuf> {
     None
 }
 
+pub fn is_github_host(url: &str) -> bool {
+    let trimmed = url.trim();
+    if trimmed.is_empty() {
+        return false;
+    }
+
+    // 1. Check scp-style SSH: git@github.com:owner/repo.git
+    if let Some(rest) = trimmed.strip_prefix("git@") {
+        if let Some(host_part) = rest.split(':').next() {
+            let h = host_part.to_lowercase();
+            return h == "github.com" || h == "gist.github.com" || h.ends_with(".github.io");
+        }
+    }
+
+    // 2. Check URL syntax: https://, http://, ssh://, git://
+    if let Some(scheme_pos) = trimmed.find("://") {
+        let after_scheme = &trimmed[scheme_pos + 3..];
+        // Strip userinfo if present: username:token@host
+        let without_user = if let Some(at_pos) = after_scheme.find('@') {
+            let first_slash = after_scheme.find('/').unwrap_or(after_scheme.len());
+            if at_pos < first_slash {
+                &after_scheme[at_pos + 1..]
+            } else {
+                after_scheme
+            }
+        } else {
+            after_scheme
+        };
+
+        // Host is everything up to the first '/', ':', or '?'
+        let host = without_user
+            .split(['/', ':', '?'])
+            .next()
+            .unwrap_or("")
+            .trim()
+            .to_lowercase();
+
+        return host == "github.com" || host == "gist.github.com" || host.ends_with(".github.io");
+    }
+
+    // 3. Fallback: check if format is host:path (e.g. github.com:owner/repo.git)
+    if let Some(colon_pos) = trimmed.find(':') {
+        let host_candidate = &trimmed[..colon_pos];
+        if !host_candidate.contains('/') {
+            let h = host_candidate.to_lowercase();
+            return h == "github.com" || h == "gist.github.com" || h.ends_with(".github.io");
+        }
+    }
+
+    false
+}
+
 pub fn inspect_github_remotes(repo_root: &std::path::Path) -> (bool, Option<String>) {
     let output = std::process::Command::new("git")
         .args(["remote", "-v"])
@@ -359,7 +411,7 @@ pub fn inspect_github_remotes(repo_root: &std::path::Path) -> (bool, Option<Stri
                 if parts.len() >= 2 {
                     has_remote = true;
                     let url = parts[1];
-                    let is_gh = url.contains("github.com") || url.contains("github.io");
+                    let is_gh = is_github_host(url);
                     if !is_gh {
                         is_all_github = false;
                         if non_github_url.is_none() {

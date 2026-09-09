@@ -35,10 +35,10 @@ Waddle uses canonical path prefix matching (`canonical.starts_with(sys_dir)`) to
 *Note: Prefix matching guarantees that nested files and subdirectories (e.g. `/etc/nginx/nginx.conf` or `/usr/local/bin`) cannot be tampered with via symlink traversal or relative path manipulation.*
 
 ### 2. User Credential & Secret Protection
-To prevent accidental exposure or malicious script extraction, Waddle completely blocks reading, writing, and deletion of:
-- **SSH Private Keys**: `id_rsa`, `id_ed25519`, `id_ecdsa`, `id_dsa`, and files in `~/.ssh/`
+To prevent accidental exposure or malicious script extraction, Waddle completely blocks unauthorized reading, writing, and deletion of:
+- **SSH Private Keys**: All private key files in `~/.ssh/` (standard names like `id_rsa`, `id_ed25519` as well as custom-named keys) are blocked from direct reading. Only safe files (`config`, `known_hosts*`, `authorized_keys*`, `*.pub`) can be opened in the embedded editor. Writing and deletion in `~/.ssh/` are blocked unconditionally.
 - **GPG Private Keys**: `~/.gnupg/private-keys-v1.d/` and keyring stores
-- **System Keyrings**: `~/.local/share/keyrings/`
+- **System Keyrings**: `~/.local/share/keyrings/` (reading, writing, and deletion strictly disallowed)
 - **Shell Configuration Files**: `~/.bashrc`, `~/.bash_profile`, `~/.bash_login`, `~/.zshrc`, `~/.zprofile`, `~/.zshenv`, `~/.profile`
 - **Config Root Protection**: Deletion of the `~/.config` root directory is strictly prohibited.
 
@@ -58,7 +58,7 @@ Waddle wraps untrusted terminal outputs in explicit XML boundaries:
 [Raw terminal stream with escaped delimiters]
 </untrusted_terminal_output>
 ```
-Any raw occurrences of `<untrusted_terminal_output>` or `</untrusted_terminal_output>` inside command outputs are sanitized and escaped before delivery to Ollama, neutralizing prompt breakout attempts.
+Any raw occurrences of `<untrusted_terminal_output>` or `</untrusted_terminal_output>` (including case-insensitive variants like `</UNTRUSTED_TERMINAL_OUTPUT>` and internal whitespace variations like `</ untrusted_terminal_output >`) are sanitized via regex `(?i)</?\s*untrusted_terminal_output\s*>` to `[untrusted_tag_escaped]` before delivery to Ollama, completely neutralizing prompt breakout attempts.
 
 ### 2. Context Metadata Sanitization
 Git branch names, recent command strings, and current working directory paths are sanitized to strip ANSI control sequences, shell escapes, and prompt injection delimiters before being assembled into system prompts.
@@ -118,7 +118,10 @@ Broad `$CONFIG/**/*` access is completely disallowed, shielding sensitive applic
 If an external or remote endpoint is configured instead of `localhost` / `127.0.0.1`, Waddle displays an amber warning banner in the Settings modal reminding users that data will traverse an external network.
 
 ### 4. GitHub-Only Push/Pull Policy
-When the GitHub restriction policy is enabled, Waddle inspects `git remote -v` before executing `git push` or `git pull`. If the remote targets an external non-GitHub domain (e.g. GitLab, Bitbucket, or an unauthorized host), the operation is blocked to protect proprietary code.
+When the GitHub restriction policy is enabled, Waddle inspects `git remote -v` using strict host validation (`is_github_host`) before executing `git push` or `git pull`.
+- Host must strictly match `github.com`, `gist.github.com`, or `*.github.io` (via SSH `git@github.com:...` or HTTPS/SSH URLs).
+- Subdomain spoofing (e.g. `https://github.com.attacker.com/repo.git`) and path-embedded trick URLs (e.g. `https://attacker.com/user/github.com.git`) are definitively rejected.
+- If the remote targets an external non-GitHub domain (e.g. GitLab, Bitbucket, or an unauthorized host), the operation is blocked to protect proprietary code.
 
 ---
 
@@ -142,7 +145,7 @@ The Kitty Graphics Protocol subsystem is hardened with multiple layers of sandbo
 
 ### 1. Local & Temporary File Sandboxing (`t=f`, `t=t`)
 - **Restricted Sandbox Directory (`t=f`)**: Local file loading via `t=f` is strictly restricted to **`$HOME/Pictures`** (and its subdirectories) by default.
-- **Temporary File Isolation & Auto-Deletion (`t=t`)**: Temporary file transmission via `t=t` is permitted only within system temp directories (`std::env::temp_dir()`, `/tmp`, `/var/tmp`) and the allowed directory. Files are read into memory and immediately unlinked from disk (`std::fs::remove_file`) before dimension validation, preventing disk exhaustion attacks and temporary file accumulation.
+- **Temporary File Isolation & Zero-Leak Auto-Deletion (`t=t`)**: Temporary file transmission via `t=t` is permitted only within system temp directories (`std::env::temp_dir()`, `/tmp`, `/var/tmp`) and the allowed directory. Files are read into memory and immediately unlinked from disk (`std::fs::remove_file`) before dimension validation. Crucially, if the file exceeds the maximum payload size (`EFBIG`), it is still deleted immediately from disk to prevent storage exhaustion.
 - **Backend Path Canonicalization**: Enforced exclusively in Rust (`src-tauri/src/kitty.rs`) using `std::fs::canonicalize`.
 - **Symlink & Traversal Escape Prevention**: Path traversal attempts using relative segments (`../`) or symlinks pointing outside the sandbox or into sensitive directories (such as `~/.ssh`, `/etc`, `/usr`, `/root`) are strictly rejected with `EACCES` or `ENOENT`.
 - **System Root Protection**: The configuration manager and backend actively disallow selecting system-critical directories (`/`, `/etc`, `/usr`, `/dev`, `/proc`, `/sys`, `~/.ssh`) as the allowed directory.
@@ -150,7 +153,7 @@ The Kitty Graphics Protocol subsystem is hardened with multiple layers of sandbo
 ### 2. Decompression Bomb & Resolution Limits
 - **Max Image Dimensions**: Single image resolution is capped at **4096 × 4096 px** by default (configurable between 1024 and 8192 px).
 - **Header Pre-Inspection**: PNG `IHDR` chunk and JPEG `SOF` segments are parsed directly from raw binary headers before full image memory allocation. Oversized images are immediately rejected with `EBADMSG`.
-- **Base64 Payload Limit**: Cumulative payload for single requests or chunked streams (`m=1`) is capped at **16 MB** (configurable between 4 and 64 MB). Over-limit streams are immediately terminated.
+- **Base64 Payload Limit & Parser Buffer Cap**: Cumulative payload for single requests or chunked streams (`m=1`) is capped at **16 MB** (configurable between 4 and 64 MB). In addition, incomplete APC streams lacking terminators (`\x1b\` or `\x07`) are bounded by `maxPayloadBytes` and safely flushed, preventing memory leaks on corrupted inputs.
 
 ### 3. Texture Cache & GPU VRAM Management (LRU)
 - **VRAM Upper Bound**: Texture cache is capped at **256 MB** (RGBA 4 bytes/px, configurable between 64 and 1024 MB).

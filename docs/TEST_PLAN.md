@@ -178,14 +178,14 @@ This document provides a comprehensive, end-to-end test plan for **Waddle**, cov
 | **TC-PERF-02** | 0ms PTY Keystroke Latency | Measure typing latency and keystroke responsiveness under load. | Real-time 0ms response with zero perceived typing lag or input buffering delay. | Manual |
 | **TC-PERF-03** | Long-Session Memory Stability | Run Waddle over extended session with active tabs, Kitty images, and Git polling. | Memory saturates at steady state without runaway heap growth or listener leaks. | Manual |
 | **TC-PERF-04** | Idle CPU Consumption (0.0%) | Monitor CPU usage via `top` / `htop` while terminal is idle. | Zero polling overhead; CPU usage remains steady at 0.0% - 0.1%. | Manual |
-| **TC-PERF-05** | Automated Tests & Static Lints | Run `cargo test`, `cargo clippy --all-targets`, and `npm run build`. | All 21 Rust tests PASS, 0 Clippy warnings, 0 TypeScript compile errors. | Automated |
+| **TC-PERF-05** | Automated Tests & Static Lints | Run `cargo test`, `cargo clippy --all-targets`, and `npm run build`. | All 24 Rust tests PASS, 0 Clippy warnings, 0 TypeScript compile errors. | Automated |
 
 ---
 
 ## 4. Test Execution Commands Quick Reference
 
 ```bash
-# 1. Run all backend security and Kitty unit tests (21 tests)
+# 1. Run all backend security and Kitty unit tests (24 tests pass)
 cargo test --manifest-path src-tauri/Cargo.toml
 
 # 2. Run backend static analysis (Verify 0 warnings)
@@ -200,7 +200,10 @@ npx tsx scratch/test_sub_clipping.mjs
 # 5. Kitty Graphics Unicode placeholder (U+10EEEE) & tofu suppression test (11 assertions)
 npx tsx scratch/test_unicode_placeholder.mjs
 
-# 6. Launch interactive desktop development environment
+# 6. Automated Security Enhancements validation test (dangerous commands & APC buffer cap)
+npx tsx scratch/test_security_enhancements.mjs
+
+# 7. Launch interactive desktop development environment
 npm run tauri dev
 ```
 

@@ -262,6 +262,9 @@ pub fn read_kitty_file(
         .map_err(|e| format!("ENOENT: Failed to read file metadata: {}", e))?;
 
     if metadata.len() as usize > max_bytes {
+        if is_temp {
+            let _ = fs::remove_file(&canonical_target);
+        }
         return Err(format!(
             "EFBIG: File size ({} bytes) exceeds maximum allowed payload limit ({} bytes)",
             metadata.len(),
@@ -506,5 +509,27 @@ mod tests {
 
         // File must still be deleted despite dimension check failure
         assert!(!file_path.exists(), "Temp file MUST be deleted even if validation fails!");
+    }
+
+    #[test]
+    fn test_temp_file_deletion_on_efbig() {
+        let temp_dir = std::env::temp_dir();
+        let file_path = temp_dir.join(format!("waddle_test_temp_efbig_{}.png", std::process::id()));
+        create_dummy_png(&file_path, 80, 80);
+        assert!(file_path.exists(), "Temp file should exist before read");
+
+        // max_bytes = 10, file is ~70 bytes, so EFBIG will trigger
+        let res = read_kitty_file(
+            file_path.to_str().unwrap(),
+            None,
+            10,
+            4096,
+            true, // is_temp
+        );
+        assert!(res.is_err(), "Expected EFBIG error");
+        assert!(res.unwrap_err().contains("EFBIG"));
+
+        // File must be deleted even on EFBIG!
+        assert!(!file_path.exists(), "Temp file MUST be deleted even if EFBIG occurs!");
     }
 }
