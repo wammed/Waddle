@@ -216,8 +216,8 @@
 | `src/i18n/translations.ts` | 日英多言語辞書（Kitty 画像プロトコル設定文言・説明・警告） |
 | `docs/FEATURES.md` & `.ja.md` | 機能仕様書への第16項「Kitty Graphics Protocol」詳細解説の追加 |
 | `docs/ARCHITECTURE.md` & `.ja.md` | アーキテクチャ図および第5項「Kitty Graphics Subsystem & Pipeline」設計の追加 |
-| `docs/TEST_PLAN.md` & `.ja.md` | 完成前検証用 包括的テスト計画書（全77テストケース・期待結果・検証手順） |
-| `SECURITY.md` & `.ja.md` | セキュリティ仕様書への「Kitty Graphics Protocol Security & Resource Guards」の追加 |
+| `docs/TEST_PLAN.md` & `.ja.md` | 完成前検証用 包括的テスト計画書（全80テストケース・期待結果・検証手順・セキュリティ強化項目） |
+| `SECURITY.md` & `.ja.md` | セキュリティ仕様書への「Kitty Graphics Protocol Security & Resource Guards」および最新6大セキュリティ強化項目の追加 |
 | `README.md` & `.ja.md` | ルート README への Kitty Graphics Protocol ハイライト追加 |
 
 ---
@@ -270,7 +270,10 @@ npm run tauri dev
 4. **セキュリティ仕様・ガードレール**:
    - [`SECURITY.md`](file:///home/susie/GitHUB/wammed/Waddle/SECURITY.md) & [`SECURITY.ja.md`](file:///home/susie/GitHUB/wammed/Waddle/SECURITY.ja.md)
    - パストラバーサル防止、保護対象パス、危険コマンド検知パターン、Webview CSP、ネットワーク境界ポリシーの更新。
-5. **開発履歴・引き継ぎ**:
+5. **包括的検証テスト計画書**:
+   - [`docs/TEST_PLAN.md`](file:///home/susie/GitHUB/wammed/Waddle/docs/TEST_PLAN.md) & [`docs/TEST_PLAN.ja.md`](file:///home/susie/GitHUB/wammed/Waddle/docs/TEST_PLAN.ja.md)
+   - 全80テストケース（Suite 1〜9）の追跡、合否判定基準、自動テストコマンド群の整合性維持。
+6. **開発履歴・引き継ぎ**:
    - [`SESSION_HANDOVER.md`](file:///home/susie/GitHUB/wammed/Waddle/SESSION_HANDOVER.md)
    - ユーザー要望、時系列開発履歴、変更重要ファイル、ビルド検証結果の追記。
 
