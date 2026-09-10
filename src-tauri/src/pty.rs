@@ -663,12 +663,12 @@ pub fn git_discard_file(path_str: &str, file_path: &str) -> Result<(), String> {
     // Security check: ensure file_path does not contain path traversal outside repo_dir
     let clean_path = std::path::Path::new(file_path);
     if clean_path.components().any(|c| c == std::path::Component::ParentDir) {
-        return Err("Path traversal detected in file_path".to_string());
+        return Err("EACCES: Path traversal detected in file_path".to_string());
     }
     let p = repo_dir.join(clean_path);
     if let (Ok(repo_canon), Ok(p_canon)) = (repo_dir.canonicalize(), p.canonicalize()) {
         if !p_canon.starts_with(&repo_canon) {
-            return Err("Attempted to discard file outside repository root".to_string());
+            return Err("EACCES: Attempted to discard file outside repository root".to_string());
         }
     }
 
@@ -884,6 +884,30 @@ pub fn git_pull(path_str: &str, restrict_to_github: bool) -> Result<String, Stri
             "git pull failed".to_string()
         };
         Err(err)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_git_discard_file_path_traversal() {
+        let temp_dir = std::env::temp_dir().join(format!("waddle_discard_test_{}", uuid::Uuid::new_v4()));
+        let _ = std::fs::create_dir_all(&temp_dir);
+
+        // 1. Path containing .. must be rejected with EACCES
+        let res = git_discard_file(temp_dir.to_str().unwrap(), "../secret.txt");
+        assert!(res.is_err());
+        let err = res.unwrap_err();
+        assert!(err.starts_with("EACCES"), "Error must start with EACCES: got {}", err);
+
+        // 2. Nested traversal
+        let res2 = git_discard_file(temp_dir.to_str().unwrap(), "foo/../../secret.txt");
+        assert!(res2.is_err());
+        assert!(res2.unwrap_err().starts_with("EACCES"));
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
     }
 }
 

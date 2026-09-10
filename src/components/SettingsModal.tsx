@@ -94,11 +94,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [ollamaStatus, setOllamaStatus] = useState<OllamaStatus | null>(null);
   const [isCheckingOllama, setIsCheckingOllama] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
-  const [isCustomFont, setIsCustomFont] = useState(false);
-
-  // Wallpaper modes: 'none' | 'preset_cyberpunk' | 'custom'
   const [bgMode, setBgMode] = useState<'none' | 'preset_cyberpunk' | 'custom'>('none');
   const [customBgPath, setCustomBgPath] = useState<string>('');
+  const [wallpaperError, setWallpaperError] = useState<string | null>(null);
+  const [isDraggingOver, setIsDraggingOver] = useState<boolean>(false);
+  const [isCustomFont, setIsCustomFont] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchOllamaStatus = async (endpoint?: string) => {
@@ -122,6 +122,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       setFormData({ ...config });
+      setWallpaperError(null);
+      setIsDraggingOver(false);
       fetchOllamaStatus(config.ai.ollama_endpoint);
       const isKnownPreset = getFontOptions(selectedLang).some((f) => f.value === config.terminal.font_family);
       setIsCustomFont(!isKnownPreset && config.terminal.font_family !== 'custom');
@@ -145,6 +147,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const handleBgModeChange = (mode: 'none' | 'preset_cyberpunk' | 'custom') => {
     setBgMode(mode);
+    setWallpaperError(null);
     if (mode === 'none') {
       setFormData((prev) => ({
         ...prev,
@@ -156,9 +159,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         terminal: { ...prev.terminal, background_image: 'preset_cyberpunk' },
       }));
     } else {
-      if (!customBgPath) {
-        handleBrowseClick();
-      } else {
+      if (customBgPath) {
         setFormData((prev) => ({
           ...prev,
           terminal: { ...prev.terminal, background_image: customBgPath },
@@ -169,6 +170,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const handleCustomPathChange = (val: string) => {
     setCustomBgPath(val);
+    setWallpaperError(null);
     setFormData((prev) => ({
       ...prev,
       terminal: { ...prev.terminal, background_image: val.trim() ? val : undefined },
@@ -177,6 +179,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   // Browse for wallpaper image using native file dialog with file-input fallback
   const handleBrowseClick = async () => {
+    setWallpaperError(null);
     try {
       const selectedPath = await TauriApi.pickWallpaperFile();
       if (selectedPath) {
@@ -187,8 +190,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         }));
         return;
       }
-    } catch (err) {
-      console.warn('Native picker error, trying input fallback:', err);
+    } catch (err: any) {
+      console.warn('Native picker error:', err);
+      const errMsg = typeof err === 'string' ? err : err?.message || String(err);
+      if (errMsg.includes('許可されていない') || errMsg.includes('マジックバイト') || errMsg.includes('存在しません')) {
+        setWallpaperError(errMsg);
+        return;
+      }
     }
     fileInputRef.current?.click();
   };
@@ -197,6 +205,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setWallpaperError(null);
 
     try {
       const buffer = await file.arrayBuffer();
@@ -207,19 +216,57 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         ...prev,
         terminal: { ...prev.terminal, background_image: savedPath },
       }));
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to save wallpaper file:', err);
+      const errMsg = typeof err === 'string' ? err : err?.message || String(err);
+      setWallpaperError(errMsg);
+    }
+  };
+
+  // Drag and drop handler for wallpaper images
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOver(false);
+    setWallpaperError(null);
+
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      try {
+        const buffer = await file.arrayBuffer();
+        const bytes = new Uint8Array(buffer);
+        const savedPath = await TauriApi.saveWallpaperFile(file.name, bytes);
+        setCustomBgPath(savedPath);
+        setFormData((prev) => ({
+          ...prev,
+          terminal: { ...prev.terminal, background_image: savedPath },
+        }));
+      } catch (err: any) {
+        console.error('Failed to save dropped wallpaper:', err);
+        const errMsg = typeof err === 'string' ? err : err?.message || String(err);
+        setWallpaperError(errMsg);
+      }
     }
   };
 
   const handleSave = async () => {
-    await TauriApi.saveConfig(formData);
-    onSaveConfig(formData);
-    setSavedSuccess(true);
-    setTimeout(() => {
-      setSavedSuccess(false);
-      onClose();
-    }, 700);
+    setWallpaperError(null);
+    try {
+      if (formData.terminal.background_image && bgMode === 'custom') {
+        await TauriApi.validateWallpaperPath(formData.terminal.background_image);
+      }
+      await TauriApi.saveConfig(formData);
+      onSaveConfig(formData);
+      setSavedSuccess(true);
+      setTimeout(() => {
+        setSavedSuccess(false);
+        onClose();
+      }, 700);
+    } catch (err: any) {
+      console.error('Failed to save config:', err);
+      const errMsg = typeof err === 'string' ? err : err?.message || String(err);
+      setWallpaperError(errMsg);
+    }
   };
 
   return (
@@ -704,32 +751,72 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </select>
 
               {bgMode === 'custom' && (
-                <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
-                  <input
-                    type="text"
-                    className="form-input"
-                    style={{ ...inputStyle, flex: 1 }}
-                    placeholder={t.settings.wallpaperCustomPlaceholder}
-                    value={customBgPath}
-                    onChange={(e) => handleCustomPathChange(e.target.value)}
-                  />
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    accept="image/*"
-                    style={{ display: 'none' }}
-                    onChange={handleFileSelect}
-                  />
-                  <button
-                    type="button"
-                    className="btn-secondary"
-                    style={{ background: '#1b2234', color: '#f8fafc', whiteSpace: 'nowrap' }}
-                    onClick={handleBrowseClick}
-                    title={t.common.browse}
+                <div style={{ marginTop: '6px' }}>
+                  <div
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      setIsDraggingOver(true);
+                    }}
+                    onDragLeave={() => setIsDraggingOver(false)}
+                    onDrop={handleDrop}
+                    style={{
+                      display: 'flex',
+                      gap: '8px',
+                      padding: '4px',
+                      borderRadius: '6px',
+                      border: isDraggingOver ? '2px dashed var(--accent, #38bdf8)' : '1px solid transparent',
+                      backgroundColor: isDraggingOver ? 'rgba(56, 189, 248, 0.08)' : 'transparent',
+                      transition: 'all 0.2s ease',
+                    }}
                   >
-                    <FolderOpen size={14} />
-                    <span>{t.common.browse}</span>
-                  </button>
+                    <input
+                      type="text"
+                      className="form-input"
+                      style={{ ...inputStyle, flex: 1 }}
+                      placeholder={t.settings.wallpaperCustomPlaceholder}
+                      value={customBgPath}
+                      onChange={(e) => handleCustomPathChange(e.target.value)}
+                    />
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                      onChange={handleFileSelect}
+                    />
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      style={{ background: '#1b2234', color: '#f8fafc', whiteSpace: 'nowrap' }}
+                      onClick={handleBrowseClick}
+                      title={t.common.browse}
+                    >
+                      <FolderOpen size={14} />
+                      <span>{t.common.browse}</span>
+                    </button>
+                  </div>
+
+                  {wallpaperError && (
+                    <div
+                      className="wallpaper-error-banner"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        marginTop: '8px',
+                        padding: '8px 12px',
+                        backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                        border: '1px solid rgba(239, 68, 68, 0.4)',
+                        borderRadius: '6px',
+                        color: '#f87171',
+                        fontSize: '12px',
+                        lineHeight: '1.4',
+                      }}
+                    >
+                      <AlertTriangle size={15} style={{ flexShrink: 0 }} />
+                      <span>{wallpaperError}</span>
+                    </div>
+                  )}
                 </div>
               )}
 

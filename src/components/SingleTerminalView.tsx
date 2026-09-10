@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useCallback, useState } from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
+import { openUrl } from '@tauri-apps/plugin-opener';
 import { CanvasAddon } from '@xterm/addon-canvas';
 import { SearchAddon } from '@xterm/addon-search';
 import { Maximize2, Minimize2, X, GitBranch, Search, ChevronUp, ChevronDown } from 'lucide-react';
@@ -177,7 +178,14 @@ export const SingleTerminalView: React.FC<SingleTerminalViewProps> = ({
     const fitAddon = new FitAddon();
     const searchAddon = new SearchAddon();
     term.loadAddon(fitAddon);
-    term.loadAddon(new WebLinksAddon());
+    term.loadAddon(
+      new WebLinksAddon((_event, uri) => {
+        openUrl(uri).catch((err) => {
+          console.warn('openUrl failed, falling back to window.open:', err);
+          window.open(uri, '_blank');
+        });
+      })
+    );
     term.loadAddon(searchAddon);
 
     searchAddonRef.current = searchAddon;
@@ -243,6 +251,17 @@ export const SingleTerminalView: React.FC<SingleTerminalViewProps> = ({
         if (event.type === 'keydown') {
           handleToggleSearchRef.current();
         }
+        return false;
+      }
+      // Ctrl+Alt+Arrows: Split ratio adjustments (do not send to PTY / xterm)
+      if (
+        event.ctrlKey &&
+        event.altKey &&
+        (event.key === 'ArrowLeft' ||
+          event.key === 'ArrowRight' ||
+          event.key === 'ArrowUp' ||
+          event.key === 'ArrowDown')
+      ) {
         return false;
       }
       return true;

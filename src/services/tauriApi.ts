@@ -416,6 +416,13 @@ export const TauriApi = {
     return await invoke<string | null>('pick_wallpaper_file');
   },
 
+  async validateWallpaperPath(path: string): Promise<void> {
+    if (!isTauri()) {
+      return;
+    }
+    await invoke('validate_wallpaper_path', { path });
+  },
+
   async getSystemInfo(): Promise<SystemInfo> {
     if (!isTauri()) {
       return {

@@ -230,42 +230,78 @@ export const TerminalPane: React.FC<TerminalPaneProps> = ({
       if (e.ctrlKey && e.altKey) {
         if (e.key === 'ArrowLeft') {
           e.preventDefault();
-          setRatioX((rx) => {
-            const next = Math.max(0.15, Math.min(0.85, rx - 0.05));
-            onUpdateSplitRatios?.(tab.id, { ratioX: next, ratioY, ratioX1, ratioX2, ratioX3, ratioY1, ratioY2 });
-            return next;
-          });
+          e.stopPropagation();
+          if (tab.layout === 'split-3-h') {
+            setRatioX1((r) => {
+              const next = Math.max(0.1, Math.min(ratioX2 - 0.1, r - 0.05));
+              onUpdateSplitRatios?.(tab.id, { ratioX, ratioY, ratioX1: next, ratioX2, ratioX3, ratioY1, ratioY2 });
+              return next;
+            });
+          } else {
+            setRatioX((rx) => {
+              const next = Math.max(0.15, Math.min(0.85, rx - 0.05));
+              onUpdateSplitRatios?.(tab.id, { ratioX: next, ratioY, ratioX1, ratioX2, ratioX3, ratioY1, ratioY2 });
+              return next;
+            });
+          }
           window.dispatchEvent(new Event('resize'));
         } else if (e.key === 'ArrowRight') {
           e.preventDefault();
-          setRatioX((rx) => {
-            const next = Math.max(0.15, Math.min(0.85, rx + 0.05));
-            onUpdateSplitRatios?.(tab.id, { ratioX: next, ratioY, ratioX1, ratioX2, ratioX3, ratioY1, ratioY2 });
-            return next;
-          });
+          e.stopPropagation();
+          if (tab.layout === 'split-3-h') {
+            setRatioX1((r) => {
+              const next = Math.max(0.1, Math.min(ratioX2 - 0.1, r + 0.05));
+              onUpdateSplitRatios?.(tab.id, { ratioX, ratioY, ratioX1: next, ratioX2, ratioX3, ratioY1, ratioY2 });
+              return next;
+            });
+          } else {
+            setRatioX((rx) => {
+              const next = Math.max(0.15, Math.min(0.85, rx + 0.05));
+              onUpdateSplitRatios?.(tab.id, { ratioX: next, ratioY, ratioX1, ratioX2, ratioX3, ratioY1, ratioY2 });
+              return next;
+            });
+          }
           window.dispatchEvent(new Event('resize'));
         } else if (e.key === 'ArrowUp') {
           e.preventDefault();
-          setRatioY((ry) => {
-            const next = Math.max(0.15, Math.min(0.85, ry - 0.05));
-            onUpdateSplitRatios?.(tab.id, { ratioX, ratioY: next, ratioX1, ratioX2, ratioX3, ratioY1, ratioY2 });
-            return next;
-          });
+          e.stopPropagation();
+          if (tab.layout === 'split-3-v') {
+            setRatioY1((r) => {
+              const next = Math.max(0.1, Math.min(ratioY2 - 0.1, r - 0.05));
+              onUpdateSplitRatios?.(tab.id, { ratioX, ratioY, ratioX1, ratioX2, ratioX3, ratioY1: next, ratioY2 });
+              return next;
+            });
+          } else {
+            setRatioY((ry) => {
+              const next = Math.max(0.15, Math.min(0.85, ry - 0.05));
+              onUpdateSplitRatios?.(tab.id, { ratioX, ratioY: next, ratioX1, ratioX2, ratioX3, ratioY1, ratioY2 });
+              return next;
+            });
+          }
           window.dispatchEvent(new Event('resize'));
         } else if (e.key === 'ArrowDown') {
           e.preventDefault();
-          setRatioY((ry) => {
-            const next = Math.max(0.15, Math.min(0.85, ry + 0.05));
-            onUpdateSplitRatios?.(tab.id, { ratioX, ratioY: next, ratioX1, ratioX2, ratioX3, ratioY1, ratioY2 });
-            return next;
-          });
+          e.stopPropagation();
+          if (tab.layout === 'split-3-v') {
+            setRatioY1((r) => {
+              const next = Math.max(0.1, Math.min(ratioY2 - 0.1, r + 0.05));
+              onUpdateSplitRatios?.(tab.id, { ratioX, ratioY, ratioX1, ratioX2, ratioX3, ratioY1: next, ratioY2 });
+              return next;
+            });
+          } else {
+            setRatioY((ry) => {
+              const next = Math.max(0.15, Math.min(0.85, ry + 0.05));
+              onUpdateSplitRatios?.(tab.id, { ratioX, ratioY: next, ratioX1, ratioX2, ratioX3, ratioY1, ratioY2 });
+              return next;
+            });
+          }
           window.dispatchEvent(new Event('resize'));
         }
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [isActive, tab.id, tab.layout, ratioX, ratioY, ratioX1, ratioX2, ratioX3, ratioY1, ratioY2, onUpdateSplitRatios]);
 
   if (!tab.panes || tab.panes.length === 0) {

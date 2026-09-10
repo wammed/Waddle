@@ -13,6 +13,7 @@ if (!hasTsxLoader) {
 }
 
 import assert from 'node:assert';
+import fs from 'node:fs';
 const { isDangerousCommand } = await import('../src/components/DangerousCommandModal.tsx');
 const { KittyApcParser } = await import('../src/services/kittyGraphics/parser.ts');
 
@@ -85,5 +86,35 @@ assert.strictEqual(parser['buffer'], '', 'Buffer must be cleared when exceeding 
 assert.ok(result.cleanText.length >= 5 * 1024 * 1024, 'Data should be flushed to cleanText');
 
 console.log('✓ KittyApcParser buffer bound tests passed.');
+
+// 3. Test TC-SEC-07: Webview Content Security Policy (CSP) configuration
+console.log('Testing TC-SEC-07 (CSP configuration)...');
+const tauriConf = JSON.parse(
+  fs.readFileSync(new URL('../src-tauri/tauri.conf.json', import.meta.url), 'utf8')
+);
+const csp = tauriConf.app?.security?.csp;
+assert.ok(csp, 'CSP should be defined in tauri.conf.json');
+assert.ok(csp.includes('connect-src'), 'CSP must define connect-src directive');
+assert.ok(!csp.includes('connect-src *'), 'connect-src must not contain open wildcard *');
+assert.ok(!csp.includes('malicious-domain.com'), 'Malicious domain must not be allowed in CSP');
+assert.ok(csp.includes('https://api.github.com'), 'Allowed domain https://api.github.com should be present');
+console.log('✓ TC-SEC-07 (CSP configuration) passed.');
+
+// 4. Test TC-SEC-08: Tauri Scoped Asset Protocol configuration
+console.log('Testing TC-SEC-08 (Scoped Asset Protocol configuration)...');
+const assetProtocol = tauriConf.app?.security?.assetProtocol;
+assert.ok(assetProtocol, 'assetProtocol should be defined in tauri.conf.json');
+assert.strictEqual(assetProtocol.enable, true, 'assetProtocol should be enabled');
+const allowList = assetProtocol.scope?.allow || [];
+// Must NOT allow sensitive paths like ~/.ssh, /etc, /root
+for (const pattern of allowList) {
+  assert.ok(!pattern.includes('.ssh'), `Asset protocol allowlist must not expose .ssh: ${pattern}`);
+  assert.ok(!pattern.startsWith('/etc'), `Asset protocol allowlist must not expose /etc: ${pattern}`);
+  assert.ok(pattern !== '/*', `Asset protocol allowlist must not allow root wildcard: ${pattern}`);
+}
+// Must restrict to safe asset directories ($CONFIG/waddle, $PICTURE, $DOWNLOAD)
+assert.ok(allowList.some((p) => p.includes('PICTURE')), 'Pictures directory should be scoped');
+assert.ok(allowList.some((p) => p.includes('DOWNLOAD')), 'Downloads directory should be scoped');
+console.log('✓ TC-SEC-08 (Scoped Asset Protocol configuration) passed.');
 
 console.log('All Security Enhancement tests passed successfully!');

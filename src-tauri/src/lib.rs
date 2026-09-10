@@ -645,6 +645,9 @@ async fn pick_wallpaper_file() -> Result<Option<String>, String> {
             if output.status.success() {
                 let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
                 if !path.is_empty() {
+                    if let Err(err) = crate::config::validate_wallpaper_file_path(&path) {
+                        return Err(err);
+                    }
                     return Ok(Some(path));
                 }
             }
@@ -668,6 +671,9 @@ async fn pick_wallpaper_file() -> Result<Option<String>, String> {
             if output.status.success() {
                 let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
                 if !path.is_empty() {
+                    if let Err(err) = crate::config::validate_wallpaper_file_path(&path) {
+                        return Err(err);
+                    }
                     return Ok(Some(path));
                 }
             }
@@ -678,6 +684,11 @@ async fn pick_wallpaper_file() -> Result<Option<String>, String> {
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+fn validate_wallpaper_path(path: String) -> Result<(), String> {
+    crate::config::validate_wallpaper_file_path(&path)
 }
 
 #[tauri::command]
@@ -810,6 +821,7 @@ pub fn run() {
             save_config,
             save_wallpaper_file,
             pick_wallpaper_file,
+            validate_wallpaper_path,
             get_system_info,
             kitty_read_file,
         ])

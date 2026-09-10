@@ -305,9 +305,53 @@ impl ConfigManager {
 
     pub fn save(&self, config: &AppConfig) -> Result<(), String> {
         let mut cfg = config.clone();
+        if let Some(ref bg) = cfg.terminal.background_image {
+            validate_wallpaper_file_path(bg)?;
+        }
         self.migrate_base64_wallpaper(&mut cfg);
         self.save_internal(&cfg)
     }
+}
+
+pub fn validate_wallpaper_file_path(path_str: &str) -> Result<(), String> {
+    let trimmed = path_str.trim();
+    if trimmed.is_empty() || trimmed == "none" || trimmed == "preset_cyberpunk" || trimmed == "preset_official" {
+        return Ok(());
+    }
+    let expanded = if trimmed.starts_with("~/") {
+        if let Some(home) = dirs::home_dir() {
+            home.join(&trimmed[2..])
+        } else {
+            PathBuf::from(trimmed)
+        }
+    } else if trimmed.starts_with("$HOME/") {
+        if let Some(home) = dirs::home_dir() {
+            home.join(&trimmed[6..])
+        } else {
+            PathBuf::from(trimmed)
+        }
+    } else {
+        PathBuf::from(trimmed)
+    };
+
+    if !expanded.is_file() {
+        return Err(format!("指定された壁紙ファイルが存在しません: {}", trimmed));
+    }
+
+    use std::io::Read;
+    let mut file = fs::File::open(&expanded)
+        .map_err(|e| format!("壁紙ファイルを開けませんでした: {}", e))?;
+    let mut buffer = [0u8; 512];
+    let bytes_read = file.read(&mut buffer)
+        .map_err(|e| format!("壁紙ファイルの読み込みに失敗しました: {}", e))?;
+    if bytes_read == 0 {
+        return Err("壁紙ファイルが空です。".to_string());
+    }
+
+    validate_image_data_and_filename(
+        expanded.file_name().and_then(|n| n.to_str()).unwrap_or("wallpaper.png"),
+        &buffer[..bytes_read],
+    ).map(|_| ())
 }
 
 #[cfg(test)]
@@ -427,5 +471,29 @@ mod tests {
         let cfg: AppConfig = serde_json::from_str(json_custom_git).unwrap();
         assert!(!cfg.git.enabled);
         assert!(!cfg.git.restrict_to_github);
+    }
+
+    #[test]
+    fn test_validate_wallpaper_file_path() {
+        let temp_dir = std::env::temp_dir().join(format!("waddle_val_test_{}", uuid::Uuid::new_v4()));
+        let _ = fs::create_dir_all(&temp_dir);
+
+        // Valid preset / none
+        assert!(validate_wallpaper_file_path("none").is_ok());
+        assert!(validate_wallpaper_file_path("preset_cyberpunk").is_ok());
+
+        // Fake png with text content must be rejected
+        let fake_png_path = temp_dir.join("test.png");
+        fs::write(&fake_png_path, b"this is a text file masquerading as png").unwrap();
+        let res = validate_wallpaper_file_path(fake_png_path.to_str().unwrap());
+        assert!(res.is_err());
+        assert!(res.unwrap_err().contains("許可されていないファイル形式"));
+
+        // Valid png must be accepted
+        let real_png_path = temp_dir.join("real.png");
+        fs::write(&real_png_path, b"\x89PNG\r\n\x1a\nvalid_png_header_and_data").unwrap();
+        assert!(validate_wallpaper_file_path(real_png_path.to_str().unwrap()).is_ok());
+
+        let _ = fs::remove_dir_all(&temp_dir);
     }
 }

@@ -161,8 +161,8 @@
 | **TC-SEC-04** | 単語境界による危険コマンド検知 | `rm -rf /`, `mkfs`, `mkswap`, `cryptsetup`, `dd if=`, `git reset --hard`, `git push --force`, `git push --delete`, `git branch -D` を実行指示。 | `DangerousCommandModal` が Rust 側と完全同期して検知し即時実行を保留。`format_disk` 変数等では誤検知しない。 | Automated / Manual |
 | **TC-SEC-05** | パイプ経由スクリプト実行の検知 | `curl ... \| bash`, `wget ... \| python3`, `python <(...)`, `bash <(...)` を含むコマンドを発行。 | 危険パターンとして検知され、警告ダイアログが表示される。 | Automated / Manual |
 | **TC-SEC-06** | AI プロンプトインジェクション防御 | 大文字小文字や空白を含む変形タグ `</ Untrusted_Terminal_Output >` を含む出力を生成し `Ctrl+K` を起動。 | 正規表現 `(?i)</?\s*untrusted_terminal_output\s*>` により変形タグも完全に安全除去され、LLM へのプロンプト脱出が阻止される。 | Automated |
-| **TC-SEC-07** | Webview Content Security Policy (CSP) | インスペクタコンソールから `fetch('https://malicious-domain.com')` を実行。 | CSP の `connect-src` 違反としてブラウザエンジンにより通信が遮断される。 | Manual |
-| **TC-SEC-08** | Tauri Scoped Asset Protocol | `asset://localhost/home/user/.ssh/id_rsa` を読み込み要求。 | アセットスコープ制限（`$CONFIG/waddle`, `$PICTURE`, `$DOWNLOAD`）によりアクセス拒絶。 | Automated |
+| **TC-SEC-07** | Webview Content Security Policy (CSP) | インスペクタコンソールから `fetch('https://malicious-domain.com')` を実行（または `node scratch/test_security_enhancements.mjs` で設定検証）。 | CSP の `connect-src` 違反としてブラウザエンジンにより通信が遮断される。 | Manual / Automated |
+| **TC-SEC-08** | Tauri Scoped Asset Protocol | `asset://localhost/home/user/.ssh/id_rsa` を読み込み要求（または `node scratch/test_security_enhancements.mjs` でスコープ設定検証）。 | アセットスコープ制限（`$CONFIG/waddle`, `$PICTURE`, `$DOWNLOAD`）によりアクセス拒絶。 | Automated |
 | **TC-SEC-09** | Kitty ローカルファイルサンドボックス | `t=f` で `/etc/shadow` や `~/.ssh/` を指定。 | Rust の `canonicalize` 検証により `EACCES` で即時ブロックされる。 | Automated |
 | **TC-SEC-10** | Kitty シンボリックリンク脱出防止 | `$HOME/Pictures/link` -> `/etc` のシンボリックリンクを作成し `t=f` で参照。 | 正準化後の実パスが許可ディレクトリ外と判定されアクセス拒絶される。 | Automated |
 | **TC-SEC-11** | Kitty 展開爆弾 (Decompression Bomb) 防護 | 4096×4096 px 超過や不正な PNG IHDR / JPEG SOF 画像を送信。 | メモリ展開前にヘッダー検査で検知され即時破棄される。 | Automated |
