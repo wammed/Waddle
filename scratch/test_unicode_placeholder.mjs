@@ -1,12 +1,26 @@
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+
+// Auto-delegate to `npx tsx` if executed directly via `node` without TypeScript/TSX loader
+const hasTsxLoader = process.execArgv.some((a) => a.includes('tsx/dist'));
+if (!hasTsxLoader) {
+  const result = spawnSync(
+    'npx',
+    ['tsx', fileURLToPath(import.meta.url), ...process.argv.slice(2)],
+    { stdio: 'inherit' }
+  );
+  process.exit(result.status ?? 0);
+}
+
 import assert from 'assert';
-import {
+const {
   isPlaceholderCell,
   decodePlaceholderCell,
   computePlaceholderUV,
   ROW_COLUMN_DIACRITICS,
   PLACEHOLDER_CODEPOINT,
-} from '../src/services/kittyGraphics/unicodePlaceholder.ts';
-import { KittyGraphicsManager } from '../src/services/kittyGraphics/manager.ts';
+} = await import('../src/services/kittyGraphics/unicodePlaceholder.ts');
+const { KittyGraphicsManager } = await import('../src/services/kittyGraphics/manager.ts');
 import xtermPkg from '@xterm/xterm';
 const { Terminal } = xtermPkg;
 
