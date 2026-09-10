@@ -33,17 +33,20 @@ export class KittyGraphicsManager {
   private isDisposed: boolean = false;
   private screenElement: HTMLElement | null = null;
   private canvasAddon?: any;
+  private onPtyWrite?: (data: string) => void;
 
   constructor(
     term: Terminal,
     container: HTMLElement,
     sessionId: string,
     config?: KittyGraphicsConfig,
-    canvasAddon?: any
+    canvasAddon?: any,
+    onPtyWrite?: (data: string) => void
   ) {
     this.term = term;
     this.sessionId = sessionId;
     this.canvasAddon = canvasAddon;
+    this.onPtyWrite = onPtyWrite;
 
     const maxDim = config?.max_dimension ?? 4096;
     const maxPayload = config?.max_payload_mb ?? 16;
@@ -62,6 +65,10 @@ export class KittyGraphicsManager {
   public setCanvasAddon(addon: any): void {
     this.canvasAddon = addon;
     this.installCanvasRendererHook();
+  }
+
+  public setOnPtyWrite(fn: (data: string) => void): void {
+    this.onPtyWrite = fn;
   }
 
   public updateConfig(config?: KittyGraphicsConfig) {
@@ -744,10 +751,21 @@ export class KittyGraphicsManager {
 
     switch (action) {
       case 'q': {
-        // Capability query probe (e.g. from fastfetch)
-        // Protocol specifies that queries MUST receive a response regardless of quiet setting
-        const id = cmd.keys.i !== undefined ? cmd.keys.i : 0;
-        this.sendPtyResponse(id, 'OK', cmd.keys.q, true);
+        // Query action (a=q):
+        // Query if an image exists in cache / manager, or probe protocol capability.
+        // Protocol specifies that queries MUST receive a response regardless of quiet setting.
+        const id = cmd.keys.i !== undefined ? cmd.keys.i : (cmd.keys.I !== undefined ? cmd.keys.I : 0);
+        if (id > 0) {
+          const pendingLoad = this.loadingImages.get(id);
+          if (pendingLoad) {
+            await pendingLoad;
+          }
+          const exists = this.cache.has(id) || this.virtualPlacements.has(id);
+          this.sendPtyResponse(id, exists ? 'OK' : 'ENOENT', cmd.keys.q, true);
+        } else {
+          // General protocol capability query probe (e.g. from fastfetch)
+          this.sendPtyResponse(0, 'OK', cmd.keys.q, true);
+        }
         break;
       }
 
@@ -1563,9 +1581,17 @@ export class KittyGraphicsManager {
     }
 
     const resp = id > 0 ? `\x1b_Gi=${id};${message}\x1b\\` : `\x1b_G;${message}\x1b\\`;
-    TauriApi.writePty(this.sessionId, resp).catch(() => {
-      // ignore write error if session closed
-    });
+    if (this.onPtyWrite) {
+      try {
+        this.onPtyWrite(resp);
+      } catch (err) {
+        console.warn('Failed to write Kitty response via onPtyWrite:', err);
+      }
+    } else {
+      TauriApi.writePty(this.sessionId, resp).catch(() => {
+        // ignore write error if session closed
+      });
+    }
   }
 
   public dispose() {

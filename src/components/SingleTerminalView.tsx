@@ -203,7 +203,10 @@ export const SingleTerminalView: React.FC<SingleTerminalViewProps> = ({
           containerRef.current,
           pane.sessionId,
           config.kitty_graphics,
-          canvasAddon || undefined
+          canvasAddon || undefined,
+          (data: string) => {
+            TauriApi.writePty(pane.sessionId, data);
+          }
         );
         kittyManagerRef.current = kittyManager;
         kittyManager.installCanvasRendererHook();
