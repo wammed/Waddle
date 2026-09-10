@@ -246,13 +246,18 @@ export const SingleTerminalView: React.FC<SingleTerminalViewProps> = ({
 
     // Attach custom keyboard shortcut handler to terminal
     term.attachCustomKeyEventHandler((event) => {
+      const isCtrlOrMeta = event.ctrlKey || event.metaKey;
+      const keyLower = event.key?.toLowerCase();
+      const code = event.code;
+
       // Ctrl+Shift+F or Ctrl+F: Open search
-      if ((event.ctrlKey || event.metaKey) && (event.key === 'f' || event.key === 'F')) {
+      if (isCtrlOrMeta && (keyLower === 'f' || code === 'KeyF')) {
         if (event.type === 'keydown') {
           handleToggleSearchRef.current();
         }
         return false;
       }
+
       // Ctrl+Alt+Arrows: Split ratio adjustments (do not send to PTY / xterm)
       if (
         event.ctrlKey &&
@@ -260,10 +265,64 @@ export const SingleTerminalView: React.FC<SingleTerminalViewProps> = ({
         (event.key === 'ArrowLeft' ||
           event.key === 'ArrowRight' ||
           event.key === 'ArrowUp' ||
-          event.key === 'ArrowDown')
+          event.key === 'ArrowDown' ||
+          code === 'ArrowLeft' ||
+          code === 'ArrowRight' ||
+          code === 'ArrowUp' ||
+          code === 'ArrowDown')
       ) {
         return false;
       }
+
+      // Alt+Arrows: Directional pane focus (do not send to PTY / xterm)
+      if (
+        event.altKey &&
+        !event.ctrlKey &&
+        (event.key === 'ArrowLeft' ||
+          event.key === 'ArrowRight' ||
+          event.key === 'ArrowUp' ||
+          event.key === 'ArrowDown' ||
+          code === 'ArrowLeft' ||
+          code === 'ArrowRight' ||
+          code === 'ArrowUp' ||
+          code === 'ArrowDown')
+      ) {
+        return false;
+      }
+
+      // Alt+Z: Active pane zoom toggle (do not send to PTY / xterm)
+      if (event.altKey && !event.ctrlKey && (keyLower === 'z' || code === 'KeyZ')) {
+        return false;
+      }
+
+      // Alt+1 .. Alt+4: Layout switching (main keyboard digits or numpad)
+      if (
+        event.altKey &&
+        !event.ctrlKey &&
+        (['1', '2', '3', '4'].includes(event.key) ||
+          ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Numpad1', 'Numpad2', 'Numpad3', 'Numpad4'].includes(code))
+      ) {
+        return false;
+      }
+
+      // Global App shortcuts: Ctrl+K, Ctrl+B, Ctrl+E, Ctrl+T, Ctrl+W, Ctrl+Shift+S, Ctrl+,
+      if (isCtrlOrMeta) {
+        // AI Command: Ctrl+K or Ctrl+Shift+K
+        if (keyLower === 'k' || code === 'KeyK') return false;
+        // Sidebar: Ctrl+B or Ctrl+Shift+B
+        if (keyLower === 'b' || code === 'KeyB') return false;
+        // Editor: Ctrl+E or Ctrl+Shift+E
+        if (keyLower === 'e' || code === 'KeyE') return false;
+        // Tabs: Ctrl+T or Ctrl+Shift+T
+        if (keyLower === 't' || code === 'KeyT') return false;
+        // Close Tab / Pane: Ctrl+W or Ctrl+Shift+W
+        if (keyLower === 'w' || code === 'KeyW') return false;
+        // Swap Panes: Ctrl+Shift+S
+        if (event.shiftKey && (keyLower === 's' || code === 'KeyS')) return false;
+        // Settings: Ctrl+,
+        if (event.key === ',' || code === 'Comma') return false;
+      }
+
       return true;
     });
 

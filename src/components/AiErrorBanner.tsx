@@ -57,6 +57,17 @@ export const AiErrorBanner: React.FC<AiErrorBannerProps> = ({
     }
   };
 
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onDismiss();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onDismiss]);
+
   return (
     <div className="error-banner">
       <div className="error-banner-content">

@@ -44,8 +44,17 @@ export const AiCommandModal: React.FC<AiCommandModalProps> = ({
       setSuggestion(null);
       setErrorMsg(null);
       setTimeout(() => inputRef.current?.focus(), 50);
+
+      const handleGlobalKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          onClose();
+        }
+      };
+      window.addEventListener('keydown', handleGlobalKeyDown);
+      return () => window.removeEventListener('keydown', handleGlobalKeyDown);
     }
-  }, [isOpen]);
+  }, [isOpen, onClose]);
 
   const handleGenerate = async () => {
     if (!prompt.trim() || loading) return;
@@ -72,9 +81,17 @@ export const AiCommandModal: React.FC<AiCommandModalProps> = ({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    const isEnter =
+      e.key === 'Enter' ||
+      e.key === '\n' ||
+      e.code === 'Enter' ||
+      e.code === 'NumpadEnter';
+
     if (e.key === 'Escape') {
+      e.preventDefault();
       onClose();
-    } else if (e.key === 'Enter') {
+    } else if (isEnter) {
+      e.preventDefault();
       if (e.ctrlKey || e.metaKey) {
         // Ctrl+Enter -> Execute immediately
         if (suggestion) {

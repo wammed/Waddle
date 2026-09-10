@@ -86,7 +86,7 @@ export const GitQuickPopover: React.FC<GitQuickPopoverProps> = ({
     }
   }, [isOpen, loadBranches]);
 
-  // Click outside to close
+  // Click outside or Escape to close
   useEffect(() => {
     if (!isOpen) return;
     const handleClickOutside = (e: MouseEvent) => {
@@ -98,8 +98,18 @@ export const GitQuickPopover: React.FC<GitQuickPopoverProps> = ({
         onClose();
       }
     };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+      }
+    };
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
   }, [isOpen, onClose]);
 
   // Switch branch
@@ -581,7 +591,14 @@ export const GitQuickPopover: React.FC<GitQuickPopoverProps> = ({
             value={commitMessage}
             onChange={(e) => setCommitMessage(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+              const isEnter =
+                e.key === 'Enter' ||
+                e.key === '\n' ||
+                e.code === 'Enter' ||
+                e.code === 'NumpadEnter';
+              if (isEnter && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault();
+                e.stopPropagation();
                 handleCommit();
               }
             }}

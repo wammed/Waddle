@@ -177,6 +177,7 @@ export function App() {
     handleApplyLayout,
     handleDirectionalFocus,
     handleSwapPanes,
+    handleToggleZoomPane,
     createNewTab,
     closeTab,
     setIsAiCommandOpen,

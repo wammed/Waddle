@@ -78,6 +78,19 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
     }
   }, [targetFilePath]);
 
+  useEffect(() => {
+    if (!isAiModalOpen) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsAiModalOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [isAiModalOpen]);
+
   // Open a file
   const handleOpenFile = async (name: string) => {
     const fullPath = name.startsWith('/') ? name : `${cwd.replace(/\/$/, '')}/${name}`;
@@ -169,6 +182,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
       handleSave();
     } else if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'k') {
       e.preventDefault();
+      e.stopPropagation();
       setIsAiModalOpen(true);
     } else if (e.key === 'Tab') {
       e.preventDefault();
@@ -478,8 +492,19 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
               value={aiInstruction}
               onChange={(e) => setAiInstruction(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                const isEnter =
+                  e.key === 'Enter' ||
+                  e.key === '\n' ||
+                  e.code === 'Enter' ||
+                  e.code === 'NumpadEnter';
+                if (isEnter && (e.ctrlKey || e.metaKey)) {
+                  e.preventDefault();
+                  e.stopPropagation();
                   handleAiEdit();
+                } else if (e.key === 'Escape') {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsAiModalOpen(false);
                 }
               }}
             />
