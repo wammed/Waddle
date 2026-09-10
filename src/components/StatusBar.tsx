@@ -20,6 +20,7 @@ interface StatusBarProps {
   onOpenSettings: () => void;
   onToggleGitPopover?: () => void;
   isGitPopoverOpen?: boolean;
+  isAiActive?: boolean;
 }
 
 export const StatusBar: React.FC<StatusBarProps> = ({
@@ -31,6 +32,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({
   onOpenSettings,
   onToggleGitPopover,
   isGitPopoverOpen,
+  isAiActive = false,
 }) => {
   const { t } = useI18n();
   const [copied, setCopied] = useState(false);
@@ -165,11 +167,11 @@ export const StatusBar: React.FC<StatusBarProps> = ({
         )}
 
         <div
-          className="status-item ai-status-indicator"
+          className={`status-item ai-status-indicator ${isAiActive ? 'active' : ''}`}
           onClick={onOpenSettings}
           title={t.statusBar.aiSettingsTooltip}
         >
-          <span className="pulse-dot" />
+          <span className={`pulse-dot ${isAiActive ? 'active' : ''}`} />
           <span>{getProviderName()}</span>
         </div>
       </div>

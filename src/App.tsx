@@ -459,6 +459,7 @@ export function App() {
         onOpenSettings={() => setIsSettingsOpen(true)}
         onToggleGitPopover={() => setIsGitPopoverOpen((prev) => !prev)}
         isGitPopoverOpen={isGitPopoverOpen}
+        isAiActive={isAiCommandOpen || isAiSidebarOpen}
       />
 
       {/* Git Quick Popover */}

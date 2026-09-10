@@ -83,6 +83,7 @@ export const SingleTerminalView: React.FC<SingleTerminalViewProps> = ({
   }, []);
 
   const lastDimensionsRef = useRef<{ cols: number; rows: number }>({ cols: 0, rows: 0 });
+  const fetchCwdAndGitRef = useRef<() => void>(() => {});
 
   const fitTerminal = useCallback(() => {
     if (!containerRef.current || !fitAddonRef.current || !termRef.current) return;
@@ -309,8 +310,18 @@ export const SingleTerminalView: React.FC<SingleTerminalViewProps> = ({
       }
     };
 
+    fetchCwdAndGitRef.current = fetchCwdAndGit;
+
     // Defer initial CWD/Git check so startup rendering & input is 100% instantaneous
     const initialFetchTimer = setTimeout(fetchCwdAndGit, 1200);
+
+    // Window focus listener to refresh CWD/Git when returning from other applications
+    const handleWindowFocus = () => {
+      if (!document.hidden && isTabActiveRef.current) {
+        fetchCwdAndGit();
+      }
+    };
+    window.addEventListener('focus', handleWindowFocus);
 
     // Send user input to PTY
     let inputLine = '';
@@ -334,6 +345,7 @@ export const SingleTerminalView: React.FC<SingleTerminalViewProps> = ({
     // Listen to PTY output
     let unlistenOutput: (() => void) | undefined;
     let unlistenExit: (() => void) | undefined;
+    let ptyOutputDebounce: ReturnType<typeof setTimeout> | null = null;
 
     TauriApi.onPtyOutput(pane.sessionId, (output) => {
       // Intercept Kitty APC sequences before passing clean text to xterm
@@ -346,6 +358,12 @@ export const SingleTerminalView: React.FC<SingleTerminalViewProps> = ({
         }
         onUpdatePaneRef.current({ lastOutput: outputBufferRef.current });
         detectErrorPatterns(textToWrite);
+
+        // Event-driven: refresh Git & CWD when command finishes and output settles
+        if (ptyOutputDebounce) clearTimeout(ptyOutputDebounce);
+        ptyOutputDebounce = setTimeout(() => {
+          fetchCwdAndGit();
+        }, 500);
       }
     }).then((unlisten) => {
       unlistenOutput = unlisten;
@@ -362,13 +380,6 @@ export const SingleTerminalView: React.FC<SingleTerminalViewProps> = ({
     }).then((unlisten) => {
       unlistenExit = unlisten;
     });
-
-    // Poll CWD and Git status periodically
-    const pollInterval = setInterval(() => {
-      if (!document.hidden && isTabActiveRef.current) {
-        fetchCwdAndGit();
-      }
-    }, 4000);
 
     // Resize observer with requestAnimationFrame throttling
     let resizeRafId: number | null = null;
@@ -397,7 +408,8 @@ export const SingleTerminalView: React.FC<SingleTerminalViewProps> = ({
       cancelAnimationFrame(rafId);
       clearTimeout(settleTimeout);
       clearTimeout(initialFetchTimer);
-      clearInterval(pollInterval);
+      if (ptyOutputDebounce) clearTimeout(ptyOutputDebounce);
+      window.removeEventListener('focus', handleWindowFocus);
       resizeObserver.disconnect();
       onDataDisposable.dispose();
       if (unlistenOutput) unlistenOutput();
@@ -422,10 +434,11 @@ export const SingleTerminalView: React.FC<SingleTerminalViewProps> = ({
     kittyManagerRef.current?.updateConfig(config.kitty_graphics);
   }, [config.kitty_graphics]);
 
-  // Force render graphics when tab or pane becomes active
+  // Force render graphics and refresh status when tab or pane becomes active
   useEffect(() => {
     if (isTabActive && isActivePane) {
       kittyManagerRef.current?.render();
+      fetchCwdAndGitRef.current();
     }
   }, [isTabActive, isActivePane]);
 

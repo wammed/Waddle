@@ -455,7 +455,12 @@ body, html {
   border-radius: 50%;
   background-color: var(--accent);
   box-shadow: 0 0 6px var(--accent);
-  animation: pulse 2s infinite;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.pulse-dot.active,
+.ai-status-indicator:hover .pulse-dot {
+  animation: pulse 1.5s infinite;
 }
 
 @keyframes pulse {
