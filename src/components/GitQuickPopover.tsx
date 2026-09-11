@@ -40,6 +40,7 @@ export const GitQuickPopover: React.FC<GitQuickPopoverProps> = ({
 }) => {
   const { t } = useI18n();
   const popoverRef = useRef<HTMLDivElement>(null);
+  const commitInputRef = useRef<HTMLInputElement>(null);
 
   const [branches, setBranches] = useState<string[]>([]);
   const [isSwitchingBranch, setIsSwitchingBranch] = useState(false);
@@ -53,6 +54,15 @@ export const GitQuickPopover: React.FC<GitQuickPopoverProps> = ({
   const [isPulling, setIsPulling] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  const commitMessageRef = useRef(commitMessage);
+  const repoPathRef = useRef(repoPath);
+  const isCommittingRef = useRef(isCommitting);
+  const handleCommitRef = useRef<() => void>(() => {});
+
+  commitMessageRef.current = commitMessage;
+  repoPathRef.current = repoPath;
+  isCommittingRef.current = isCommitting;
 
   // Categorize files
   const files = gitStatus.files || [];
@@ -86,9 +96,13 @@ export const GitQuickPopover: React.FC<GitQuickPopoverProps> = ({
     }
   }, [isOpen, loadBranches]);
 
-  // Click outside or Escape to close
+  // Click outside or Escape / Ctrl+Enter handler
   useEffect(() => {
     if (!isOpen) return;
+
+    // Focus input on open
+    setTimeout(() => commitInputRef.current?.focus(), 50);
+
     const handleClickOutside = (e: MouseEvent) => {
       if (
         popoverRef.current &&
@@ -98,17 +112,30 @@ export const GitQuickPopover: React.FC<GitQuickPopoverProps> = ({
         onClose();
       }
     };
+
     const handleKeyDown = (e: KeyboardEvent) => {
+      const isEnter =
+        e.key === 'Enter' ||
+        e.key === '\n' ||
+        e.code === 'Enter' ||
+        e.code === 'NumpadEnter';
+
       if (e.key === 'Escape') {
         e.preventDefault();
+        e.stopPropagation();
         onClose();
+      } else if (isEnter && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        e.stopPropagation();
+        handleCommitRef.current();
       }
     };
+
     document.addEventListener('mousedown', handleClickOutside);
-    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown, true);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
-      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keydown', handleKeyDown, true);
     };
   }, [isOpen, onClose]);
 
@@ -192,6 +219,7 @@ export const GitQuickPopover: React.FC<GitQuickPopoverProps> = ({
     try {
       const msg = await TauriApi.gitGenerateCommitMessage(repoPath);
       setCommitMessage(msg);
+      setTimeout(() => commitInputRef.current?.focus(), 50);
     } catch (err: any) {
       setActionError(String(err));
     } finally {
@@ -201,11 +229,12 @@ export const GitQuickPopover: React.FC<GitQuickPopoverProps> = ({
 
   // Commit
   const handleCommit = async () => {
-    if (!commitMessage.trim()) return;
+    const msg = commitMessageRef.current.trim();
+    if (!msg || isCommittingRef.current) return;
     setIsCommitting(true);
     setActionError(null);
     try {
-      const res = await TauriApi.gitCommit(repoPath, commitMessage.trim());
+      const res = await TauriApi.gitCommit(repoPathRef.current, msg);
       setSuccessMessage(res.split('\n')[0] || 'Committed successfully');
       setCommitMessage('');
       onRefreshGit();
@@ -214,8 +243,11 @@ export const GitQuickPopover: React.FC<GitQuickPopoverProps> = ({
       setActionError(String(err));
     } finally {
       setIsCommitting(false);
+      setTimeout(() => commitInputRef.current?.focus(), 50);
     }
   };
+
+  handleCommitRef.current = handleCommit;
 
   // Push
   const handlePush = async () => {
@@ -585,6 +617,7 @@ export const GitQuickPopover: React.FC<GitQuickPopoverProps> = ({
 
         <div className="git-commit-input-wrapper">
           <input
+            ref={commitInputRef}
             type="text"
             className="git-commit-input"
             placeholder={t.gitPopover.commitMessagePlaceholder}

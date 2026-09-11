@@ -37,6 +37,41 @@ export const AiCommandModal: React.FC<AiCommandModalProps> = ({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [confirmCmd, setConfirmCmd] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const suggestionRef = useRef<CommandSuggestion | null>(null);
+  const loadingRef = useRef<boolean>(false);
+  const promptRef = useRef<string>('');
+  const confirmCmdRef = useRef<string | null>(null);
+
+  suggestionRef.current = suggestion;
+  loadingRef.current = loading;
+  promptRef.current = prompt;
+  confirmCmdRef.current = confirmCmd;
+
+  const handleGenerate = async () => {
+    const currentPrompt = promptRef.current.trim();
+    if (!currentPrompt || loadingRef.current) return;
+    setLoading(true);
+    setErrorMsg(null);
+
+    try {
+      const res = await TauriApi.generateCommand(currentPrompt, context);
+      setSuggestion(res);
+    } catch (err: any) {
+      setErrorMsg(String(err));
+    } finally {
+      setLoading(false);
+      setTimeout(() => inputRef.current?.focus(), 50);
+    }
+  };
+
+  const handleRun = (cmd: string) => {
+    if (suggestionRef.current?.is_dangerous || isDangerousCommand(cmd)) {
+      setConfirmCmd(cmd);
+    } else {
+      onExecuteCommand(cmd);
+      onClose();
+    }
+  };
 
   useEffect(() => {
     if (isOpen) {
@@ -46,39 +81,45 @@ export const AiCommandModal: React.FC<AiCommandModalProps> = ({
       setTimeout(() => inputRef.current?.focus(), 50);
 
       const handleGlobalKeyDown = (e: KeyboardEvent) => {
+        // If dangerous confirmation is open, let it handle keys
+        if (confirmCmdRef.current) return;
+
+        const isEnter =
+          e.key === 'Enter' ||
+          e.key === '\n' ||
+          e.code === 'Enter' ||
+          e.code === 'NumpadEnter';
+
         if (e.key === 'Escape') {
           e.preventDefault();
+          e.stopPropagation();
           onClose();
+        } else if (isEnter) {
+          e.preventDefault();
+          e.stopPropagation();
+          if (e.ctrlKey || e.metaKey) {
+            // Ctrl+Enter -> Execute immediately
+            if (suggestionRef.current) {
+              handleRun(suggestionRef.current.command);
+            } else {
+              handleGenerate();
+            }
+          } else {
+            // Enter -> If suggestion exists, insert. Else generate.
+            if (suggestionRef.current) {
+              onInsertCommand(suggestionRef.current.command);
+              onClose();
+            } else {
+              handleGenerate();
+            }
+          }
         }
       };
-      window.addEventListener('keydown', handleGlobalKeyDown);
-      return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+
+      window.addEventListener('keydown', handleGlobalKeyDown, true);
+      return () => window.removeEventListener('keydown', handleGlobalKeyDown, true);
     }
   }, [isOpen, onClose]);
-
-  const handleGenerate = async () => {
-    if (!prompt.trim() || loading) return;
-    setLoading(true);
-    setErrorMsg(null);
-
-    try {
-      const res = await TauriApi.generateCommand(prompt.trim(), context);
-      setSuggestion(res);
-    } catch (err: any) {
-      setErrorMsg(String(err));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleRun = (cmd: string) => {
-    if (suggestion?.is_dangerous || isDangerousCommand(cmd)) {
-      setConfirmCmd(cmd);
-    } else {
-      onExecuteCommand(cmd);
-      onClose();
-    }
-  };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     const isEnter =
@@ -89,20 +130,20 @@ export const AiCommandModal: React.FC<AiCommandModalProps> = ({
 
     if (e.key === 'Escape') {
       e.preventDefault();
+      e.stopPropagation();
       onClose();
     } else if (isEnter) {
       e.preventDefault();
+      e.stopPropagation();
       if (e.ctrlKey || e.metaKey) {
-        // Ctrl+Enter -> Execute immediately
-        if (suggestion) {
-          handleRun(suggestion.command);
+        if (suggestionRef.current) {
+          handleRun(suggestionRef.current.command);
         } else {
           handleGenerate();
         }
       } else {
-        // Enter -> If suggestion exists, insert. Else generate.
-        if (suggestion) {
-          onInsertCommand(suggestion.command);
+        if (suggestionRef.current) {
+          onInsertCommand(suggestionRef.current.command);
           onClose();
         } else {
           handleGenerate();
