@@ -708,6 +708,7 @@ export const TEST_CASES: TestCase[] = [
     expected: 'Payload coalesces in memory and decodes cleanly on final chunk.',
     expectedJa: 'メモリ内で結合され、m=0 で欠損なく単一画像としてデコード・描画される。',
     type: 'Scripted',
+    command: 'node scratch/test_kitty_chunking.mjs',
   },
   {
     id: 'TC-KITTY-04',
@@ -721,6 +722,7 @@ export const TEST_CASES: TestCase[] = [
     expected: 'Responds OK immediately for a=q; suppresses leak for q=0; always responds for q=2.',
     expectedJa: 'a=q に即座に OK 返信。q=0 で一切の不要エスケープ漏洩がなく、q=2 で常時応答。',
     type: 'Scripted / Manual',
+    command: 'node scratch/test_kitty_query.mjs',
   },
   {
     id: 'TC-KITTY-05',
@@ -762,6 +764,7 @@ export const TEST_CASES: TestCase[] = [
     expected: 'xterm scrolls automatically; entire image fits completely in viewport.',
     expectedJa: 'xterm 内部の自動スクロールが働き、画像全体が画面内に確実に収まる。',
     type: 'Scripted',
+    command: 'node scratch/test_cursor_advance.mjs',
   },
   {
     id: 'TC-KITTY-08',
@@ -831,6 +834,7 @@ export const TEST_CASES: TestCase[] = [
     expected: 'Image dimensions and clipping are registered without consuming text buffer cells.',
     expectedJa: 'テキストバッファの空白専有を行わずに仮想配置サイズ・切り抜き情報が保持される。',
     type: 'Scripted',
+    command: 'node scratch/test_unicode_placeholder.mjs',
   },
   {
     id: 'TC-KITTY-13',
@@ -985,6 +989,7 @@ export const TEST_CASES: TestCase[] = [
     expected: 'Asset protocol scope disallows path; access denied.',
     expectedJa: 'アセットスコープ制限（$CONFIG/waddle, $PICTURE, $DOWNLOAD）によりアクセス拒絶。',
     type: 'Automated',
+    command: 'node scratch/test_security_enhancements.mjs',
   },
   {
     id: 'TC-SEC-09',
@@ -1140,6 +1145,7 @@ export const TEST_CASES: TestCase[] = [
     expected: 'Textures evict upon exceeding 256MB; ImageBitmap.close() frees VRAM immediately.',
     expectedJa: '256MB 超過時に古い画像が追い出され、ImageBitmap.close() によりメモリが解放される。',
     type: 'Automated / Manual',
+    command: 'node scratch/test_lru_vram.mjs',
   },
   {
     id: 'TC-PERF-02',

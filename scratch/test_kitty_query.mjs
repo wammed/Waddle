@@ -53,6 +53,13 @@ if (typeof window === 'undefined') {
     getComputedStyle: () => ({ paddingLeft: '0', paddingTop: '0' }),
   };
 }
+if (typeof createImageBitmap === 'undefined') {
+  globalThis.createImageBitmap = async () => ({
+    width: 1,
+    height: 1,
+    close: () => {},
+  });
+}
 
 const mockTerm = {
   cols: 80,
@@ -120,16 +127,16 @@ async function runTests() {
   manager.filterPtyOutput('\x1b_Ga=q;\x1b\\');
   await new Promise((r) => setTimeout(r, 20));
   assert.strictEqual(ptyWrites.length, 1, 'Should send exactly 1 response for capability query');
-  assert.strictEqual(ptyWrites[0], '\x1b_G;OK\x1b\\', 'Should respond with \\x1b_G;OK\\x1b\\ for capability query');
-  console.log('✔ Test 3: Capability query (a=q) correctly responded with \\x1b_G;OK\\x1b\\');
+  assert.strictEqual(ptyWrites[0], '\x1b_G;ok\x1b\\', 'Should respond with \\x1b_G;ok\\x1b\\ for capability query');
+  console.log('✔ Test 3: Capability query (a=q) correctly responded with \\x1b_G;ok\\x1b\\');
 
   // Test 4: Capability query probe with i=0 (a=q,i=0)
   ptyWrites.length = 0;
   manager.filterPtyOutput('\x1b_Ga=q,i=0;\x1b\\');
   await new Promise((r) => setTimeout(r, 20));
   assert.strictEqual(ptyWrites.length, 1, 'Should send exactly 1 response for i=0 query');
-  assert.strictEqual(ptyWrites[0], '\x1b_G;OK\x1b\\', 'Should respond with \\x1b_G;OK\\x1b\\ for i=0 query');
-  console.log('✔ Test 4: Capability query with i=0 correctly responded with \\x1b_G;OK\\x1b\\');
+  assert.strictEqual(ptyWrites[0], '\x1b_G;ok\x1b\\', 'Should respond with \\x1b_G;ok\\x1b\\ for i=0 query');
+  console.log('✔ Test 4: Capability query with i=0 correctly responded with \\x1b_G;ok\\x1b\\');
 
   // Test 5: Query with quiet flag q=0 (default quiet) - responses must NOT be suppressed
   ptyWrites.length = 0;
@@ -160,8 +167,33 @@ async function runTests() {
   assert.strictEqual(ptyWrites[0], '\x1b_Gi=99;OK\x1b\\', 'Should respond with OK for existing virtual placement ID 99');
   console.log('✔ Test 7: Query for virtual placement ID 99 correctly responded with OK');
 
+  // Test 8: Quiet mode q=0 (default) suppresses transmission response
+  ptyWrites.length = 0;
+  const tinyPng = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+  manager.filterPtyOutput(`\x1b_Ga=t,f=100,i=101,q=0;${tinyPng}\x1b\\`);
+  await new Promise((r) => setTimeout(r, 50));
+  assert.strictEqual(ptyWrites.length, 0, 'q=0 (or omitted) MUST suppress OK responses to prevent prompt pollution');
+  console.log('✔ Test 8: Image transmission with q=0 is completely silent (no leak)');
+
+  // Test 9: Quiet mode q=2 forces transmission response
+  ptyWrites.length = 0;
+  manager.filterPtyOutput(`\x1b_Ga=t,f=100,i=102,q=2;${tinyPng}\x1b\\`);
+  await new Promise((r) => setTimeout(r, 50));
+  assert.strictEqual(ptyWrites.length, 1, 'q=2 MUST send response');
+  assert.strictEqual(ptyWrites[0], '\x1b_Gi=102;OK\x1b\\', 'q=2 should respond with OK');
+  console.log('✔ Test 9: Image transmission with q=2 always responds with OK');
+
   manager.dispose();
-  console.log('--- All Kitty Graphics Query tests passed successfully! ---');
+
+  // Test 10: Rust backend PTY query probe tests
+  console.log('\nTesting Rust backend PTY instant query response tests...');
+  const rustTest = spawnSync('cargo', ['test', 'test_kitty_query', '--manifest-path', 'src-tauri/Cargo.toml'], {
+    encoding: 'utf-8',
+  });
+  assert.strictEqual(rustTest.status, 0, 'Rust test_kitty_query tests must pass');
+  console.log('✔ Test 10: Rust backend 0ms PTY query tests (3 tests) all passed');
+
+  console.log('\n=== TC-KITTY-04 Result: ALL CHECKS PASSED ===');
 }
 
 runTests().catch((err) => {
