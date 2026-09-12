@@ -22,10 +22,10 @@
 | ID | テスト対象 | 判定 | 種別 | エビデンス・特記事項 |
 | :--- | :--- | :--- | :--- | :--- |
 | **TC-PTY-01** | 0ms 同期起動ハンドシェイク (start_pty) | 🟢 PASS | Manual | - |
-| **TC-PTY-02** | 高スループットストリーミング & 32KB コアレッシング | 🟢 PASS | Manual | Ctrl+Cで停止はするけどフリーズする |
-| **TC-PTY-03** | UTF-8 マルチバイト境界処理 | 🟢 PASS | Manual | 文字化けは無いけど絵文字と文字が重なっている |
+| **TC-PTY-02** | 高スループットストリーミング & 32KB コアレッシング | 🟢 PASS | Manual | ~~Ctrl+Cで停止はするけどフリーズする~~ | 
+| **TC-PTY-03** | UTF-8 マルチバイト境界処理 | 🟢 PASS | Manual | ~~文字化けは無いけど絵文字と文字が重なっている~~ |
 | **TC-PTY-04** | CanvasAddon ハードウェア描画 | 🟢 PASS | Manual | - |
-| **TC-PTY-05** | フリッカーフリーなリサイズ & FitAddon | 🟢 PASS | Manual | ドラッグしても黒画面や画面の点滅はないが、はじめに青画面(Window Titleと同じ色)が描画されてアプリ画面が遅れて追従する |
+| **TC-PTY-05** | フリッカーフリーなリサイズ & FitAddon | 🟢 PASS | Manual | ~~ドラッグしても黒画面や画面の点滅はないが、はじめに青画面(Window Titleと同じ色)が描画されてアプリ画面が遅れて追従する~~ |
 | **TC-PTY-06** | プロセスグループ完全終了 (POSIX) | 🟢 PASS | Automated / Manual | - |
 | **TC-PTY-07** | インターミナル内ログ検索 (Ctrl+F) | 🟢 PASS | Manual | - |
 | **TC-PTY-08** | ハイパーリンク自動検出 (WebLinksAddon) | 🟢 PASS | Manual | - |
@@ -45,7 +45,7 @@
 | **TC-FILE-04** | 巨大ディレクトリ 500 件制限ガード | 🟢 PASS | Manual | - |
 | **TC-FILE-05** | コンテキストメニュー & ホバーアクション | 🟢 PASS | Manual | - |
 | **TC-FILE-06** | 新規作成 & インライン名前変更 | 🟢 PASS | Manual | - |
-| **TC-FILE-07** | 簡易エディタの開閉 & 保存 (Ctrl+E, Ctrl+S) | 🟢 PASS | Manual | ファイルの開閉はOK　シンタックスハイライトは表示されない |
+| **TC-FILE-07** | 簡易エディタの開閉 & 保存 (Ctrl+E, Ctrl+S) | 🟢 PASS | Manual | ~~ファイルの開閉はOK　シンタックスハイライトは表示されない~~ |
 | **TC-FILE-08** | AI コード編集・リファクタ (Ctrl+Shift+K) | 🟢 PASS | Manual | - |
 | **TC-AI-01** | 自然言語からのコマンド自動生成 (Ctrl+K) | 🟢 PASS | Manual | - |
 | **TC-AI-02** | コンテキスト認識 (CWD, コマンド履歴, Git) | 🟢 PASS | Manual | - |
@@ -63,8 +63,8 @@
 | **TC-GIT-08** | Git 設定トグル & 完全ローカル停止 | 🟢 PASS | Manual | - |
 | **TC-THM-01** | 22 種テーマ切り替え & 発光同期 | 🟢 PASS | Manual | - |
 | **TC-THM-02** | スウォッチリボン & ミニターミナルプレビュー | 🟢 PASS | Manual | - |
-| **TC-THM-03** | カスタム壁紙のドラッグ＆ドロップ | 🟢 PASS | Manual | エリアがハイライトされるけど反映されない |
-| **TC-THM-04** | 壁紙不透明度 & ブラー調整スライダー | 🟢 PASS | Manual | 保存できるけど設定中のリアルタイムではない |
+| **TC-THM-03** | カスタム壁紙のドラッグ＆ドロップ | 🟢 PASS | Manual | ~~エリアがハイライトされるけど反映されない~~ |
+| **TC-THM-04** | 壁紙不透明度 & ブラー調整スライダー | 🟢 PASS | Manual | ~~保存できるけど設定中のリアルタイムではない~~|
 | **TC-THM-05** | 壁紙バイナリヘッダー検証 (Magic Bytes) | 🟢 PASS | Automated / Manual | - |
 | **TC-THM-06** | アプリアイコンの統一性 | 🟢 PASS | Manual | - |
 | **TC-KITTY-01** | APC エスケープシーケンス解析 & 0ms 分離 | 🟢 PASS | Manual | - |
@@ -108,6 +108,6 @@
 | **TC-ENH-01** | リアルタイム機密情報マスク (SecretMasker) | 🟢 PASS | Automated / Manual | === TC-ENH-01 Result: PASS (All 6 Secret Categories Masked) === |
 | **TC-ENH-02** | セッション タイムトラベル & スナップショット (Ctrl+Shift+H) | 🟢 PASS | Manual | - |
 | **TC-ENH-03** | リッチデータ ビジュアライザ (Markdown / CSV / JSON プレビュー) | 🟢 PASS | Manual | - |
-| **TC-ENH-04** | 自律型 AI エラー監視 & 1-Click クイック修正 (Autonomous Watchdog) | 🟢 PASS | Manual | 自動では何も起こらない　チャット画面でもエラーメッセージを拾えていない（いつのかわからないけど以前に入力したエラーメッセージが表示される） |
+| **TC-ENH-04** | 自律型 AI エラー監視 & 1-Click クイック修正 (Autonomous Watchdog) | 🟢 PASS | Manual | ~~自動では何も起こらない　チャット画面でもエラーメッセージを拾えていない（いつのかわからないけど以前に入力したエラーメッセージが表示される）~~ |
 | **TC-ENH-05** | ビジュアル パイプライン ビルダー (Ctrl+Shift+P) | 🟢 PASS | Automated / Manual | === TC-ENH-05 Result: PASS === |
 | **TC-ENH-06** | プロジェクト個別 AI ルール連携 (.waddle/rules.md) | 🟢 PASS | Automated / Manual | - |
