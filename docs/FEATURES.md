@@ -27,7 +27,7 @@ Welcome to the comprehensive feature guide for **Waddle**, the AI-integrated, pr
 19. [📊 Rich Data Visualizer (Markdown / CSV / JSON Preview)](#19--rich-data-visualizer-markdown--csv--json-preview)
 20. [🐕 Autonomous AI Error Watchdog & 1-Click Fix](#20--autonomous-ai-error-watchdog--1-click-fix)
 21. [🔗 Visual Pipeline Builder (`Ctrl + Shift + P`)](#21--visual-pipeline-builder-ctrl--shift--p)
-22. [📜 Project-Specific AI Rules (`.waddle/rules.md`)](#22--project-specific-ai-rules-waddlerulesmd)
+22. [📜 Project-Specific & Global Common AI Rules (`.waddle/` & `~/.config/waddle/`)](#22--project-specific--global-common-ai-rules-waddle--configwaddle)
 23. [⌨️ Complete Keybindings Reference](#️-complete-keybindings-reference)
 
 ---
@@ -453,13 +453,53 @@ Welcome to the comprehensive feature guide for **Waddle**, the AI-integrated, pr
 
 ---
 
-### 22. 📜 Project-Specific AI Rules (`.waddle/rules.md`)
+### 22. 📜 Project-Specific & Global Common AI Rules (`.waddle/` & `~/.config/waddle/`)
 
-- **Repository Rule Discovery**:
-  - Tauri backend `get_project_rules` automatically detects `.waddle/rules.md` in the current project root or parent repository.
-- **Context Injection**:
-  - When active, an informative `.waddle/rules.md active` badge appears in the AI Command Generator (`Ctrl + K`).
-  - Project-specific constraints (e.g. "Use pnpm instead of npm", "Never run sudo", "Enforce branch prefix feature/") are injected seamlessly into the system prompt.
+Waddle's local AI subsystem (`Ctrl+K` command generator, error diagnostic watchdog, Copilot chat, and in-editor refactoring) features a powerful **Two-Tier Hierarchical Rule Discovery Architecture**.
+
+```mermaid
+flowchart TD
+    Cwd["Working Directory (e.g., Rooney/src/components)"] --> CheckProject["1. Ancestor Traversal (Up to 12 levels / .git root)"]
+    CheckProject -->|"Found: Rooney/.waddle/"| ProjectRules["[Top Priority] Project-Specific Rules Active\n(Rooney/.waddle/rules.md / rules_ja.md)"]
+    CheckProject -->|"Not Found (outside repo e.g., cd ~)"| CheckGlobal["2. Global Common Directory Search\n(~/.config/waddle/)"]
+    CheckGlobal --> GlobalRules["[Fallback] Global Common Rules Active\n(~/.config/waddle/rules.md / rules_ja.md)"]
+    
+    ProjectRules --> AIContext["AI System Prompt Injection\n& Status Bar / Ctrl+K Badge Illumination"]
+    GlobalRules --> AIContext
+```
+
+#### 1. Two-Tier Hierarchical Discovery
+1. **Tier 1 (Top Priority): Project-Specific Rules (`<PROJECT_ROOT>/.waddle/`)**:
+   - Traverses upwards from current directory up to 12 ancestor levels or the Git repository root (`.git`).
+   - **Concrete Example (Project `Rooney`)**:
+     - Place your project-specific rules in the project root at `Rooney/.waddle/`:
+       - English locales (`en-US`, `en-GB`): `Rooney/.waddle/rules.md`
+       - Japanese locale (`ja`): `Rooney/.waddle/rules_ja.md`
+     - Even when working inside deep subdirectories (e.g. `cd Rooney/src/components`), **Waddle automatically walks up ancestors and resolves `Rooney/.waddle/rules.md`**, ensuring project constraints are never lost while moving around inside the codebase.
+2. **Tier 2 (Fallback & Default): Global Common Rules (`~/.config/waddle/`)**:
+   - When navigating outside any repository (e.g. `cd ~` or `/tmp`), or inside projects without `.waddle/`, **Waddle automatically loads global common rules from `~/.config/waddle/`**:
+     - English locales: `~/.config/waddle/rules.md`
+     - Japanese locale: `~/.config/waddle/rules_ja.md`
+   - On application startup or rule discovery, if these files do not exist, high-quality sample templates are automatically seeded under `~/.config/waddle/`.
+
+#### 2. Full Locale Synchronization (`en-US`, `en-GB`, `ja`)
+- **When Japanese (`ja`) is selected**:
+  - Prioritizes `rules_ja.md`. Falls back to `rules.md` if absent.
+- **When English (`en-US`, `en-GB`) is selected**:
+  - Prioritizes `rules.md`. Falls back to `rules_ja.md` if absent.
+
+#### 3. Visual Feedback & UI Indicators
+- **Status Bar (Right Indicator)**:
+  - Display Label:
+    - Project-specific: `📖 Private Rules`
+    - Global common: `📖 Global Rules`
+  - Tooltip:
+    - Project-specific: `Private Rules JA (.waddle/rules_ja.md)` / `Private Rules US (.waddle/rules.md)` / `Private Rules UK (.waddle/rules.md)`
+    - Global common: `Global Rules JA (~/.config/waddle/rules_ja.md)` / `Global Rules US (~/.config/waddle/rules.md)` / `Global Rules UK (~/.config/waddle/rules.md)`
+- **AI Command Modal (`Ctrl + K`)**:
+  - Header badge illuminates `Private Rules JA` (or `Global Rules JA` / `US` / `UK`) with detailed path on hover.
+- **Pre-Configured Sample Templates**:
+  - `.waddle/rules.md` (English) and `.waddle/rules_ja.md` (Japanese) provide complete, battle-tested templates covering tech stack overview, command policies, coding guidelines, Conventional Commits, and security guardrails.
 
 ---
 

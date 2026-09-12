@@ -54,7 +54,7 @@
 - 📊 **リッチデータ ビジュアライザ (Markdown / CSV / JSON)**: Markdown 組版、CSV ソート・検索テーブル、JSON 折りたたみツリーをエディタおよびツリーから1クリックで瞬時プレビュー。([詳細](docs/FEATURES.ja.md#19--リッチデータ-ビジュアライザ-markdown--csv--json-プレビュー))
 - 🐕 **自律型 AI エラー監視 (Autonomous Watchdog)**: コマンド失敗を自動検知し、AI が原因を即時診断してワンクリックで修正コマンドを提示・実行。([詳細](docs/FEATURES.ja.md#20--自律型-ai-エラー監視--1-click-クイック修正-autonomous-watchdog))
 - 🔗 **ビジュアル パイプライン ビルダー (`Ctrl + Shift + P`)**: ビルド、テスト、デプロイなどの複数コマンドを視覚的にステップ構成し、条件付きで自動連続実行。([詳細](docs/FEATURES.ja.md#21--ビジュアル-パイプライン-ビルダー-ctrl--shift--p))
-- 📜 **プロジェクト個別 AI ルール連携 (`.waddle/rules.md`)**: リポジトリ直下のルールファイルを自動読込し、チーム固有のコーディング規約を AI コマンド生成に反映。([詳細](docs/FEATURES.ja.md#22--プロジェクト個別-ai-ルール連携-waddlerulesmd))
+- 📜 **プロジェクト個別 & グローバル共通 AI ルール (`~/.config/waddle/` & `.waddle/`)**: リポジトリ内では上位ルートの個別規約（`.waddle/rules_ja.md` / `rules.md`）、リポジトリ外ではグローバル共通規約（`~/.config/waddle/`）を自動適用。選択言語（日本語/英語）に完全連動。([詳細](docs/FEATURES.ja.md#22--プロジェクト個別--グローバル共通-ai-ルール連携-waddlerulesmd--configwaddlerulesmd))
 - 🎨 **全22種のネオン & 洗練テーマ**: UI 全体の動的ネオン発光同期、デスクトップからのドラッグ＆ドロップ壁紙設定と 60 FPS リアルタイムぼかし/透過プレビュー、Nerd Fonts タイポグラフィ。([詳細](docs/FEATURES.ja.md#11--全22種類の洗練されたテーマ--高電圧ネオンコレクション))
 
 > 📖 **各機能の詳しい技術仕様や内部機構は** [機能仕様書 (docs/FEATURES.ja.md)](docs/FEATURES.ja.md) をご覧ください。

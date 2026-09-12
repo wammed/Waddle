@@ -105,6 +105,13 @@ export interface TerminalContext {
   git_branch?: string;
   recent_command?: string;
   recent_output?: string;
+  language?: string;
+}
+
+export interface ProjectRulesInfo {
+  content: string;
+  filename: string;
+  relative_path: string;
 }
 
 export interface CommandSuggestion {

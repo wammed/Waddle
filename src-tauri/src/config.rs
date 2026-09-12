@@ -244,6 +244,7 @@ impl ConfigManager {
             .unwrap_or_else(|| PathBuf::from("."))
             .join("waddle");
         let _ = fs::create_dir_all(&config_dir);
+        crate::ai::ensure_global_rules(&config_dir);
         Self {
             config_path: config_dir.join("config.json"),
             config_dir,

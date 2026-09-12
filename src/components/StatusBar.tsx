@@ -10,7 +10,7 @@ import {
   ShieldCheck,
   BookOpen,
 } from 'lucide-react';
-import { AppConfig, GitStatus, SystemInfo } from '../types';
+import { AppConfig, GitStatus, SystemInfo, ProjectRulesInfo } from '../types';
 import { useI18n } from '../i18n';
 import { TauriApi } from '../services/tauriApi';
 
@@ -37,22 +37,22 @@ export const StatusBar: React.FC<StatusBarProps> = ({
   isGitPopoverOpen,
   isAiActive = false,
 }) => {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const [copied, setCopied] = useState(false);
-  const [hasProjectRules, setHasProjectRules] = useState(false);
+  const [activeRules, setActiveRules] = useState<ProjectRulesInfo | null>(null);
 
   useEffect(() => {
     if (!cwd) return;
     let isCancelled = false;
-    TauriApi.getProjectRules(cwd).then((rules) => {
+    TauriApi.getProjectRules(cwd, language).then((rules) => {
       if (!isCancelled) {
-        setHasProjectRules(!!rules);
+        setActiveRules(rules);
       }
     });
     return () => {
       isCancelled = true;
     };
-  }, [cwd]);
+  }, [cwd, language]);
 
   const handleCopyCwd = () => {
     if (cwd) {
@@ -176,17 +176,29 @@ export const StatusBar: React.FC<StatusBarProps> = ({
           </div>
         )}
 
-        {/* Project AI Rules Active Indicator */}
-        {hasProjectRules && config.ai?.enable_project_rules !== false && (
-          <div
-            className="status-item"
-            title="プロジェクト固有 AI ルール適用中 (.waddle/rules.md)"
-            style={{ color: '#89b4fa', gap: '4px' }}
-          >
-            <BookOpen size={12} />
-            <span style={{ fontSize: '11px' }}>Project Rules</span>
-          </div>
-        )}
+        {/* Project & Global AI Rules Active Indicator */}
+        {activeRules && config.ai?.enable_project_rules !== false && (() => {
+          const isGlobal = activeRules.relative_path.startsWith('~');
+          const localeTag =
+            activeRules.filename?.includes('_ja') || (language === 'ja' && activeRules.filename !== 'rules.md')
+              ? 'JA'
+              : language === 'en-GB'
+              ? 'UK'
+              : 'US';
+          const label = isGlobal ? 'Global Rules' : 'Private Rules';
+          const tooltip = `${label} ${localeTag} (${activeRules.relative_path})`;
+
+          return (
+            <div
+              className="status-item"
+              title={tooltip}
+              style={{ color: '#89b4fa', gap: '4px' }}
+            >
+              <BookOpen size={12} />
+              <span style={{ fontSize: '11px' }}>{label}</span>
+            </div>
+          );
+        })()}
 
         <div
           className="status-item"

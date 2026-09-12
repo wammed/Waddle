@@ -84,7 +84,7 @@ Waddle は、高速・堅牢な **Rust バックエンド** と、最新の **Re
 - **非同期ランタイム**: Tokio マルチスレッドランタイム。
 - **主要モジュール**:
   - `pty.rs`: 疑似端末（PTY）の生成、出力コアレッシング、UTF-8 境界処理、プロセスグループ管理、Git Branch Ref 検証。
-  - `ai.rs`: Ollama HTTP 通信、行バッファリング SSE デコード、プロンプト生成、危険コマンド判定、SSRF クラウドメタデータ遮断、`.waddle/rules.md` プロジェクトルール読み込み。
+  - `ai.rs`: Ollama HTTP 通信、行バッファリング SSE デコード、プロンプト生成、危険コマンド判定、SSRF クラウドメタデータ遮断、2段階階層 AI ルール解決（上位ディレクトリ走査によるプロジェクト個別 `.waddle/rules_ja.md` / `rules.md` 探索 ＆ `~/.config/waddle/` グローバル共通ルール自動初期化・フォールバック）。
   - `config.rs`: `~/.config/waddle/config.json` のアトミック保存、壁紙管理。
   - `kitty.rs`: パス正規化・サンドボックス脱出遮断・展開爆弾対策・Base64 エンコード・一時ファイル自動削除。
   - `lib.rs`: コマンドルーティング、仮想ファイルシステム走査遮断 (`/proc`, `/sys`, `/dev`)、SSH/GPG/Keyring 秘密鍵アクセス拒否、Git 操作。

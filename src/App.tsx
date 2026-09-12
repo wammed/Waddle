@@ -293,6 +293,7 @@ export function App() {
     git_branch: activePane?.gitStatus.branch || activeTab?.gitStatus.branch,
     recent_command: activePane?.lastCommand || activeTab?.lastCommand,
     recent_output: activePane?.lastOutput || activeTab?.lastOutput,
+    language: config.general?.language || 'en-US',
   };
 
   // Commands to PTY

@@ -655,12 +655,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             }}>
               <div style={{ paddingRight: '16px' }}>
                 <div style={{ fontSize: '13px', fontWeight: 600, color: '#f8fafc', marginBottom: '4px' }}>
-                  {selectedLang === 'ja' ? 'プロジェクト個別 AI ルール (.waddle/rules.md)' : 'Project AI Rules (.waddle/rules.md)'}
+                  {selectedLang === 'ja' ? 'プロジェクト個別 & グローバル共通 AI ルール' : 'Project & Global Common AI Rules'}
                 </div>
                 <div style={{ fontSize: '12px', color: '#94a3b8', lineHeight: 1.5 }}>
                   {selectedLang === 'ja'
-                    ? 'リポジトリ直下の .waddle/rules.md や .github/copilot-instructions.md を自動検知し、AIシステムプロンプトへ注入します'
-                    : 'Automatically detect and inject .waddle/rules.md or copilot instructions into the AI context'}
+                    ? 'リポジトリ内では上位ルートの .waddle/rules_ja.md (日本語) / rules.md (英語) を最優先し、プロジェクト外では ~/.config/waddle/ のグローバル共通ルールを自動検知してAIへ注入します'
+                    : 'Prioritizes project .waddle/rules.md (US/UK) / rules_ja.md (JA) in repos, and falls back to global common rules in ~/.config/waddle/ outside projects'}
                 </div>
               </div>
               <label className="toggle-switch" style={{ position: 'relative', display: 'inline-block', width: '44px', height: '24px', flexShrink: 0 }}>

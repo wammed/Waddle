@@ -27,7 +27,7 @@
 19. [📊 リッチデータ ビジュアライザ (Markdown / CSV / JSON プレビュー)](#19--リッチデータ-ビジュアライザ-markdown--csv--json-プレビュー)
 20. [🐕 自律型 AI エラー監視 & 1-Click クイック修正 (Autonomous Watchdog)](#20--自律型-ai-エラー監視--1-click-クイック修正-autonomous-watchdog)
 21. [🔗 ビジュアル パイプライン ビルダー (`Ctrl + Shift + P`)](#21--ビジュアル-パイプライン-ビルダー-ctrl--shift--p)
-22. [📜 プロジェクト個別 AI ルール連携 (`.waddle/rules.md`)](#22--プロジェクト個別-ai-ルール連携-waddlerulesmd)
+22. [📜 プロジェクト個別 & グローバル共通 AI ルール連携 (`.waddle/` & `~/.config/waddle/`)](#22--プロジェクト個別--グローバル共通-ai-ルール連携-waddle--configwaddle)
 23. [⌨️ ショートカットキー一覧 完全版](#️-ショートカットキー一覧-完全版)
 
 ---
@@ -444,12 +444,53 @@
 
 ---
 
-### 22. 📜 プロジェクト個別 AI ルール連携 (`.waddle/rules.md`)
+### 22. 📜 プロジェクト個別 & グローバル共通 AI ルール連携 (`.waddle/` & `~/.config/waddle/`)
 
-- **ローカルリポジトリルール読み込み**:
-  - カレントディレクトリまたは上位リポジトリ直下の `.waddle/rules.md` を Tauri バックエンドの `get_project_rules` コマンドで自動探索・読み込み。
-- **AI プロンプト自動注入**:
-  - AI コマンド生成モーダル (`Ctrl + K`) に `.waddle/rules.md active` のバッジが表示され、チーム固有のコーディング規約や推奨パッケージマネージャー（`pnpm` 優先、`sudo` 禁止等）がプロンプトのコンテキストに自動組み込み。
+Waddle のローカル AI（`Ctrl+K` コマンド生成、エラー診断、Copilot チャット、インラインコードリファクタリング）は、**「リポジトリ個別ルール」** と **「グローバル共通ルール」** の強力な 2 段階階層探索アーキテクチャを備えています。
+
+```mermaid
+flowchart TD
+    Cwd["作業ディレクトリ (例: Rooney/src/components)"] --> CheckProject["1. 親ディレクトリを上位へ探索 (最大12階層 / .git まで)"]
+    CheckProject -->|"発見: Rooney/.waddle/"| ProjectRules["【最優先】プロジェクト個別ルール適用\n(Rooney/.waddle/rules_ja.md / rules.md)"]
+    CheckProject -->|"未発見 (リポジトリ外 cd ~ など)"| CheckGlobal["2. グローバル共通ディレクトリ探索\n(~/.config/waddle/)"]
+    CheckGlobal --> GlobalRules["【フォールバック】グローバル共通ルール適用\n(~/.config/waddle/rules_ja.md / rules.md)"]
+    
+    ProjectRules --> AIContext["AI システムプロンプト自動注入\n& ステータスバー / Ctrl+K バッジ点灯"]
+    GlobalRules --> AIContext
+```
+
+#### 1. 2 段階の優先探索順位
+1. **第 1 優先：プロジェクト個別ルール (`<PROJECT_ROOT>/.waddle/`)**:
+   - カレントディレクトリから親ディレクトリ方向（上位最大 12 階層または `.git` リポジトリルートまで）を自動走査。
+   - **具体例 (プロジェクト `Rooney` の場合)**:
+     - プロジェクトルート直下の `Rooney/.waddle/` 配下にルールファイルを配置します。
+       - 日本語環境: `Rooney/.waddle/rules_ja.md`
+       - 英語環境: `Rooney/.waddle/rules.md`
+     - ターミナルで `cd Rooney/src/components` など**深いサブディレクトリ階層に移動しても、上位の `Rooney/.waddle/rules_ja.md` を自動検出してプロジェクト個別ルールが継続適用**されます。
+2. **第 2 優先：グローバル共通ルール (`~/.config/waddle/`)**:
+   - リポジトリ外（ホームディレクトリ `cd ~` や `/tmp` 等）に移動した場合、またはプロジェクト内に `.waddle/` が存在しない場合、**`~/.config/waddle/` 配下のグローバル共通ルールが自動的に読み込まれます**。
+     - 日本語環境: `~/.config/waddle/rules_ja.md`
+     - 英語環境: `~/.config/waddle/rules.md`
+   - 初回起動時や探索時にこれらのファイルが存在しない場合、高品質なサンプルテンプレートが `~/.config/waddle/` に自動生成・初期配備されます。
+
+#### 2. 言語切り替え (`en-US`, `en-GB`, `ja`) との完全連動
+- **日本語 (`ja`) 選択時**:
+  - `rules_ja.md` を最優先で読み込み。存在しない場合は `rules.md` に自動フォールバック。
+- **英語 (`en-US`, `en-GB`) 選択時**:
+  - `rules.md` を最優先で読み込み。存在しない場合は `rules_ja.md` に自動フォールバック。
+
+#### 3. UI 連動表示と視覚フィードバック
+- **ステータスバー (右側インジケーター)**:
+  - 表示ラベル:
+    - プロジェクト個別ルール適用時: `📖 Private Rules`
+    - グローバル共通ルール適用時: `📖 Global Rules`
+  - ツールチップ:
+    - プロジェクト個別ルール適用時: `Private Rules JA (.waddle/rules_ja.md)` / `Private Rules US (.waddle/rules.md)` / `Private Rules UK (.waddle/rules.md)`
+    - グローバル共通ルール適用時: `Global Rules JA (~/.config/waddle/rules_ja.md)` / `Global Rules US (~/.config/waddle/rules.md)` / `Global Rules UK (~/.config/waddle/rules.md)`
+- **AI コマンドモーダル (`Ctrl + K`)**:
+  - タイトルヘッダー横に `Private Rules JA`（または `Global Rules JA` / `US` / `UK`）のスマートバッジが点灯し、ホバーで詳細パスを表示。
+- **リッチなサンプルテンプレートの標準配備**:
+  - `.waddle/rules.md` (英語) および `.waddle/rules_ja.md` (日本語) に、概要、コマンド実行ポリシー、コーディング規約、Conventional Commits、セキュリティガードレールを網羅したサンプルテンプレートが記述済み。
 
 ---
 

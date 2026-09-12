@@ -12,6 +12,7 @@ import {
   PtySessionInfo,
   SystemInfo,
   TerminalContext,
+  ProjectRulesInfo,
 } from '../types';
 
 export const isTauri = () => {
@@ -390,10 +391,10 @@ export const TauriApi = {
     };
   },
 
-  async getProjectRules(cwd: string): Promise<string | null> {
+  async getProjectRules(cwd: string, lang?: string): Promise<ProjectRulesInfo | null> {
     if (!isTauri()) return null;
     try {
-      return await invoke<string | null>('get_project_rules', { cwd });
+      return await invoke<ProjectRulesInfo | null>('get_project_rules', { cwd, lang });
     } catch {
       return null;
     }

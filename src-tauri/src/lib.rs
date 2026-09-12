@@ -621,9 +621,12 @@ async fn check_ollama_status(
 async fn generate_command(
     state: State<'_, AppState>,
     prompt: String,
-    context: TerminalContext,
+    mut context: TerminalContext,
 ) -> Result<CommandSuggestion, String> {
     let config = state.config_manager.load();
+    if context.language.is_none() {
+        context.language = Some(config.general.language.clone());
+    }
     state
         .ai_client
         .generate_command(&prompt, &context, &config.ai)
@@ -636,9 +639,12 @@ async fn explain_error(
     command: String,
     output: String,
     exit_code: i32,
-    context: TerminalContext,
+    mut context: TerminalContext,
 ) -> Result<ErrorExplanation, String> {
     let config = state.config_manager.load();
+    if context.language.is_none() {
+        context.language = Some(config.general.language.clone());
+    }
     state
         .ai_client
         .explain_error(&command, &output, exit_code, &context, &config.ai)
@@ -651,9 +657,12 @@ async fn stream_ai_chat(
     state: State<'_, AppState>,
     chat_id: String,
     messages: Vec<ChatMessage>,
-    context: TerminalContext,
+    mut context: TerminalContext,
 ) -> Result<(), String> {
     let config = state.config_manager.load();
+    if context.language.is_none() {
+        context.language = Some(config.general.language.clone());
+    }
     state
         .ai_client
         .stream_chat(app, chat_id, messages, &context, &config.ai)
@@ -666,9 +675,12 @@ async fn ai_edit_code(
     instruction: String,
     code: String,
     file_name: Option<String>,
-    context: TerminalContext,
+    mut context: TerminalContext,
 ) -> Result<String, String> {
     let config = state.config_manager.load();
+    if context.language.is_none() {
+        context.language = Some(config.general.language.clone());
+    }
     state
         .ai_client
         .edit_code(
@@ -830,8 +842,16 @@ fn kitty_read_file(
 }
 
 #[tauri::command]
-fn get_project_rules(cwd: String) -> Result<Option<String>, String> {
-    Ok(ai::load_project_rules(&cwd))
+fn get_project_rules(
+    state: State<'_, AppState>,
+    cwd: String,
+    lang: Option<String>,
+) -> Result<Option<ai::ProjectRulesInfo>, String> {
+    let effective_lang = lang.unwrap_or_else(|| {
+        let config = state.config_manager.load();
+        config.general.language
+    });
+    Ok(ai::load_project_rules_info(&cwd, Some(&effective_lang)))
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

@@ -256,6 +256,30 @@
       - `npm run tauri build`（リリースバイナリ生成完了）。
       - `~/.local/bin/waddle` へ再配備完了。
 
+34. **プロジェクト個別 & グローバル共通 rules.md（`~/.config/waddle/` & `.waddle/`）の 2 段階階層探索 & 自動初期化配備 (`TC-ENH-06`)**:
+    - **ユーザー要望**:
+      - 「個別プロジェクト用 rules.md（サンプルテンプレート記述済み）を選択された言語に合わせて .waddle/rules.md (US,UK) .waddle/rules_ja.md (JA) の一方を読み込むようにして」
+      - 「グローバル共通ルールとしてほしい。~/.config/waddle/以下に配置することを徹底するように。README等のドキュメントにもそのことを明記」
+      - 「例えばプロジェクトRooneyにおいて個別ルールを適用したい場合、Rooney/.waddle/rules.md に配置するという理解でいい？」に基づき実施。
+    - **改修内容**:
+      1. **2 段階階層探索パイプライン (`src-tauri/src/ai.rs`)**:
+         - **Tier 1 (プロジェクト個別最優先)**: `cwd` から親ディレクトリ方向（最大 12 階層 / `.git` ルートまで）を遡って自動走査。例: `Rooney/src/components` にいても `Rooney/.waddle/rules_ja.md` (JA) または `Rooney/.waddle/rules.md` (US/UK) を自動解決。
+         - **Tier 2 (グローバル共通フォールバック)**: リポジトリ外 (`cd ~` や `/tmp`) または `.waddle/` がない場所では、`~/.config/waddle/rules_ja.md` (JA) または `~/.config/waddle/rules.md` (US/UK) を自動適用。
+      2. **グローバルルールの自動生成・初期配備 (`src-tauri/src/ai.rs` & `src-tauri/src/config.rs`)**:
+         - `ConfigManager::new()` および探索時に `ensure_global_rules(&config_dir)` を実行。`~/.config/waddle/rules.md` および `rules_ja.md` が存在しない場合、埋め込みの高品質テンプレートから自動生成。
+      3. **UI 連動バッジ & ツールチップ判別 (`StatusBar.tsx` & `AiCommandModal.tsx`)**:
+         - ステータスバー: `Private Rules`（プロジェクト時）/ `Global Rules`（グローバル時）を表示。
+         - ツールチップ: `Private Rules JA/US/UK (パス)` / `Global Rules JA/US/UK (パス)` を表示。
+         - `Ctrl + K` ヘッダー: `Private Rules JA` / `Global Rules JA` 等のスマートバッジを表示。
+      4. **ドキュメント徹底明記**:
+         - `README.md` / `README.ja.md`, `docs/FEATURES.md` / `docs/FEATURES.ja.md`, `docs/ARCHITECTURE.md` / `docs/ARCHITECTURE.ja.md`, `docs/TEST_PLAN.md` / `docs/TEST_PLAN.ja.md`, `src/data/testPlanData.ts` にプロジェクト `Rooney` の具体例と探索フロー図を完備。
+    - **検証**:
+      - `cargo test --manifest-path src-tauri/Cargo.toml test_load_project_rules`（サブディレクトリ上位探索・グローバルフォールバック全 37 件 PASS）。
+      - `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets`（警告 0 件）。
+      - `npm run build`（TypeScript 型検査 & Vite ビルド成功、2.13秒）。
+      - `npm run tauri build`（リリースバイナリ生成完了、24.33秒）。
+      - `~/.local/bin/waddle` へ再配備完了。
+
 ---
 
 ## 3. 実施された主要な改善と技術的解決策

@@ -84,7 +84,7 @@ Waddle is built on a hybrid architecture combining a high-performance **Rust bac
 - **Runtime**: Tokio multi-threaded asynchronous runtime.
 - **Subsystem Modules**:
   - `pty.rs`: Pseudo-terminal allocation, output stream coalescing, UTF-8 decoders, process group lifecycle control, and Git branch ref validation.
-  - `ai.rs`: Ollama HTTP client, line-buffered SSE chunk assembly, prompt templates, dangerous command interception, SSRF cloud metadata protection, and `.waddle/rules.md` project rules ingestion.
+  - `ai.rs`: Ollama HTTP client, line-buffered SSE chunk assembly, prompt templates, dangerous command interception, SSRF cloud metadata protection, and two-tier hierarchical AI rules resolution (ancestor traversal for project `.waddle/rules.md` / `rules_ja.md` & `~/.config/waddle/` global common rules auto-seeding and fallback).
   - `config.rs`: Atomic read/write operations for `~/.config/waddle/config.json`, wallpaper management, and legacy migration.
   - `kitty.rs`: Sandboxed local image reader with path canonicalization, symlink escape checks, decompression bomb defenses, Base64 encoder, and temporary file auto-unlinking.
   - `lib.rs`: Tauri command router, virtual filesystem traversal defense (`/proc`, `/sys`, `/dev`), private key isolation (`~/.ssh`, `~/.gnupg`, `~/.local/share/keyrings`), and Git CLI execution.

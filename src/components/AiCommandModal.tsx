@@ -8,8 +8,9 @@ import {
   AlertTriangle,
   X,
   Loader2,
+  BookOpen,
 } from 'lucide-react';
-import { CommandSuggestion, TerminalContext } from '../types';
+import { CommandSuggestion, TerminalContext, ProjectRulesInfo } from '../types';
 import { TauriApi } from '../services/tauriApi';
 import { useI18n } from '../i18n';
 import { DangerousCommandModal, isDangerousCommand } from './DangerousCommandModal';
@@ -36,6 +37,7 @@ export const AiCommandModal: React.FC<AiCommandModalProps> = ({
   const [copied, setCopied] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [confirmCmd, setConfirmCmd] = useState<string | null>(null);
+  const [activeRules, setActiveRules] = useState<ProjectRulesInfo | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const suggestionRef = useRef<CommandSuggestion | null>(null);
   const loadingRef = useRef<boolean>(false);
@@ -78,6 +80,9 @@ export const AiCommandModal: React.FC<AiCommandModalProps> = ({
       setPrompt('');
       setSuggestion(null);
       setErrorMsg(null);
+      if (context.cwd) {
+        TauriApi.getProjectRules(context.cwd, context.language).then(setActiveRules);
+      }
       setTimeout(() => inputRef.current?.focus(), 50);
 
       const handleGlobalKeyDown = (e: KeyboardEvent) => {
@@ -170,9 +175,41 @@ export const AiCommandModal: React.FC<AiCommandModalProps> = ({
         onKeyDown={handleKeyDown}
       >
         <div className="ai-modal-header">
-          <div className="ai-modal-title">
+          <div className="ai-modal-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Sparkles size={16} />
             <span>{t.aiCommand.title}</span>
+            {activeRules && (() => {
+              const isGlobal = activeRules.relative_path.startsWith('~');
+              const localeTag =
+                activeRules.filename?.includes('_ja') || (context.language === 'ja' && activeRules.filename !== 'rules.md')
+                  ? 'JA'
+                  : context.language === 'en-GB'
+                  ? 'UK'
+                  : 'US';
+              const label = isGlobal ? 'Global Rules' : 'Private Rules';
+              const tooltip = `${label} ${localeTag} (${activeRules.relative_path})`;
+
+              return (
+                <span
+                  style={{
+                    fontSize: '11px',
+                    background: 'rgba(137, 180, 250, 0.12)',
+                    color: '#89b4fa',
+                    border: '1px solid rgba(137, 180, 250, 0.3)',
+                    borderRadius: '12px',
+                    padding: '1px 8px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    fontWeight: 500,
+                  }}
+                  title={tooltip}
+                >
+                  <BookOpen size={11} />
+                  {label} {localeTag}
+                </span>
+              );
+            })()}
           </div>
           <button
             onClick={onClose}
