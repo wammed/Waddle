@@ -506,6 +506,61 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 }
               />
             </div>
+
+            {/* Project Specific Rules Toggle */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              justifyContent: 'space-between',
+              padding: '12px 14px',
+              background: 'rgba(255, 255, 255, 0.02)',
+              border: '1px solid rgba(255, 255, 255, 0.06)',
+              borderRadius: '8px',
+              marginTop: '12px',
+            }}>
+              <div style={{ paddingRight: '16px' }}>
+                <div style={{ fontSize: '13px', fontWeight: 600, color: '#f8fafc', marginBottom: '4px' }}>
+                  {selectedLang === 'ja' ? 'プロジェクト個別 AI ルール (.waddle/rules.md)' : 'Project AI Rules (.waddle/rules.md)'}
+                </div>
+                <div style={{ fontSize: '12px', color: '#94a3b8', lineHeight: 1.5 }}>
+                  {selectedLang === 'ja'
+                    ? 'リポジトリ直下の .waddle/rules.md や .github/copilot-instructions.md を自動検知し、AIシステムプロンプトへ注入します'
+                    : 'Automatically detect and inject .waddle/rules.md or copilot instructions into the AI context'}
+                </div>
+              </div>
+              <label className="toggle-switch" style={{ position: 'relative', display: 'inline-block', width: '44px', height: '24px', flexShrink: 0 }}>
+                <input
+                  type="checkbox"
+                  checked={formData.ai.enable_project_rules ?? true}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      ai: { ...formData.ai, enable_project_rules: e.target.checked },
+                    })
+                  }
+                  style={{ opacity: 0, width: 0, height: 0 }}
+                />
+                <span style={{
+                  position: 'absolute',
+                  cursor: 'pointer',
+                  top: 0, left: 0, right: 0, bottom: 0,
+                  backgroundColor: (formData.ai.enable_project_rules ?? true) ? 'var(--accent)' : 'rgba(255, 255, 255, 0.2)',
+                  borderRadius: '24px',
+                  transition: '0.2s',
+                }}>
+                  <span style={{
+                    position: 'absolute',
+                    height: '18px',
+                    width: '18px',
+                    left: (formData.ai.enable_project_rules ?? true) ? '23px' : '3px',
+                    bottom: '3px',
+                    backgroundColor: '#fff',
+                    borderRadius: '50%',
+                    transition: '0.2s',
+                  }} />
+                </span>
+              </label>
+            </div>
           </div>
 
           {/* Terminal Appearance Section */}
@@ -876,6 +931,116 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </div>
                 </div>
               )}
+            </div>
+
+            {/* Real-time Secret Masking Toggle */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              justifyContent: 'space-between',
+              padding: '12px 14px',
+              background: 'rgba(255, 255, 255, 0.02)',
+              border: '1px solid rgba(255, 255, 255, 0.06)',
+              borderRadius: '8px',
+              marginTop: '12px',
+            }}>
+              <div style={{ paddingRight: '16px' }}>
+                <div style={{ fontSize: '13px', fontWeight: 600, color: '#f8fafc', marginBottom: '4px' }}>
+                  {selectedLang === 'ja' ? 'リアルタイム機密情報マスク (Secret Masking)' : 'Real-time Secret Masking'}
+                </div>
+                <div style={{ fontSize: '12px', color: '#94a3b8', lineHeight: 1.5 }}>
+                  {selectedLang === 'ja'
+                    ? 'ターミナル出力中の AWSキー、GitHubトークン、Bearerトークン、SSH秘密鍵、パスワードを自動検知して伏字化します'
+                    : 'Automatically mask AWS keys, GitHub tokens, Bearer tokens, private keys, and passwords from terminal screen output'}
+                </div>
+              </div>
+              <label className="toggle-switch" style={{ position: 'relative', display: 'inline-block', width: '44px', height: '24px', flexShrink: 0 }}>
+                <input
+                  type="checkbox"
+                  checked={formData.terminal.mask_secrets ?? true}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      terminal: { ...formData.terminal, mask_secrets: e.target.checked },
+                    })
+                  }
+                  style={{ opacity: 0, width: 0, height: 0 }}
+                />
+                <span style={{
+                  position: 'absolute',
+                  cursor: 'pointer',
+                  top: 0, left: 0, right: 0, bottom: 0,
+                  backgroundColor: (formData.terminal.mask_secrets ?? true) ? 'var(--accent)' : 'rgba(255, 255, 255, 0.2)',
+                  borderRadius: '24px',
+                  transition: '0.2s',
+                }}>
+                  <span style={{
+                    position: 'absolute',
+                    height: '18px',
+                    width: '18px',
+                    left: (formData.terminal.mask_secrets ?? true) ? '23px' : '3px',
+                    bottom: '3px',
+                    backgroundColor: '#fff',
+                    borderRadius: '50%',
+                    transition: '0.2s',
+                  }} />
+                </span>
+              </label>
+            </div>
+
+            {/* Autonomous Watchdog Toggle */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              justifyContent: 'space-between',
+              padding: '12px 14px',
+              background: 'rgba(255, 255, 255, 0.02)',
+              border: '1px solid rgba(255, 255, 255, 0.06)',
+              borderRadius: '8px',
+              marginTop: '10px',
+            }}>
+              <div style={{ paddingRight: '16px' }}>
+                <div style={{ fontSize: '13px', fontWeight: 600, color: '#f8fafc', marginBottom: '4px' }}>
+                  {selectedLang === 'ja' ? '自律型エラー監視・修正提案 (Autonomous Watchdog)' : 'Autonomous Error Watchdog'}
+                </div>
+                <div style={{ fontSize: '12px', color: '#94a3b8', lineHeight: 1.5 }}>
+                  {selectedLang === 'ja'
+                    ? 'コマンド失敗時にバックグラウンドで即座にAIエラー解析を実行し、1-Clickクイック修正ボタンを提示します'
+                    : 'Auto-analyze non-zero exit codes in background and provide 1-click quick fix actions'}
+                </div>
+              </div>
+              <label className="toggle-switch" style={{ position: 'relative', display: 'inline-block', width: '44px', height: '24px', flexShrink: 0 }}>
+                <input
+                  type="checkbox"
+                  checked={formData.terminal.watchdog_auto_analyze ?? true}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      terminal: { ...formData.terminal, watchdog_auto_analyze: e.target.checked },
+                    })
+                  }
+                  style={{ opacity: 0, width: 0, height: 0 }}
+                />
+                <span style={{
+                  position: 'absolute',
+                  cursor: 'pointer',
+                  top: 0, left: 0, right: 0, bottom: 0,
+                  backgroundColor: (formData.terminal.watchdog_auto_analyze ?? true) ? 'var(--accent)' : 'rgba(255, 255, 255, 0.2)',
+                  borderRadius: '24px',
+                  transition: '0.2s',
+                }}>
+                  <span style={{
+                    position: 'absolute',
+                    height: '18px',
+                    width: '18px',
+                    left: (formData.terminal.watchdog_auto_analyze ?? true) ? '23px' : '3px',
+                    bottom: '3px',
+                    backgroundColor: '#fff',
+                    borderRadius: '50%',
+                    transition: '0.2s',
+                  }} />
+                </span>
+              </label>
             </div>
           </div>
 

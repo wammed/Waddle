@@ -22,7 +22,13 @@ Welcome to the comprehensive feature guide for **Waddle**, the AI-integrated, pr
 14. [🐙 Git & GitHub Integration, Local AI Commits & Push/Pull Policy](#14--git--github-integration-local-ai-commits--pushpull-policy)
 15. [🔄 One-Click Workspace Refresh & Safe Confirmation Dialog](#15--one-click-workspace-refresh--safe-confirmation-dialog)
 16. [🖼️ Kitty Graphics Protocol Support & Strict Security Sandboxing](#16--kitty-graphics-protocol-support--strict-security-sandboxing)
-17. [⌨️ Complete Keybindings Reference](#️-complete-keybindings-reference)
+17. [🛡️ Real-Time Secret Masking (`SecretMasker`)](#17--real-time-secret-masking-secretmasker)
+18. [⏳ Session Time Travel & Snapshot History (`Ctrl + Shift + H`)](#18--session-time-travel--snapshot-history-ctrl--shift--h)
+19. [📊 Rich Data Visualizer (Markdown / CSV / JSON Preview)](#19--rich-data-visualizer-markdown--csv--json-preview)
+20. [🐕 Autonomous AI Error Watchdog & 1-Click Fix](#20--autonomous-ai-error-watchdog--1-click-fix)
+21. [🔗 Visual Pipeline Builder (`Ctrl + Shift + P`)](#21--visual-pipeline-builder-ctrl--shift--p)
+22. [📜 Project-Specific AI Rules (`.waddle/rules.md`)](#22--project-specific-ai-rules-waddlerulesmd)
+23. [⌨️ Complete Keybindings Reference](#️-complete-keybindings-reference)
 
 ---
 
@@ -231,10 +237,15 @@ Welcome to the comprehensive feature guide for **Waddle**, the AI-integrated, pr
 
 ### 13. 🛡️ Hardened Multi-Layer Security & AI Safety Guardrails
 
-- **System Directory Prefix Protection**:
+- **System Directory Prefix Protection & Virtual FS Isolation**:
   - Prefixed canonical path validation blocks writing or deletion in `/etc`, `/usr`, `/bin`, `/sbin`, `/boot`, `/lib`, `/sys`, `/proc`, `/dev`, `/root`, `/run`.
+  - Directory listing and path traversal into virtual kernel mounts (`/proc`, `/sys`, `/dev`) are blocked at the backend to prevent host process reconnaissance.
 - **Sensitive Credential Shield**:
-  - Completely blocks reading, writing, and deletion of SSH keys (`~/.ssh/*`), GPG keys (`~/.gnupg/*`), Linux keyrings, shell startup files (`.bashrc`, `.zshrc`, etc.), and `~/.config` root.
+  - Completely blocks reading, writing, and deletion of SSH private keys (`~/.ssh/id_rsa`, `id_ed25519`, etc.), GPG private keys (`~/.gnupg/private-keys-v1.d`), Linux keyrings (`~/.local/share/keyrings`), shell startup files (`.bashrc`, `.zshrc`, etc.), and `~/.config` root. Public keys (`.pub`) and `known_hosts` remain safely readable.
+- **Ollama SSRF & Cloud Metadata Defense**:
+  - `validate_ollama_endpoint` strictly blocks local link-local and cloud metadata addresses (`169.254.169.254`, IPv6 `[fd00:ec2::254]`), preventing SSRF attacks aimed at exfiltrating AWS/GCP/Azure instance IAM credentials.
+- **Git Branch Ref Strict Sanitization**:
+  - `git_checkout_branch` and `git_create_branch` sanitize branch arguments, strictly rejecting leading hyphens (preventing CLI option injection like `-D` or `--help`), control characters, spaces, and `..` path sequences.
 - **Indirect Prompt Injection Defense**:
   - Terminal output is escaped with XML delimiter wrappers (`<untrusted_terminal_output>`) to neutralize prompt breakout attacks.
 - **Word-Boundary Dangerous Command Interception**:
@@ -353,6 +364,76 @@ Welcome to the comprehensive feature guide for **Waddle**, the AI-integrated, pr
 
 ---
 
+---
+
+### 17. 🛡️ Real-Time Secret Masking (`SecretMasker`)
+
+- **Automated Credential Detection**:
+  - Intercepts live terminal PTY streams and runs high-speed regex evaluation against common credential formats:
+    - GitHub Personal Access Tokens (`ghp_...`, `gho_...`, `ghu_...`, `ghs_...`, `ghr_...`)
+    - AWS Access Key IDs (`AKIA...`, `ASIA...`) & Secret Access Keys
+    - OpenAI API Keys (`sk-...`, `sk-proj-...`)
+    - Slack Tokens (`xoxb-...`, `xoxp-...`)
+    - JSON Web Tokens (JWT)
+    - Private key blocks (`-----BEGIN OPENSSH PRIVATE KEY-----`, etc.)
+- **Redaction**:
+  - Matches are instantly replaced in the terminal display buffer with `***MASKED_KEY***` or asterisks.
+  - Can be toggled on/off in the Settings modal under "Terminal Secret Masking".
+  - Neutralizes credential leakage during screen sharing, live streams, and video recordings.
+
+---
+
+### 18. ⏳ Session Time Travel & Snapshot History (`Ctrl + Shift + H`)
+
+- **Timeline Interface (`SessionHistoryModal`)**:
+  - Activated via `Ctrl + Shift + H`. Displays chronological history of executed commands with execution timestamps, exit status (success: green, failure: red), working directory, and terminal output snapshots.
+- **State Restoration & Replay**:
+  - Select any historical command to re-run it in the active terminal pane or copy it to the clipboard with one click.
+  - Session history records persist automatically to `localStorage` across app launches.
+
+---
+
+### 19. 📊 Rich Data Visualizer (Markdown / CSV / JSON Preview)
+
+- **Dedicated Preview Modal (`RichPreviewModal`)**:
+  - Accessible via the file tree right-click context menu or the "Rich Preview" button in the embedded editor.
+- **Format-Specific Visualizers**:
+  - **Markdown**: Clean typographic layout with headers, lists, syntax-highlighted code blocks, and tables.
+  - **CSV**: Interactive data grid with auto-detected headers, sortable columns (ascending/descending), and instant full-text filtering.
+  - **JSON**: Collapsible/expandable hierarchical tree view with syntax color-coding and fast search.
+
+---
+
+### 20. 🐕 Autonomous AI Error Watchdog & 1-Click Fix
+
+- **Detection Engine**:
+  - Automatically captures non-zero process exit codes and common CLI error patterns (`error:`, `fatal:`, `command not found`, `syntax error`) in the PTY output stream.
+- **Diagnosis & Fix**:
+  - An unobtrusive diagnostic toast/banner appears at the bottom of the active terminal with root-cause analysis.
+  - Clicking "Fix with AI" prompts local Ollama to diagnose the issue and generates the exact corrective command ready for 1-click execution.
+
+---
+
+### 21. 🔗 Visual Pipeline Builder (`Ctrl + Shift + P`)
+
+- **Workflow Orchestration (`PipelineBuilderModal`)**:
+  - Open with `Ctrl + Shift + P`. Graphically configure sequential build, test, lint, and deploy workflows.
+- **Execution & Controls**:
+  - Reorder steps, toggle steps on/off, and specify "Stop on Error" thresholds.
+  - Clicking "Run Pipeline" streams outputs directly to the active terminal pane with live progress tracking.
+
+---
+
+### 22. 📜 Project-Specific AI Rules (`.waddle/rules.md`)
+
+- **Repository Rule Discovery**:
+  - Tauri backend `get_project_rules` automatically detects `.waddle/rules.md` in the current project root or parent repository.
+- **Context Injection**:
+  - When active, an informative `.waddle/rules.md active` badge appears in the AI Command Generator (`Ctrl + K`).
+  - Project-specific constraints (e.g. "Use pnpm instead of npm", "Never run sudo", "Enforce branch prefix feature/") are injected seamlessly into the system prompt.
+
+---
+
 ## ⌨️ Complete Keybindings Reference
 
 | Shortcut | Context | Action |
@@ -363,6 +444,8 @@ Welcome to the comprehensive feature guide for **Waddle**, the AI-integrated, pr
 | `Ctrl + S` | Editor | Save currently open file |
 | `Ctrl + Shift + K` | Editor | Open **AI Code Edit / Refactor** |
 | `Ctrl + Shift + F` / `Ctrl + F` | Terminal | Toggle **In-Terminal Log Search** |
+| `Ctrl + Shift + H` | Global | Open **Session Timeline & History Restoration** modal |
+| `Ctrl + Shift + P` | Global | Open **Visual Pipeline Builder** modal |
 | `Enter` | Search Bar | Find next match in scrollback buffer |
 | `Shift + Enter` | Search Bar | Find previous match in scrollback buffer |
 | `Ctrl + T` | Global | Open a new terminal tab |

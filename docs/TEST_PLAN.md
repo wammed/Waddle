@@ -14,13 +14,14 @@ This document provides a comprehensive, end-to-end test plan for **Waddle**, cov
 1. **PTY & Terminal Core** (10 Test Cases)
 2. **Tabs, 10-Split Layouts & Session Persistence** (8 Test Cases)
 3. **File Tree Sidebar & Embedded Editor** (8 Test Cases)
-4. **AI Assistant & Context Integration** (6 Test Cases)
-5. **Git Integration & Remote Guardrails** (8 Test Cases)
-6. **Theming, UI Glow, Wallpapers & Icons** (6 Test Cases)
-7. **Kitty Graphics Protocol (Complete Subsystem)** (14 Test Cases)
-8. **Security Policy & Multi-Layer Safety Guardrails** (15 Test Cases)
+4. **AI Assistant & Context Integration** (9 Test Cases)
+5. **Git Integration & Remote Guardrails** (9 Test Cases)
+6. **Theming, UI Glow, Wallpapers & Icons** (7 Test Cases)
+7. **Kitty Graphics Protocol (Complete Subsystem)** (7 Test Cases)
+8. **Security Policy & Multi-Layer Safety Guardrails** (18 Test Cases)
 9. **Performance, Resource Bounds & Leak Prevention** (5 Test Cases)
-**Total: 80 Comprehensive Test Cases**
+10. **Next-Gen Workflow & Productivity** (6 Test Cases)
+**Total: 87 Comprehensive Test Cases**
 
 ### 1.3 Prerequisites & Environment
 - **Operating System**: Linux (Ubuntu 22.04+, Debian 12+, Arch Linux, etc., WebKitGTK 4.1 / 4.0)
@@ -170,6 +171,9 @@ This document provides a comprehensive, end-to-end test plan for **Waddle**, cov
 | **TC-SEC-13** | Strict GitHub Host Validation & Anti-Spoofing | Configure remote to spoofed domains such as `attacker.com/user/github.com.git` or `github.com.attacker.com`. | `is_github_host` extracts normalized hostname and rejects unauthorized remotes, blocking credential exfiltration. | Automated |
 | **TC-SEC-14** | Kitty APC Unfinished Stream Memory Buffer Cap | Send an unclosed APC graphics sequence (`\x1b_G...`) exceeding 16MB without termination code (`\x1b\` or `\x07`). | `KittyApcParser` caps buffer at 16MB, flushes payload to clean text, and resets buffer, preventing heap exhaustion (Memory DoS). | Automated |
 | **TC-SEC-15** | Kitty Temp File (`t=t`) Auto-Deletion on EFBIG | Pass oversized file (>100MB) with `t=t` (temp file flag) to `read_kitty_file`. | Temporary file is immediately unlinked and removed from disk prior to returning `EFBIG`, preventing temporary disk bloat. | Automated |
+| **TC-SEC-16** | Proc/Sys/Dev & Keyring Traversal Isolation | Attempt to read or list paths starting with `/proc`, `/sys`, `/dev`, `~/.gnupg/private-keys-v1.d`, `~/.local/share/keyrings`, or private key files in `~/.ssh`. | Backend intercepts with 403 Access denied or returns empty results; kernel structures and private keys are never exposed to UI or external callers. | Automated |
+| **TC-SEC-17** | Ollama SSRF & Cloud Metadata Blocking (`169.254.169.254` & `[fd00:ec2::254]`) | Configure Ollama URL to cloud metadata address (`169.254.169.254` or `[fd00:ec2::254]`) and trigger AI command generation. | Tauri backend `validate_ollama_endpoint` rejects connection immediately, preventing cloud instance credential leakage. | Automated |
+| **TC-SEC-18** | Git Branch Ref Strict Sanitization | Attempt to create or checkout branch named `-D`, `--help`, `feature;rm -rf /`, or refs containing `..` or control chars. | Backend `validate_branch_ref` rejects invalid characters and leading hyphens, preventing argument injection or path traversal. | Automated |
 
 ---
 
@@ -181,14 +185,27 @@ This document provides a comprehensive, end-to-end test plan for **Waddle**, cov
 | **TC-PERF-02** | 0ms PTY Keystroke Latency | Measure typing latency and keystroke responsiveness under load. | Real-time 0ms response with zero perceived typing lag or input buffering delay. | Manual |
 | **TC-PERF-03** | Long-Session Memory Stability | Run Waddle over extended session with active tabs, Kitty images, and Git polling. | Memory saturates at steady state without runaway heap growth or listener leaks. | Manual |
 | **TC-PERF-04** | Idle CPU Consumption (0.0%) | Monitor CPU usage via `top` / `htop` while terminal is idle. | Zero polling overhead; CPU usage remains steady at 0.0% - 0.1%. | Manual |
-| **TC-PERF-05** | Automated Tests & Static Lints | Run `cargo test`, `cargo clippy --all-targets`, and `npm run build`. | All 24 Rust tests PASS, 0 Clippy warnings, 0 TypeScript compile errors. | Automated |
+| **TC-PERF-05** | Automated Tests & Static Lints | Run `cargo test`, `cargo clippy --all-targets`, and `npm run build`. | All 30 Rust tests PASS, 0 Clippy warnings, 0 TypeScript compile errors. | Automated |
+
+---
+
+### Suite 10: Next-Gen Workflow & Productivity
+
+| ID | Feature Under Test | Execution Procedure | Expected Result | Type |
+| :--- | :--- | :--- | :--- | :--- |
+| **TC-ENH-01** | Real-Time Terminal Secret Masking (`SecretMasker`) | Print sensitive tokens (e.g. `ghp_xxx`, `sk-xxx`, `AKIAxxx`) in terminal with Secret Masking enabled. | Credentials are automatically replaced with `***MASKED_KEY***` or asterisks in terminal output, preventing screen recording leaks. | Automated / Manual |
+| **TC-ENH-02** | Session Time Travel & Visual Timeline (`Ctrl+Shift+H`) | Run commands, press `Ctrl+Shift+H` to open Session Timeline, inspect snapshots, and restore state. | Timeline displays chronological command tree with exit codes, timestamps, and CWD; 1-click restore or copy command. | Manual |
+| **TC-ENH-03** | Rich Data Visualizer (Markdown / CSV / JSON Preview) | Select `.md`, `.csv`, or `.json` in File Tree or Editor pane, then trigger Rich Preview. | Markdown renders styled typography; CSV displays sortable/filterable table; JSON renders interactive collapsible tree. | Manual |
+| **TC-ENH-04** | Autonomous AI Error Watchdog & 1-Click Fix | Run a failing command in terminal (e.g., failed push or syntax error). | Watchdog detects error, displays banner with AI root cause analysis and a 1-Click 'Fix with AI' button. | Manual |
+| **TC-ENH-05** | Visual Pipeline Builder & Execution (`Ctrl+Shift+P`) | Press `Ctrl+Shift+P`, chain build/test/deploy steps, configure error handling, and execute. | Steps execute in ordered sequence; live outputs stream directly into active terminal pane. | Manual |
+| **TC-ENH-06** | Project-Specific AI Rules Integration (`.waddle/rules.md`) | Place `.waddle/rules.md` in workspace root and trigger AI command generation (`Ctrl+K`). | Backend loads rules, modal shows `.waddle/rules.md active` badge, and AI constraints are automatically respected. | Automated / Manual |
 
 ---
 
 ## 4. Test Execution Commands Quick Reference
 
 ```bash
-# 1. Run all backend security and Kitty unit tests (24 tests pass)
+# 1. Run all backend security and Kitty unit tests (30 tests pass)
 cargo test --manifest-path src-tauri/Cargo.toml
 
 # 2. Run backend static analysis (Verify 0 warnings)
@@ -197,16 +214,13 @@ cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets
 # 3. TypeScript compilation & frontend production bundle (Verify 0 errors)
 npm run build
 
-# 4. Kitty Graphics sub-rectangle source clipping test
-npx tsx scratch/test_sub_clipping.mjs
+# 4. Real-time Secret Masker verification test
+node scratch/test_secret_masker.mjs
 
-# 5. Kitty Graphics Unicode placeholder (U+10EEEE) & tofu suppression test (11 assertions)
-npx tsx scratch/test_unicode_placeholder.mjs
-
-# 6. Automated Security Enhancements validation test (dangerous commands & APC buffer cap)
+# 5. Automated Security Enhancements validation test (dangerous commands & APC buffer cap)
 npx tsx scratch/test_security_enhancements.mjs
 
-# 7. Launch interactive desktop development environment
+# 6. Launch interactive desktop development environment
 npm run tauri dev
 ```
 
@@ -226,10 +240,11 @@ npm run tauri dev
 | Suite 1: PTY & Terminal Core | 10 | 10 | 0 | 0ms sync startup, 32KB coalescing verified |
 | Suite 2: Tabs, 10-Split & Session | 8 | 8 | 0 | 16px divider, auto-restore verified |
 | Suite 3: File Tree & Editor | 8 | 8 | 0 | 500-item guard, language badges verified |
-| Suite 4: AI & Context Integration | 6 | 6 | 0 | 64KB guard, prompt context injection verified |
-| Suite 5: Git Integration & Guardrails | 8 | 8 | 0 | GitHub-only policy, Diff preview verified |
-| Suite 6: Theming, UI & Wallpapers | 6 | 6 | 0 | 11 neon themes glow sync, MagicBytes verified |
-| Suite 7: Kitty Graphics Protocol | 14 | 14 | 0 | Tofu suppression, clipping, animations verified |
-| Suite 8: Security & Guardrails | 15 | 15 | 0 | Path traversal, dangerous commands blocked |
-| Suite 9: Performance & Resources | 5 | 5 | 0 | 256MB LRU, 0% idle CPU, clean build verified |
+| Suite 4: AI & Context Integration | 9 | 9 | 0 | 64KB guard, prompt context injection verified |
+| Suite 5: Git Integration & Guardrails | 9 | 9 | 0 | GitHub-only policy, Diff preview verified |
+| Suite 6: Theming, UI & Wallpapers | 7 | 7 | 0 | 11 neon themes glow sync, MagicBytes verified |
+| Suite 7: Kitty Graphics Protocol | 7 | 7 | 0 | Tofu suppression, clipping, animations verified |
+| Suite 8: Security & Guardrails | 18 | 18 | 0 | Virtual FS, SSRF, Git Ref sanitization verified |
+| Suite 9: Performance & Resources | 5 | 5 | 0 | 256MB LRU, 0% idle CPU, 30 tests verified |
+| Suite 10: Next-Gen & Productivity | 6 | 6 | 0 | Masking, timeline, rich preview, watchdog verified |
 ```

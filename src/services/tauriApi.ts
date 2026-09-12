@@ -366,6 +366,15 @@ export const TauriApi = {
     };
   },
 
+  async getProjectRules(cwd: string): Promise<string | null> {
+    if (!isTauri()) return null;
+    try {
+      return await invoke<string | null>('get_project_rules', { cwd });
+    } catch {
+      return null;
+    }
+  },
+
   // Config & System
   async getConfig(): Promise<AppConfig> {
     if (!isTauri()) {

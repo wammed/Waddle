@@ -328,7 +328,7 @@ export const TestPlanModal: React.FC<TestPlanModalProps> = ({ isOpen, onClose })
                 </h2>
               </div>
               <span style={{ fontSize: '12px', color: '#94a3b8' }}>
-                {isJa ? '全 80 項目・9 スイートのリアルタイム合否判定 & エビデンス記録' : 'Real-time test verification & evidence recording for all 80 items across 9 suites'}
+                {isJa ? `全 ${TEST_CASES.length} 項目・${TEST_SUITES.length} スイートのリアルタイム合否判定 & エビデンス記録` : `Real-time test verification & evidence recording for all ${TEST_CASES.length} items across ${TEST_SUITES.length} suites`}
               </span>
             </div>
           </div>
@@ -711,7 +711,7 @@ export const TestPlanModal: React.FC<TestPlanModalProps> = ({ isOpen, onClose })
             >
               <span>{isJa ? '全スイート' : 'All Suites'}</span>
               <span style={{ fontSize: '11px', background: 'rgba(255, 255, 255, 0.1)', padding: '1px 6px', borderRadius: '10px' }}>
-                80
+                {TEST_CASES.length}
               </span>
             </button>
 

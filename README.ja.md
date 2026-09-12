@@ -49,6 +49,12 @@
 - 📂 **高機能ファイルツリー**: `/proc/<pid>/cwd` によるカレントディレクトリ自動追跡、言語別カラーバッジ、ブレッドクラム、インデントガイド、右クリックメニュー。([詳細](docs/FEATURES.ja.md#3--左側ファイルツリーサイドバー-ctrl--b))
 - 🐙 **Git & GitHub 統合ハブ**: ステータスバー連動ポップオーバー、1クリック Push/Pull、ローカル AI による Conventional Commit 自動生成、GUI Diff ビューワー。([詳細](docs/FEATURES.ja.md#14--git--github-連携ローカル-ai-コミット生成--pushpull-ポリシー))
 - 🖼️ **Kitty 画像プロトコル (Kitty Graphics)**: `fastfetch`, `yazi`, Neovim (`image.nvim`) などの CLI/TUI ツールからのターミナル直接画像描画に完全対応。厳格な `$HOME/Pictures` サンドボックスおよび展開爆弾対策ガードレールを標準統合。([詳細](docs/FEATURES.ja.md#16--kitty-画像プロトコル-kitty-graphics-protocol-完全対応--厳格なセキュリティサンドボックス))
+- 🛡️ **リアルタイム機密情報マスク (Secret Masking)**: APIキー（GitHub, AWS, OpenAI等）やトークンを自動検知・即時マスクし、画面共有や動画撮影時の漏洩を防止。([詳細](docs/FEATURES.ja.md#17--リアルタイム機密情報マスク-secret-masking))
+- ⏳ **セッション タイムトラベル & 履歴復元 (`Ctrl + Shift + H`)**: 過去の実行コマンド、終了コード、CWD、出力をタイムライン形式でビジュアル化し、1クリックで状態復元やコマンド再実行。([詳細](docs/FEATURES.ja.md#18--セッション-タイムトラベル--スナップショット履歴-ctrl--shift--h))
+- 📊 **リッチデータ ビジュアライザ (Markdown / CSV / JSON)**: Markdown 組版、CSV ソート・検索テーブル、JSON 折りたたみツリーをエディタおよびツリーから1クリックで瞬時プレビュー。([詳細](docs/FEATURES.ja.md#19--リッチデータ-ビジュアライザ-markdown--csv--json-プレビュー))
+- 🐕 **自律型 AI エラー監視 (Autonomous Watchdog)**: コマンド失敗を自動検知し、AI が原因を即時診断してワンクリックで修正コマンドを提示・実行。([詳細](docs/FEATURES.ja.md#20--自律型-ai-エラー監視--1-click-クイック修正-autonomous-watchdog))
+- 🔗 **ビジュアル パイプライン ビルダー (`Ctrl + Shift + P`)**: ビルド、テスト、デプロイなどの複数コマンドを視覚的にステップ構成し、条件付きで自動連続実行。([詳細](docs/FEATURES.ja.md#21--ビジュアル-パイプライン-ビルダー-ctrl--shift--p))
+- 📜 **プロジェクト個別 AI ルール連携 (`.waddle/rules.md`)**: リポジトリ直下のルールファイルを自動読込し、チーム固有のコーディング規約を AI コマンド生成に反映。([詳細](docs/FEATURES.ja.md#22--プロジェクト個別-ai-ルール連携-waddlerulesmd))
 - 🎨 **全22種のネオン & 洗練テーマ**: UI 全体の動的ネオン発光同期、すりガラスぼかし付き壁紙カスタマイズ、Nerd Fonts タイポグラフィ。([詳細](docs/FEATURES.ja.md#11--全22種類の洗練されたテーマ--高電圧ネオンコレクション))
 
 > 📖 **各機能の詳しい技術仕様や内部機構は** [機能仕様書 (docs/FEATURES.ja.md)](docs/FEATURES.ja.md) をご覧ください。
@@ -108,10 +114,13 @@ sudo pacman -U src-tauri/target/release/bundle/pacman/waddle-0.1.0-1-x86_64.pkg.
 | `Ctrl + B` | **ファイルツリーサイドバー** の表示/非表示を切り替え |
 | `Ctrl + E` | **簡易内蔵エディタ** の表示/非表示を切り替え |
 | `Ctrl + Shift + F` | **ターミナル内ログ検索** の表示/非表示を切り替え |
+| `Ctrl + Shift + H` | **セッション タイムライン & 履歴復元** モーダルを開く |
+| `Ctrl + Shift + P` | **ビジュアル パイプライン ビルダー** モーダルを開く |
 | `Ctrl + T` | 新規ターミナルタブを開く |
 | `Ctrl + W` | 現在のターミナルタブを閉じる |
 | `Ctrl + Shift + S` | 分割ペインの**スワップ（配置入れ替え）** |
 | `Alt + 1 ~ 4` | レイアウト切り替え（**単一、左右2分割、左メイン3分割、2×2グリッド**） |
+| `Ctrl + Enter` | **Git コミット実行** / **AI コマンド即時実行** |
 | `Ctrl + ,` | **設定画面**（テーマ、フォント、AI、壁紙、言語、Git）を開く |
 | `Esc` | 開いているモーダル・検索バー・ポップアップを閉じる |
 
@@ -123,7 +132,8 @@ sudo pacman -U src-tauri/target/release/bundle/pacman/waddle-0.1.0-1-x86_64.pkg.
 
 Waddle は **100% 完全オフライン・ローカルファースト** で動作します：
 - **ゼロクラウド流出**: テレメトリ、外部クラウド API、トラッキングは一切ありません。プロンプトもターミナルログもすべて PC 内で処理されます。
-- **多層防御ガードレール**: システムディレクトリ（`/etc`, `/usr` 等）の前方一致保護、資格情報（SSH/GPG鍵）遮断、XMLタグ境界エスケープ、単語境界による破壊的コマンド検知を完備。
+- **多層防御ガードレール**: システムディレクトリ（`/etc`, `/usr` 等）および仮想ファイルシステム（`/proc`, `/sys`, `/dev`）のトラバーサル遮断、GPG/Keyring/SSH秘密鍵の絶対保護、Ollama SSRF防御（クラウドメタデータ `169.254.169.254` 遮断）、Git Branch Ref 厳格サニタイズ、XMLタグ境界エスケープ、単語境界による破壊的コマンド検知を完備。
+- **機密情報保護 (Secret Masking)**: ターミナル出力中の API キーやアクセストークンを正規表現で即時マスクし、画面共有や録画での意図せぬ資格情報露出を防止。
 - **堅牢な POSIX PTY**: 32KB 出力コアレッシング、UTF-8 マルチバイト境界繰り越し、およびプロセスグループ（`-pid`）の安全なシグナル終了。
 
 > 📐 システム全体の構造設計は [アーキテクチャ解説 (docs/ARCHITECTURE.ja.md)](docs/ARCHITECTURE.ja.md) をご覧ください。  

@@ -16,6 +16,8 @@ interface UseGlobalShortcutsOptions {
   setIsEditorOpen: React.Dispatch<React.SetStateAction<boolean>>;
   setIsFileTreeOpen: React.Dispatch<React.SetStateAction<boolean>>;
   setIsSettingsOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  setIsTimelineOpen?: React.Dispatch<React.SetStateAction<boolean>>;
+  setIsPipelineBuilderOpen?: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 export function useGlobalShortcuts({
@@ -33,6 +35,8 @@ export function useGlobalShortcuts({
   setIsEditorOpen,
   setIsFileTreeOpen,
   setIsSettingsOpen,
+  setIsTimelineOpen,
+  setIsPipelineBuilderOpen,
 }: UseGlobalShortcutsOptions) {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -56,6 +60,26 @@ export function useGlobalShortcuts({
         e.stopPropagation();
         if (activeTab) {
           handleSwapPanes(activeTab.id);
+        }
+        return;
+      }
+
+      // Ctrl+Shift+H: Session Timeline
+      if (isCtrlOrMeta && e.shiftKey && (keyLower === 'h' || code === 'KeyH')) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (setIsTimelineOpen) {
+          setIsTimelineOpen((prev) => !prev);
+        }
+        return;
+      }
+
+      // Ctrl+Shift+P: Visual Pipeline Builder
+      if (isCtrlOrMeta && e.shiftKey && (keyLower === 'p' || code === 'KeyP')) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (setIsPipelineBuilderOpen) {
+          setIsPipelineBuilderOpen((prev) => !prev);
         }
         return;
       }
@@ -182,5 +206,7 @@ export function useGlobalShortcuts({
     setIsEditorOpen,
     setIsFileTreeOpen,
     setIsSettingsOpen,
+    setIsTimelineOpen,
+    setIsPipelineBuilderOpen,
   ]);
 }

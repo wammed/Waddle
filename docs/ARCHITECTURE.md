@@ -12,24 +12,26 @@ graph TD
         TermView["Terminal View: xterm.js + WebLinks + Canvas + Search + Fit"]
         WallLayer["Wallpaper Layer: Custom Image + Blur + Opacity Overlay"]
         Editor["Embedded Editor: Quick Open + Run in Terminal + AI Refactor"]
-        AIOverlay["AI Command Modal Ctrl+K / Smart Error Banner"]
+        AIOverlay["AI Command Modal Ctrl+K / Autonomous Error Watchdog Banner"]
         Copilot["AI Copilot Sidebar: Context-Aware Chat + Session Export"]
         GitUI["Git Quick Popover & Diff Viewer: Push / Pull / Staging / Commits"]
+        NextGenModals["Enhanced Modals: SessionHistory + PipelineBuilder + RichPreview + TestPlan"]
+        Services["Frontend Services: secretMasker + sessionHistory + kittyGraphics"]
         Settings["Settings Modal: Ollama Model & Wallpaper & Git Config"]
         Hooks["Custom Hooks: useTerminalTabs + useGlobalShortcuts"]
     end
 
     subgraph Rust_Backend ["Backend: Rust + Tauri Core"]
         PtyMgr["PTY Manager: portable-pty + UTF-8 buffer + Process Group Kill"]
-        GitCore["Git Engine: Status / Stage / Commit / Push / Pull / Diff / Policy"]
-        AiCore["Ollama Client: Line-Buffered Streaming / Tags / Generate"]
-        FileIO["File System: Read / Write / List with Guardrails"]
+        GitCore["Git Engine: Status / Stage / Commit / Push / Pull / Diff / Ref Validation"]
+        AiCore["Ollama Client: Line-Buffered Streaming / Tags / SSRF Defense / Project Rules"]
+        FileIO["File System: Read / Write / List with Virtual FS & Key Isolation"]
         ConfigMgr["Config Manager: ~/.config/waddle/config.json"]
     end
 
     subgraph System_Layer ["Local Linux Environment"]
         Shell["Linux Shell: /bin/bash, zsh, fish"]
-        GitRepo["Git Repository & GitHub Remotes"]
+        GitRepo["Git Repository (.waddle/rules.md) & GitHub Remotes"]
         Ollama["Local Ollama: http://localhost:11434"]
     end
 
@@ -42,6 +44,8 @@ graph TD
     AiCore <-->|REST / SSE Stream| Ollama
     Hooks --> TermView
     Hooks --> AIOverlay
+    Services --> TermView
+    NextGenModals --> TermView
 ```
 
 ---
@@ -58,6 +62,15 @@ Waddle is built on a hybrid architecture combining a high-performance **Rust bac
   - `@xterm/addon-search`: Hardware-accelerated terminal scrollback buffer search.
   - `@xterm/addon-fit`: Responsive dimension calculation matching parent DOM geometry.
   - `@xterm/addon-web-links`: Automatic detection and click navigation for HTTP/HTTPS URLs.
+- **Frontend Services & Extended Subsystems**:
+  - `src/services/secretMasker.ts`: Real-time regex pattern evaluator masking sensitive credentials (`ghp_...`, `sk-...`, `AKIA...`, JWT, private keys) in the terminal output stream.
+  - `src/services/sessionHistory.ts`: Comprehensive command timeline tracking, exit code logging, CWD recording, and `localStorage` snapshot persistence.
+  - `src/services/kittyGraphics/`: Full Kitty Graphics Protocol subsystem (APC parser, texture manager, 256MB LRU cache, infinite/counted animation timers, Unicode placeholder tofu suppression).
+- **Modals & Visual Tools**:
+  - `SessionHistoryModal.tsx`: Time travel session replay and snapshot restoration (`Ctrl+Shift+H`).
+  - `PipelineBuilderModal.tsx`: Visual multi-step command chaining and sequential execution (`Ctrl+Shift+P`).
+  - `RichPreviewModal.tsx`: Formatted Markdown, sortable/filterable CSV table, and collapsible JSON tree visualizer.
+  - `TestPlanModal.tsx`: Interactive verification form for 87 test cases across 10 suites with Markdown/JSON export.
 - **State Management**:
   - `useTerminalTabs`: Manages tab hierarchies, multi-pane layouts, zoom state, dynamic split ratios, and automatic session persistence to `localStorage`.
   - `useGlobalShortcuts`: Centralized keybinding dispatcher with focus-aware bubbling prevention.
@@ -70,11 +83,11 @@ Waddle is built on a hybrid architecture combining a high-performance **Rust bac
 ### 3. Native Services Layer (Rust Backend)
 - **Runtime**: Tokio multi-threaded asynchronous runtime.
 - **Subsystem Modules**:
-  - `pty.rs`: Pseudo-terminal allocation, output stream coalescing, UTF-8 decoders, and process group lifecycle control.
-  - `ai.rs`: Ollama HTTP client, line-buffered SSE chunk assembly, prompt templates, and dangerous command detection engine.
+  - `pty.rs`: Pseudo-terminal allocation, output stream coalescing, UTF-8 decoders, process group lifecycle control, and Git branch ref validation.
+  - `ai.rs`: Ollama HTTP client, line-buffered SSE chunk assembly, prompt templates, dangerous command interception, SSRF cloud metadata protection, and `.waddle/rules.md` project rules ingestion.
   - `config.rs`: Atomic read/write operations for `~/.config/waddle/config.json`, wallpaper management, and legacy migration.
-  - `kitty.rs`: Sandboxed local image reader with path canonicalization, symlink escape checks, decompression bomb defenses, and Base64 encoder.
-  - `lib.rs`: Tauri command router, directory traversal, file operations with prefix guards, and Git CLI wrappers.
+  - `kitty.rs`: Sandboxed local image reader with path canonicalization, symlink escape checks, decompression bomb defenses, Base64 encoder, and temporary file auto-unlinking.
+  - `lib.rs`: Tauri command router, virtual filesystem traversal defense (`/proc`, `/sys`, `/dev`), private key isolation (`~/.ssh`, `~/.gnupg`, `~/.local/share/keyrings`), and Git CLI execution.
 
 ---
 

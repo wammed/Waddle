@@ -49,6 +49,12 @@
 - 📂 **Rich File Tree Explorer**: Real-time CWD tracking (`/proc/<pid>/cwd`), language-colored badges, clickable breadcrumbs, indent guides, and right-click context menu. ([Details](docs/FEATURES.md#3--left-sidebar-file-tree-explorer-ctrl--b))
 - 🐙 **Integrated Git & GitHub Hub**: Status bar quick popover, one-click push/pull, local AI conventional commit generator, and syntax-highlighted diff viewer. ([Details](docs/FEATURES.md#14--git--github-integration-local-ai-commits--pushpull-policy))
 - 🖼️ **Kitty Graphics Protocol**: Native inline image rendering and graphics support for CLI/TUI tools (`fastfetch`, `yazi`, Neovim `image.nvim`) with strict `$HOME/Pictures` sandboxing and decompression bomb protection. ([Details](docs/FEATURES.md#16--kitty-graphics-protocol-support--strict-security-sandboxing))
+- 🛡️ **Real-Time Secret Masking**: Automatically detects and redacts sensitive API keys (GitHub, AWS, OpenAI, etc.) and credentials in terminal streams (`***MASKED_KEY***`) to prevent shoulder surfing or recording leaks. ([Details](docs/FEATURES.md#17--real-time-secret-masking-secretmasker))
+- ⏳ **Session Time Travel (`Ctrl + Shift + H`)**: Visual command history and snapshot timeline with exit codes, timestamps, CWD, and 1-click state restoration or command replay. ([Details](docs/FEATURES.md#18--session-time-travel--snapshot-history-ctrl--shift--h))
+- 📊 **Rich Data Visualizer**: In-pane Markdown formatted typography, sortable/filterable interactive CSV tables, and collapsible JSON syntax trees directly from the file tree or editor. ([Details](docs/FEATURES.md#19--rich-data-visualizer-markdown--csv--json-preview))
+- 🐕 **Autonomous AI Error Watchdog**: Monitors terminal failures in real time, auto-diagnoses root causes via local LLM, and provides a 1-click quick fix button. ([Details](docs/FEATURES.md#20--autonomous-ai-error-watchdog--1-click-fix))
+- 🔗 **Visual Pipeline Builder (`Ctrl + Shift + P`)**: Visually chain multi-step build, test, lint, and deploy workflows with stop-on-error control and live terminal stream execution. ([Details](docs/FEATURES.md#21--visual-pipeline-builder-ctrl--shift--p))
+- 📜 **Project-Specific AI Rules (`.waddle/rules.md`)**: Automatically loads repository-level rules to enforce custom team guidelines and constraints during AI command generation. ([Details](docs/FEATURES.md#22--project-specific-ai-rules-waddlerulesmd))
 - 🎨 **22 Cyberpunk & Neon Themes**: Vibrant UI glow synchronization, custom wallpaper support with frosted glass blur, and built-in Nerd Font typography. ([Details](docs/FEATURES.md#11--22-premium-themes--high-voltage-neon-collection))
 
 > 📖 **Looking for in-depth feature specifications?** See the full [Feature Guide (docs/FEATURES.md)](docs/FEATURES.md).
@@ -108,10 +114,13 @@ sudo pacman -U src-tauri/target/release/bundle/pacman/waddle-0.1.0-1-x86_64.pkg.
 | `Ctrl + B` | Toggle **File Tree Sidebar** |
 | `Ctrl + E` | Toggle **Embedded Code Editor** |
 | `Ctrl + Shift + F` | Toggle **In-Terminal Log Search** |
+| `Ctrl + Shift + H` | Open **Session Timeline & History Restoration** modal |
+| `Ctrl + Shift + P` | Open **Visual Pipeline Builder** modal |
 | `Ctrl + T` | Open new terminal tab |
 | `Ctrl + W` | Close active terminal tab |
 | `Ctrl + Shift + S` | **Swap panes** in current split tab |
 | `Alt + 1 ~ 4` | Switch layout (**Single, 2-Split, 3-Split, 4-Split Grid**) |
+| `Ctrl + Enter` | **Execute Git Commit** / **Run AI Command Immediately** |
 | `Ctrl + ,` | Open **Settings** (Themes, Fonts, Ollama, Wallpapers, Git) |
 | `Esc` | Close active modal, search overlay, or popover |
 
@@ -123,7 +132,8 @@ sudo pacman -U src-tauri/target/release/bundle/pacman/waddle-0.1.0-1-x86_64.pkg.
 
 Waddle operates under a strict **100% offline, local-first** model:
 - **Zero Cloud Leakage**: No telemetry, analytics, or external API keys; all AI prompts and terminal streams remain on your local machine.
-- **Multi-Layer Defense**: System directory prefix guards (`/etc`, `/usr`, etc.), user credential shields (`~/.ssh`, `~/.gnupg`), indirect prompt injection delimiters, and word-boundary destructive command interception.
+- **Multi-Layer Defense**: System directory prefix guards (`/etc`, `/usr`), virtual filesystem isolation (`/proc`, `/sys`, `/dev`), user credential shields (`~/.ssh`, `~/.gnupg`, `~/.local/share/keyrings`), Ollama SSRF protection (blocking cloud metadata `169.254.169.254`), Git Branch Ref strict sanitization, indirect prompt injection delimiters, and word-boundary destructive command interception.
+- **Real-Time Secret Masking**: Credentials and API keys (GitHub, AWS, OpenAI, etc.) in terminal streams are automatically redacted in real time (`***MASKED_KEY***`) to protect against video recording and screen sharing leakage.
 - **Robust POSIX PTY**: Memory-safe Rust core with 32KB output coalescing, UTF-8 multi-byte carry-over, and clean process group termination (`SIGHUP`/`SIGTERM`).
 
 > 📐 Explore the system design in the [Architecture Guide (docs/ARCHITECTURE.md)](docs/ARCHITECTURE.md).  

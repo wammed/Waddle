@@ -4,6 +4,7 @@ export interface AiConfig {
   ollama_model: string;
   temperature: number;
   custom_system_prompt?: string;
+  enable_project_rules?: boolean;
 }
 
 export interface TerminalConfig {
@@ -18,6 +19,19 @@ export interface TerminalConfig {
   background_image?: string;
   background_opacity?: number;
   background_blur?: number;
+  mask_secrets?: boolean;
+  watchdog_auto_analyze?: boolean;
+}
+
+export interface SessionCommandRecord {
+  id: string;
+  command: string;
+  cwd: string;
+  timestamp: number;
+  durationMs?: number;
+  exitCode?: number;
+  outputSnippet?: string;
+  paneId?: string;
 }
 
 export type Language = 'en-US' | 'en-GB' | 'ja';

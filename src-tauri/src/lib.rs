@@ -401,10 +401,46 @@ fn read_directory(path: String, show_hidden: bool) -> Result<Vec<FileEntry>, Str
         return Ok(Vec::new());
     }
 
+    let canonical = resolve_canonical_path(p);
+
+    // 1. Block virtual/kernel/device filesystem probing: /proc, /sys, /dev
+    let path_str = canonical.to_string_lossy();
+    if path_str.starts_with("/proc") || path_str.starts_with("/sys") || path_str.starts_with("/dev") {
+        return Err("安全上の理由により仮想/システムディレクトリ (/proc, /sys, /dev) の参照は禁止されています。".to_string());
+    }
+
+    // 2. Block sensitive credential directory browsing and flag SSH dir
+    let is_ssh_dir = if let Some(home) = dirs::home_dir() {
+        let home_canon = home.canonicalize().unwrap_or(home);
+        let gpg_private = home_canon.join(".gnupg").join("private-keys-v1.d");
+        if canonical == gpg_private || canonical.starts_with(&gpg_private) {
+            return Err("安全上の理由によりGPG秘密鍵領域の参照は禁止されています。".to_string());
+        }
+        let keyrings_dir = home_canon.join(".local").join("share").join("keyrings");
+        if canonical == keyrings_dir || canonical.starts_with(&keyrings_dir) {
+            return Err("安全上の理由によりシステムキーリング領域の参照は禁止されています。".to_string());
+        }
+        let ssh_dir = home_canon.join(".ssh");
+        canonical == ssh_dir || canonical.starts_with(&ssh_dir)
+    } else {
+        false
+    };
+
     let mut entries_list = Vec::new();
     if let Ok(entries) = fs::read_dir(p) {
         for entry in entries.flatten() {
             if let Ok(file_name) = entry.file_name().into_string() {
+                // If browsing ~/.ssh, strip private keys to protect credentials
+                if is_ssh_dir {
+                    let is_safe_ssh_file = file_name == "config"
+                        || file_name.starts_with("known_hosts")
+                        || file_name.starts_with("authorized_keys")
+                        || file_name.ends_with(".pub");
+                    if !is_safe_ssh_file {
+                        continue;
+                    }
+                }
+
                 if !show_hidden && file_name.starts_with('.') {
                     continue;
                 }
@@ -645,9 +681,7 @@ async fn pick_wallpaper_file() -> Result<Option<String>, String> {
             if output.status.success() {
                 let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
                 if !path.is_empty() {
-                    if let Err(err) = crate::config::validate_wallpaper_file_path(&path) {
-                        return Err(err);
-                    }
+                    crate::config::validate_wallpaper_file_path(&path)?;
                     return Ok(Some(path));
                 }
             }
@@ -671,9 +705,7 @@ async fn pick_wallpaper_file() -> Result<Option<String>, String> {
             if output.status.success() {
                 let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
                 if !path.is_empty() {
-                    if let Err(err) = crate::config::validate_wallpaper_file_path(&path) {
-                        return Err(err);
-                    }
+                    crate::config::validate_wallpaper_file_path(&path)?;
                     return Ok(Some(path));
                 }
             }
@@ -769,6 +801,11 @@ fn kitty_read_file(
     )
 }
 
+#[tauri::command]
+fn get_project_rules(cwd: String) -> Result<Option<String>, String> {
+    Ok(ai::load_project_rules(&cwd))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let pty_manager = PtyManager::new();
@@ -817,6 +854,7 @@ pub fn run() {
             explain_error,
             stream_ai_chat,
             ai_edit_code,
+            get_project_rules,
             get_config,
             save_config,
             save_wallpaper_file,
@@ -1049,6 +1087,41 @@ mod tests {
             // Keyrings must be rejected
             let keyring = home.join(".local").join("share").join("keyrings").join("login.keyring");
             assert!(validate_safe_read(&keyring).is_err());
+        }
+    }
+
+    #[test]
+    fn test_read_directory_path_probing_protection() {
+        // 1. Virtual / kernel filesystem access must be rejected
+        assert!(read_directory("/proc".to_string(), true).is_err());
+        assert!(read_directory("/proc/sys".to_string(), true).is_err());
+        assert!(read_directory("/sys".to_string(), true).is_err());
+        assert!(read_directory("/dev".to_string(), true).is_err());
+
+        if let Some(home) = dirs::home_dir() {
+            // 2. Sensitive key vault directories must be rejected
+            let gpg_private = home.join(".gnupg").join("private-keys-v1.d");
+            let _ = fs::create_dir_all(&gpg_private);
+            assert!(read_directory(gpg_private.to_string_lossy().to_string(), true).is_err());
+
+            let keyrings_dir = home.join(".local").join("share").join("keyrings");
+            let _ = fs::create_dir_all(&keyrings_dir);
+            assert!(read_directory(keyrings_dir.to_string_lossy().to_string(), true).is_err());
+
+            // 3. ~/.ssh directory should not expose private keys
+            let ssh_dir = home.join(".ssh");
+            if ssh_dir.is_dir() {
+                if let Ok(entries) = read_directory(ssh_dir.to_string_lossy().to_string(), true) {
+                    for entry in entries {
+                        let name = &entry.name;
+                        let is_safe = name == "config"
+                            || name.starts_with("known_hosts")
+                            || name.starts_with("authorized_keys")
+                            || name.ends_with(".pub");
+                        assert!(is_safe, "Private key file {} should have been stripped from read_directory", name);
+                    }
+                }
+            }
         }
     }
 }

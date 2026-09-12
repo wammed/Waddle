@@ -9,6 +9,7 @@ import {
   Check,
   Loader2,
   RefreshCw,
+  Eye,
 } from 'lucide-react';
 import { AppConfig, TerminalContext } from '../types';
 import { TauriApi } from '../services/tauriApi';
@@ -24,6 +25,7 @@ interface EditorPaneProps {
   onExecuteInTerminal: (command: string) => void;
   onInsertInTerminal?: (command: string) => void;
   targetFilePath?: string | null;
+  onRichPreview?: (filePath: string, fileName: string, content: string) => void;
 }
 
 export const EditorPane: React.FC<EditorPaneProps> = ({
@@ -35,6 +37,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
   onExecuteInTerminal,
   onInsertInTerminal,
   targetFilePath,
+  onRichPreview,
 }) => {
   const { t } = useI18n();
   const [filePath, setFilePath] = useState('');
@@ -249,6 +252,21 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          {onRichPreview && filePath && (
+            <button
+              className="action-btn"
+              style={{ padding: '3px 8px', fontSize: '11px' }}
+              onClick={() => {
+                const name = filePath.split('/').pop() || 'file';
+                onRichPreview(filePath, name, content);
+              }}
+              title="リッチプレビュー (Markdown / CSV / JSON)"
+            >
+              <Eye size={13} color="#a6e3a1" />
+              <span>プレビュー</span>
+            </button>
+          )}
+
           <button
             className="action-btn"
             style={{ padding: '3px 8px', fontSize: '11px' }}

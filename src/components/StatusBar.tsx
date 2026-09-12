@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Folder,
   GitBranch,
@@ -7,9 +7,12 @@ import {
   Sparkles,
   Layers,
   ShieldAlert,
+  ShieldCheck,
+  BookOpen,
 } from 'lucide-react';
 import { AppConfig, GitStatus, SystemInfo } from '../types';
 import { useI18n } from '../i18n';
+import { TauriApi } from '../services/tauriApi';
 
 interface StatusBarProps {
   cwd: string;
@@ -36,6 +39,20 @@ export const StatusBar: React.FC<StatusBarProps> = ({
 }) => {
   const { t } = useI18n();
   const [copied, setCopied] = useState(false);
+  const [hasProjectRules, setHasProjectRules] = useState(false);
+
+  useEffect(() => {
+    if (!cwd) return;
+    let isCancelled = false;
+    TauriApi.getProjectRules(cwd).then((rules) => {
+      if (!isCancelled) {
+        setHasProjectRules(!!rules);
+      }
+    });
+    return () => {
+      isCancelled = true;
+    };
+  }, [cwd]);
 
   const handleCopyCwd = () => {
     if (cwd) {
@@ -147,6 +164,30 @@ export const StatusBar: React.FC<StatusBarProps> = ({
       </div>
 
       <div className="statusbar-right">
+        {/* Secret Masking Indicator */}
+        {config.terminal?.mask_secrets !== false && (
+          <div
+            className="status-item"
+            title="リアルタイム機密情報マスク有効 (Secret Masking Active)"
+            style={{ color: '#a6e3a1', gap: '4px' }}
+          >
+            <ShieldCheck size={12} />
+            <span style={{ fontSize: '11px' }}>Masking</span>
+          </div>
+        )}
+
+        {/* Project AI Rules Active Indicator */}
+        {hasProjectRules && config.ai?.enable_project_rules !== false && (
+          <div
+            className="status-item"
+            title="プロジェクト固有 AI ルール適用中 (.waddle/rules.md)"
+            style={{ color: '#89b4fa', gap: '4px' }}
+          >
+            <BookOpen size={12} />
+            <span style={{ fontSize: '11px' }}>Project Rules</span>
+          </div>
+        )}
+
         <div
           className="status-item"
           onClick={onOpenAiCommand}

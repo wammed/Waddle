@@ -11,6 +11,8 @@ import { AppConfig, TerminalPaneInfo, GitStatus } from '../types';
 import { TauriApi } from '../services/tauriApi';
 import { useI18n } from '../i18n';
 import { KittyGraphicsManager } from '../services/kittyGraphics';
+import { maskSecrets } from '../services/secretMasker';
+import { sessionHistory } from '../services/sessionHistory';
 
 interface SingleTerminalViewProps {
   pane: TerminalPaneInfo;
@@ -319,6 +321,10 @@ export const SingleTerminalView: React.FC<SingleTerminalViewProps> = ({
         if (keyLower === 'w' || code === 'KeyW') return false;
         // Swap Panes: Ctrl+Shift+S
         if (event.shiftKey && (keyLower === 's' || code === 'KeyS')) return false;
+        // Session Timeline: Ctrl+Shift+H
+        if (event.shiftKey && (keyLower === 'h' || code === 'KeyH')) return false;
+        // Pipeline Builder: Ctrl+Shift+P
+        if (event.shiftKey && (keyLower === 'p' || code === 'KeyP')) return false;
         // Settings: Ctrl+,
         if (event.key === ',' || code === 'Comma') return false;
       }
@@ -408,8 +414,18 @@ export const SingleTerminalView: React.FC<SingleTerminalViewProps> = ({
 
       if (data === '\r' || data === '\n') {
         if (inputLine.trim().length > 0) {
-          lastCommandRef.current = inputLine.trim();
-          onUpdatePaneRef.current({ lastCommand: lastCommandRef.current });
+          const executedCmd = inputLine.trim();
+          lastCommandRef.current = executedCmd;
+          onUpdatePaneRef.current({ lastCommand: executedCmd });
+          try {
+            sessionHistory.addRecord({
+              command: executedCmd,
+              cwd: pane.cwd || '~',
+              paneId: pane.id,
+            });
+          } catch {
+            // ignore
+          }
         }
         inputLine = '';
         setTimeout(fetchCwdAndGit, 400);
@@ -427,8 +443,12 @@ export const SingleTerminalView: React.FC<SingleTerminalViewProps> = ({
 
     TauriApi.onPtyOutput(pane.sessionId, (output) => {
       // Intercept Kitty APC sequences before passing clean text to xterm
-      const textToWrite = kittyManager ? kittyManager.filterPtyOutput(output) : output;
+      let textToWrite = kittyManager ? kittyManager.filterPtyOutput(output) : output;
       if (textToWrite) {
+        // Real-time secret masking if enabled
+        if (config.terminal.mask_secrets !== false) {
+          textToWrite = maskSecrets(textToWrite).maskedText;
+        }
         term.write(textToWrite);
         outputBufferRef.current += textToWrite;
         if (outputBufferRef.current.length > 10000) {

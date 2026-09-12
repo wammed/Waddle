@@ -38,6 +38,7 @@ interface FileTreeSidebarProps {
   onOpenFile: (filePath: string) => void;
   onInsertToTerminal?: (text: string) => void;
   onOpenDiff?: (filePath: string, isStaged: boolean) => void;
+  onRichPreview?: (filePath: string, fileName: string) => void;
 }
 
 interface FileLanguageMeta {
@@ -89,6 +90,7 @@ export const FileTreeSidebar: React.FC<FileTreeSidebarProps> = ({
   onOpenFile,
   onInsertToTerminal,
   onOpenDiff,
+  onRichPreview,
 }) => {
   const { t } = useI18n();
   const [rootPath, setRootPath] = useState<string>(cwd);
@@ -913,6 +915,21 @@ export const FileTreeSidebar: React.FC<FileTreeSidebarProps> = ({
             >
               <FileCode size={13} color="var(--accent)" />
               <span>{t.fileTree.openInEditor}</span>
+            </button>
+          )}
+
+          {!contextMenu.entry.is_dir && onRichPreview && (
+            <button
+              className="context-menu-item"
+              onClick={() => {
+                const path = contextMenu.entry.path;
+                const name = contextMenu.entry.name;
+                setContextMenu(null);
+                onRichPreview(path, name);
+              }}
+            >
+              <Eye size={13} color="#a6e3a1" />
+              <span>リッチプレビュー (Rich Preview)</span>
             </button>
           )}
 

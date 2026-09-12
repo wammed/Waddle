@@ -11,6 +11,12 @@ pub struct AiConfig {
     pub ollama_model: String,
     pub temperature: f32,
     pub custom_system_prompt: Option<String>,
+    #[serde(default = "default_true")]
+    pub enable_project_rules: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 impl Default for AiConfig {
@@ -21,6 +27,7 @@ impl Default for AiConfig {
             ollama_model: "llama3.2".to_string(),
             temperature: 0.2,
             custom_system_prompt: None,
+            enable_project_rules: true,
         }
     }
 }
@@ -41,6 +48,10 @@ pub struct TerminalConfig {
     pub background_opacity: f32,
     #[serde(default)]
     pub background_blur: u32,
+    #[serde(default = "default_true")]
+    pub mask_secrets: bool,
+    #[serde(default = "default_true")]
+    pub watchdog_auto_analyze: bool,
 }
 
 fn default_background_image() -> Option<String> {
@@ -65,6 +76,8 @@ impl Default for TerminalConfig {
             background_image: default_background_image(),
             background_opacity: 0.85,
             background_blur: 0,
+            mask_secrets: true,
+            watchdog_auto_analyze: true,
         }
     }
 }
@@ -318,15 +331,15 @@ pub fn validate_wallpaper_file_path(path_str: &str) -> Result<(), String> {
     if trimmed.is_empty() || trimmed == "none" || trimmed == "preset_cyberpunk" || trimmed == "preset_official" {
         return Ok(());
     }
-    let expanded = if trimmed.starts_with("~/") {
+    let expanded = if let Some(rest) = trimmed.strip_prefix("~/") {
         if let Some(home) = dirs::home_dir() {
-            home.join(&trimmed[2..])
+            home.join(rest)
         } else {
             PathBuf::from(trimmed)
         }
-    } else if trimmed.starts_with("$HOME/") {
+    } else if let Some(rest) = trimmed.strip_prefix("$HOME/") {
         if let Some(home) = dirs::home_dir() {
-            home.join(&trimmed[6..])
+            home.join(rest)
         } else {
             PathBuf::from(trimmed)
         }

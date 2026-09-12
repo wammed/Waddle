@@ -14,6 +14,8 @@ import {
   Square,
   RotateCcw,
   ClipboardCheck,
+  History,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { PaneLayout, TerminalTab } from '../types';
 import waddleIcon from '../assets/waddle-icon.svg';
@@ -39,6 +41,8 @@ interface TitleBarProps {
   onToggleFileTree: () => void;
   onRefreshAll: () => void;
   onOpenTestPlan: () => void;
+  onOpenTimeline?: () => void;
+  onOpenPipelineBuilder?: () => void;
 }
 
 export const TitleBar: React.FC<TitleBarProps> = ({
@@ -59,6 +63,8 @@ export const TitleBar: React.FC<TitleBarProps> = ({
   onToggleFileTree,
   onRefreshAll,
   onOpenTestPlan,
+  onOpenTimeline,
+  onOpenPipelineBuilder,
 }) => {
   const { t } = useI18n();
   const [isLayoutPopoverOpen, setIsLayoutPopoverOpen] = useState(false);
@@ -210,6 +216,30 @@ export const TitleBar: React.FC<TitleBarProps> = ({
           <ClipboardCheck size={14} color="#00f0ff" />
           <span>{t.titleBar.testPlan}</span>
         </button>
+
+        {onOpenPipelineBuilder && (
+          <button
+            id="btn-pipeline-builder"
+            className="action-btn"
+            onClick={onOpenPipelineBuilder}
+            title="パイプライン ビルダー (Ctrl+Shift+P)"
+          >
+            <SlidersHorizontal size={14} color="#a6e3a1" />
+            <span>パイプ</span>
+          </button>
+        )}
+
+        {onOpenTimeline && (
+          <button
+            id="btn-session-timeline"
+            className="action-btn"
+            onClick={onOpenTimeline}
+            title="セッション タイムライン (Ctrl+Shift+H)"
+          >
+            <History size={14} color="#89b4fa" />
+            <span>履歴</span>
+          </button>
+        )}
 
         <button
           id="btn-settings"

@@ -12,24 +12,26 @@ graph TD
         TermView["ターミナル画面: xterm.js + WebLinks + Canvas + Search + Fit"]
         WallLayer["壁紙レイヤー: カスタム画像 + ぼかし + 透過度オーバーレイ"]
         Editor["内蔵エディタ: ファイルオープン + ターミナル実行 + AIリファクタ"]
-        AIOverlay["AI コマンドモーダル Ctrl+K / スマートエラーバナー"]
+        AIOverlay["AI コマンドモーダル Ctrl+K / 自律型 Error Watchdog バナー"]
         Copilot["AI Copilot サイドバー: コンテキスト認識チャット + エクスポート"]
         GitUI["Git Quick Popover & Diff Viewer: Push / Pull / ステージング / コミット"]
+        NextGenModals["拡張モーダル: SessionHistory + PipelineBuilder + RichPreview + TestPlan"]
+        Services["フロントエンドサービス: secretMasker + sessionHistory + kittyGraphics"]
         Settings["設定モーダル: Ollama モデル自動検出 & 壁紙 & Git 設定"]
         Hooks["カスタムフック: useTerminalTabs + useGlobalShortcuts"]
     end
 
     subgraph Rust_Backend ["バックエンド: Rust + Tauri Core"]
         PtyMgr["PTY マネージャー: portable-pty + UTF-8 境界バッファ + プロセスグループ終了"]
-        GitCore["Git エンジン: Status / Stage / Commit / Push / Pull / Diff / ポリシー検証"]
-        AiCore["Ollama クライアント: 行バッファリングストリーミング / タグ取得 / 生成"]
-        FileIO["ファイルシステム: 読込 / 保存 / 一覧 (多層保護ガードレール付き)"]
+        GitCore["Git エンジン: Status / Stage / Commit / Push / Pull / Diff / Ref検証"]
+        AiCore["Ollama クライアント: 行バッファリングストリーミング / タグ取得 / SSRF防御 / プロジェクトルール読込"]
+        FileIO["ファイルシステム: 読込 / 保存 / 一覧 (仮想FS遮断・秘密鍵保護ガードレール付き)"]
         ConfigMgr["設定管理: ~/.config/waddle/config.json"]
     end
 
     subgraph System_Layer ["ローカル Linux 環境"]
         Shell["Linux シェル: /bin/bash, zsh, fish"]
-        GitRepo["Git リポジトリ & GitHub リモート"]
+        GitRepo["Git リポジトリ (.waddle/rules.md) & GitHub リモート"]
         Ollama["ローカル Ollama: http://localhost:11434"]
     end
 
@@ -42,6 +44,8 @@ graph TD
     AiCore <-->|REST / SSE ストリーミング| Ollama
     Hooks --> TermView
     Hooks --> AIOverlay
+    Services --> TermView
+    NextGenModals --> TermView
 ```
 
 ---
@@ -58,6 +62,15 @@ Waddle は、高速・堅牢な **Rust バックエンド** と、最新の **Re
   - `@xterm/addon-search`: ログスクロールバックのリアルタイム検索。
   - `@xterm/addon-fit`: 親コンテナサイズへの自動文字枠再計算。
   - `@xterm/addon-web-links`: URL リンクの自動認識とクリックオープン。
+- **フロントエンドサービス & 拡張サブシステム**:
+  - `src/services/secretMasker.ts`: ターミナル出力中の API キーやアクセストークンを正規表現でリアルタイム検知・マスク。
+  - `src/services/sessionHistory.ts`: コマンド履歴、終了ステータス、CWD、ターミナル出力スナップショットの追跡と `localStorage` 永続化。
+  - `src/services/kittyGraphics/`: Kitty Graphics Protocol（APC パース、テクスチャ管理、256MB LRU キャッシュ、アニメーションループ、Unicode プレースホルダー豆腐抑止）。
+- **モーダル & ビジュアルツール**:
+  - `SessionHistoryModal.tsx`: セッションタイムトラベル & 履歴復元 (`Ctrl+Shift+H`)。
+  - `PipelineBuilderModal.tsx`: ビジュアルパイプラインビルダー (`Ctrl+Shift+P`)。
+  - `RichPreviewModal.tsx`: Markdown 組版、CSV ソート・検索テーブル、JSON 折りたたみツリープレビュー。
+  - `TestPlanModal.tsx`: 87項目・10スイートのリアルタイム合否判定 & エビデンス記録フォーム。
 - **状態管理**:
   - `useTerminalTabs`: タブ・ペイン構成、分割比率、ズーム状態、および `localStorage` への自動永続化を統括。
   - `useGlobalShortcuts`: アプリ全域のキーボードショートカット集中管理。
@@ -70,11 +83,11 @@ Waddle は、高速・堅牢な **Rust バックエンド** と、最新の **Re
 ### 3. ネイティブサービス層 (Rust バックエンド)
 - **非同期ランタイム**: Tokio マルチスレッドランタイム。
 - **主要モジュール**:
-  - `pty.rs`: 疑似端末（PTY）の生成、出力コアレッシング、UTF-8 境界処理、プロセスグループ管理。
-  - `ai.rs`: Ollama HTTP 通信、行バッファリング SSE デコード、プロンプト生成、危険コマンド判定。
+  - `pty.rs`: 疑似端末（PTY）の生成、出力コアレッシング、UTF-8 境界処理、プロセスグループ管理、Git Branch Ref 検証。
+  - `ai.rs`: Ollama HTTP 通信、行バッファリング SSE デコード、プロンプト生成、危険コマンド判定、SSRF クラウドメタデータ遮断、`.waddle/rules.md` プロジェクトルール読み込み。
   - `config.rs`: `~/.config/waddle/config.json` のアトミック保存、壁紙管理。
-  - `kitty.rs`: パス正規化・サンドボックス脱出遮断・展開爆弾対策・Base64 エンコードを備えた安全なローカル画像リーダー。
-  - `lib.rs`: コマンドルーティング、ファイル操作ガードレール、Git 操作。
+  - `kitty.rs`: パス正規化・サンドボックス脱出遮断・展開爆弾対策・Base64 エンコード・一時ファイル自動削除。
+  - `lib.rs`: コマンドルーティング、仮想ファイルシステム走査遮断 (`/proc`, `/sys`, `/dev`)、SSH/GPG/Keyring 秘密鍵アクセス拒否、Git 操作。
 
 ---
 

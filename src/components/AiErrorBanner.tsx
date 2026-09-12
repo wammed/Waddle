@@ -19,6 +19,7 @@ interface AiErrorBannerProps {
   output: string;
   exitCode: number;
   context: TerminalContext;
+  autoAnalyze?: boolean;
   onDismiss: () => void;
   onInsertCommand: (command: string) => void;
   onExecuteCommand: (command: string) => void;
@@ -29,6 +30,7 @@ export const AiErrorBanner: React.FC<AiErrorBannerProps> = ({
   output,
   exitCode,
   context,
+  autoAnalyze = true,
   onDismiss,
   onInsertCommand,
   onExecuteCommand,
@@ -44,6 +46,7 @@ export const AiErrorBanner: React.FC<AiErrorBannerProps> = ({
     try {
       const res = await TauriApi.explainError(command, output, exitCode, context);
       setExplanation(res);
+      // Auto expand if there's a fix command or auto analyzed
       setExpanded(true);
     } catch (err) {
       setExplanation({
@@ -56,6 +59,12 @@ export const AiErrorBanner: React.FC<AiErrorBannerProps> = ({
       setLoading(false);
     }
   };
+
+  React.useEffect(() => {
+    if (autoAnalyze && !explanation && !loading) {
+      handleExplain();
+    }
+  }, [autoAnalyze]);
 
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -73,51 +82,99 @@ export const AiErrorBanner: React.FC<AiErrorBannerProps> = ({
       <div className="error-banner-content">
         <AlertCircle size={16} color="#f43f5e" />
         <span>{t.errorBanner.detected(command)}</span>
+        {loading && (
+          <span
+            style={{
+              fontSize: '11px',
+              color: '#fda4af',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              marginLeft: '8px',
+            }}
+          >
+            <Loader2 size={12} className="animate-spin" />
+            Watchdog 自動分析中...
+          </span>
+        )}
       </div>
 
-      {!explanation ? (
-        <button
-          className="btn-primary"
-          style={{
-            background: 'linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)',
-            color: '#fff',
-            padding: '4px 10px',
-            fontSize: '12px',
-          }}
-          onClick={handleExplain}
-          disabled={loading}
-        >
-          {loading ? (
-            <Loader2 size={13} className="animate-spin" />
-          ) : (
-            <Sparkles size={13} />
-          )}
-          <span>{t.errorBanner.investigateBtn}</span>
-        </button>
-      ) : (
-        <button
-          className="btn-secondary"
-          style={{ padding: '4px 8px', fontSize: '11px' }}
-          onClick={() => setExpanded(!expanded)}
-        >
-          {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-          <span>{expanded ? t.common.close : t.errorBanner.details}</span>
-        </button>
-      )}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        {explanation?.fix_command && !expanded && (
+          <button
+            className="btn-primary"
+            style={{
+              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+              color: '#fff',
+              padding: '3px 9px',
+              fontSize: '11px',
+              fontWeight: 700,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              border: 'none',
+              borderRadius: '6px',
+            }}
+            onClick={() => {
+              const cmd = explanation.fix_command!;
+              if (isDangerousCommand(cmd)) {
+                setConfirmCmd(cmd);
+              } else {
+                onExecuteCommand(cmd);
+                onDismiss();
+              }
+            }}
+            title="1-Click Quick Fix: 修正コマンドを即座に実行"
+          >
+            <Play size={10} fill="#fff" />
+            ⚡ 1-Click 修正
+          </button>
+        )}
 
-      <button
-        onClick={onDismiss}
-        style={{
-          background: 'transparent',
-          border: 'none',
-          color: '#94a3b8',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-        }}
-      >
-        <X size={15} />
-      </button>
+        {!explanation ? (
+          <button
+            className="btn-primary"
+            style={{
+              background: 'linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)',
+              color: '#fff',
+              padding: '4px 10px',
+              fontSize: '12px',
+            }}
+            onClick={handleExplain}
+            disabled={loading}
+          >
+            {loading ? (
+              <Loader2 size={13} className="animate-spin" />
+            ) : (
+              <Sparkles size={13} />
+            )}
+            <span>{t.errorBanner.investigateBtn}</span>
+          </button>
+        ) : (
+          <button
+            className="btn-secondary"
+            style={{ padding: '4px 8px', fontSize: '11px' }}
+            onClick={() => setExpanded(!expanded)}
+          >
+            {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            <span>{expanded ? t.common.close : t.errorBanner.details}</span>
+          </button>
+        )}
+
+        <button
+          onClick={onDismiss}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            color: '#94a3b8',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+          }}
+        >
+          <X size={15} />
+        </button>
+      </div>
 
       {/* Expanded Diagnosis Box */}
       {explanation && expanded && (

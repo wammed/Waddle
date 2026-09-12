@@ -1,6 +1,7 @@
 use crate::config::AiConfig;
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
+use std::path::Path;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter};
 
@@ -44,6 +45,90 @@ pub struct OllamaStatus {
     pub error: Option<String>,
 }
 
+/// Validates Ollama endpoint URL to guard against SSRF and cloud metadata access.
+pub fn validate_ollama_endpoint(endpoint: &str) -> Result<String, String> {
+    let clean = endpoint.trim();
+    if clean.is_empty() {
+        return Ok("http://localhost:11434".to_string());
+    }
+    let parsed = reqwest::Url::parse(clean)
+        .map_err(|e| format!("Invalid Ollama endpoint URL: {}", e))?;
+
+    // 1. Enforce http or https
+    if parsed.scheme() != "http" && parsed.scheme() != "https" {
+        return Err("Ollama endpoint scheme must be http or https".to_string());
+    }
+
+    // 2. Reject cloud metadata host names & IPs
+    let host_str = parsed.host_str().ok_or_else(|| "Ollama endpoint missing host".to_string())?.to_lowercase();
+    if host_str == "169.254.169.254"
+        || host_str == "metadata.google.internal"
+        || host_str == "instance-data"
+        || host_str.contains("169.254.169.254")
+        || host_str == "[fd00:ec2::254]"
+        || host_str == "fd00:ec2::254"
+    {
+        return Err("Access to cloud metadata service via Ollama endpoint is forbidden".to_string());
+    }
+
+    // Check link-local IP range (169.254.0.0/16) or IPv6 metadata
+    let bare_host = host_str.trim_start_matches('[').trim_end_matches(']');
+    if let Ok(ip) = bare_host.parse::<std::net::IpAddr>() {
+        match ip {
+            std::net::IpAddr::V4(ipv4) => {
+                let octets = ipv4.octets();
+                if octets[0] == 169 && octets[1] == 254 {
+                    return Err("Access to link-local / cloud metadata IP via Ollama endpoint is forbidden".to_string());
+                }
+            }
+            std::net::IpAddr::V6(ipv6) => {
+                if let Some(ipv4) = ipv6.to_ipv4_mapped() {
+                    let octets = ipv4.octets();
+                    if octets[0] == 169 && octets[1] == 254 {
+                        return Err("Access to link-local / cloud metadata IP via Ollama endpoint is forbidden".to_string());
+                    }
+                }
+                let segs = ipv6.segments();
+                if segs[0] == 0xfd00 && segs[1] == 0xec2 && segs[2] == 0 && segs[3] == 0 && segs[4] == 0 && segs[5] == 0 && segs[6] == 0 && segs[7] == 0x0254 {
+                    return Err("Access to cloud metadata service via Ollama endpoint is forbidden".to_string());
+                }
+            }
+        }
+    }
+
+    Ok(clean.trim_end_matches('/').to_string())
+}
+
+/// Discovers and loads project-specific AI rules from `.waddle/rules.md`, `.waddle/instructions.md`, or `.github/copilot-instructions.md`.
+pub fn load_project_rules(cwd: &str) -> Option<String> {
+    if cwd.trim().is_empty() {
+        return None;
+    }
+    let base = Path::new(cwd);
+    let candidates = [
+        base.join(".waddle").join("rules.md"),
+        base.join(".waddle").join("instructions.md"),
+        base.join(".github").join("copilot-instructions.md"),
+    ];
+
+    for path in &candidates {
+        if path.is_file() {
+            if let Ok(content) = std::fs::read_to_string(path) {
+                let trimmed = content.trim();
+                if !trimmed.is_empty() {
+                    let truncated = if trimmed.len() > 16384 {
+                        &trimmed[..16384]
+                    } else {
+                        trimmed
+                    };
+                    return Some(truncated.to_string());
+                }
+            }
+        }
+    }
+    None
+}
+
 pub struct AiClient {
     client: reqwest::Client,
 }
@@ -60,7 +145,17 @@ impl AiClient {
 
     /// Ollama 接続状態とインストール済みモデル一覧の取得
     pub async fn check_ollama_status(&self, endpoint: &str) -> OllamaStatus {
-        let clean_endpoint = endpoint.trim_end_matches('/');
+        let clean_endpoint = match validate_ollama_endpoint(endpoint) {
+            Ok(ep) => ep,
+            Err(err) => {
+                return OllamaStatus {
+                    available: false,
+                    version: None,
+                    models: Vec::new(),
+                    error: Some(err),
+                };
+            }
+        };
         let tags_url = format!("{}/api/tags", clean_endpoint);
         let version_url = format!("{}/api/version", clean_endpoint);
 
@@ -128,7 +223,7 @@ impl AiClient {
             )
             .to_string();
 
-        let system_prompt = format!(
+        let mut system_prompt = format!(
             "You are Waddle AI, an expert Linux command line assistant. \
 The user operates on OS: {}, Shell: {}, Current Working Directory: {}. Git Branch: {}. \
 The user will ask for a shell command in natural language (Japanese or English). \
@@ -148,6 +243,20 @@ Output strictly valid JSON with no markdown formatting around it.",
             context.cwd,
             safe_branch
         );
+
+        if let Some(ref custom) = config.custom_system_prompt {
+            if !custom.trim().is_empty() {
+                system_prompt.push_str("\n\n[USER INSTRUCTIONS]:\n");
+                system_prompt.push_str(custom.trim());
+            }
+        }
+
+        if config.enable_project_rules {
+            if let Some(rules) = load_project_rules(&context.cwd) {
+                system_prompt.push_str("\n\n[PROJECT SPECIFIC RULES & CONTEXT]:\n");
+                system_prompt.push_str(&rules);
+            }
+        }
 
         let user_prompt = format!(
             "User Request: {}\nRecent command in history: {}\nRecent output context:\n{}",
@@ -199,7 +308,7 @@ Output strictly valid JSON with no markdown formatting around it.",
         config: &AiConfig,
     ) -> Result<ErrorExplanation, String> {
         let sanitized_output = sanitize_untrusted_output(Some(output), 2000);
-        let system_prompt = format!(
+        let mut system_prompt = format!(
             "You are Waddle AI, an expert Linux diagnostic tool. \
 The user executed a command that failed with exit code {}.\n\
 OS: {}, Shell: {}, CWD: {}\n\
@@ -215,6 +324,13 @@ Analyze the error and output strictly JSON:
 Output strictly valid JSON with no markdown wrapping.",
             exit_code, context.os, context.shell, context.cwd
         );
+
+        if config.enable_project_rules {
+            if let Some(rules) = load_project_rules(&context.cwd) {
+                system_prompt.push_str("\n\n[PROJECT SPECIFIC RULES & CONTEXT]:\n");
+                system_prompt.push_str(&rules);
+            }
+        }
 
         let user_prompt = format!(
             "Executed Command: {}\nExit Code: {}\nOutput / Error Log:\n{}",
@@ -245,7 +361,7 @@ Output strictly valid JSON with no markdown wrapping.",
         config: &AiConfig,
     ) -> Result<(), String> {
         let sanitized_output = sanitize_untrusted_output(context.recent_output.as_deref(), 1500);
-        let system_prompt = format!(
+        let mut system_prompt = format!(
             "You are Waddle Copilot, an AI assistant deeply integrated into the user's Linux terminal powered completely by local Ollama.\n\
 System Information:\n\
 - OS: {}\n\
@@ -266,6 +382,20 @@ Format your responses using Markdown. When suggesting commands, use ```bash code
             sanitized_output
         );
 
+        if let Some(ref custom) = config.custom_system_prompt {
+            if !custom.trim().is_empty() {
+                system_prompt.push_str("\n\n[USER INSTRUCTIONS]:\n");
+                system_prompt.push_str(custom.trim());
+            }
+        }
+
+        if config.enable_project_rules {
+            if let Some(rules) = load_project_rules(&context.cwd) {
+                system_prompt.push_str("\n\n[PROJECT SPECIFIC RULES & CONTEXT]:\n");
+                system_prompt.push_str(&rules);
+            }
+        }
+
         self.stream_ollama(&app, &chat_id, &system_prompt, messages, config)
             .await
     }
@@ -279,7 +409,7 @@ Format your responses using Markdown. When suggesting commands, use ```bash code
         context: &TerminalContext,
         config: &AiConfig,
     ) -> Result<String, String> {
-        let system_prompt = format!(
+        let mut system_prompt = format!(
             "You are Waddle Code Assistant. \
 The user is editing a file (filename: {}) in their Linux terminal (OS: {}, CWD: {}). \
 Follow the user's instruction and return the edited or generated full code. \
@@ -289,17 +419,20 @@ Output ONLY the resulting code. Wrap the code in a single markdown code block li
             context.cwd
         );
 
+        if config.enable_project_rules {
+            if let Some(rules) = load_project_rules(&context.cwd) {
+                system_prompt.push_str("\n\n[PROJECT SPECIFIC RULES & CONTEXT]:\n");
+                system_prompt.push_str(&rules);
+            }
+        }
+
         let user_prompt = format!(
             "Instruction: {}\n\nOriginal Code:\n```\n{}\n```",
             instruction, code
         );
 
-        let endpoint = if config.ollama_endpoint.is_empty() {
-            "http://localhost:11434"
-        } else {
-            &config.ollama_endpoint
-        };
-        let url = format!("{}/api/generate", endpoint.trim_end_matches('/'));
+        let endpoint = validate_ollama_endpoint(&config.ollama_endpoint)?;
+        let url = format!("{}/api/generate", endpoint);
 
         let model = if config.ollama_model.is_empty() {
             "llama3.2"
@@ -356,12 +489,8 @@ Output ONLY the resulting code. Wrap the code in a single markdown code block li
 
         let user_prompt = format!("Generate a commit message for this diff:\n\n```diff\n{}\n```", truncated_diff);
 
-        let endpoint = if config.ollama_endpoint.is_empty() {
-            "http://localhost:11434"
-        } else {
-            &config.ollama_endpoint
-        };
-        let url = format!("{}/api/generate", endpoint.trim_end_matches('/'));
+        let endpoint = validate_ollama_endpoint(&config.ollama_endpoint)?;
+        let url = format!("{}/api/generate", endpoint);
         let model = if config.ollama_model.is_empty() {
             "llama3.2"
         } else {
@@ -417,12 +546,8 @@ Output ONLY the resulting code. Wrap the code in a single markdown code block li
         user_prompt: &str,
         config: &AiConfig,
     ) -> Result<String, String> {
-        let endpoint = if config.ollama_endpoint.is_empty() {
-            "http://localhost:11434"
-        } else {
-            &config.ollama_endpoint
-        };
-        let url = format!("{}/api/generate", endpoint.trim_end_matches('/'));
+        let endpoint = validate_ollama_endpoint(&config.ollama_endpoint)?;
+        let url = format!("{}/api/generate", endpoint);
 
         let model = if config.ollama_model.is_empty() {
             "llama3.2"
@@ -472,12 +597,8 @@ Output ONLY the resulting code. Wrap the code in a single markdown code block li
         messages: Vec<ChatMessage>,
         config: &AiConfig,
     ) -> Result<(), String> {
-        let endpoint = if config.ollama_endpoint.is_empty() {
-            "http://localhost:11434"
-        } else {
-            &config.ollama_endpoint
-        };
-        let url = format!("{}/api/chat", endpoint.trim_end_matches('/'));
+        let endpoint = validate_ollama_endpoint(&config.ollama_endpoint)?;
+        let url = format!("{}/api/chat", endpoint);
 
         let model = if config.ollama_model.is_empty() {
             "llama3.2"
@@ -794,5 +915,49 @@ mod tests {
         let long = "a".repeat(300);
         let truncated = sanitize_untrusted_output(Some(&long), 100);
         assert!(truncated.contains("... [truncated] ..."));
+    }
+
+    #[test]
+    fn test_validate_ollama_endpoint() {
+        // Valid endpoints
+        assert_eq!(validate_ollama_endpoint("").unwrap(), "http://localhost:11434");
+        assert_eq!(validate_ollama_endpoint("   ").unwrap(), "http://localhost:11434");
+        assert_eq!(validate_ollama_endpoint("http://localhost:11434").unwrap(), "http://localhost:11434");
+        assert_eq!(validate_ollama_endpoint("http://127.0.0.1:11434/").unwrap(), "http://127.0.0.1:11434");
+        assert_eq!(validate_ollama_endpoint("https://ollama.mycompany.internal:8443").unwrap(), "https://ollama.mycompany.internal:8443");
+
+        // Disallowed schemes
+        assert!(validate_ollama_endpoint("file:///etc/passwd").is_err());
+        assert!(validate_ollama_endpoint("ftp://example.com").is_err());
+        assert!(validate_ollama_endpoint("gopher://evil.com").is_err());
+
+        // Block cloud metadata SSRF targets
+        assert!(validate_ollama_endpoint("http://169.254.169.254/latest/meta-data/").is_err());
+        assert!(validate_ollama_endpoint("http://169.254.1.1:80").is_err());
+        assert!(validate_ollama_endpoint("http://metadata.google.internal/computeMetadata/v1/").is_err());
+        assert!(validate_ollama_endpoint("http://instance-data/latest/meta-data/").is_err());
+        assert!(validate_ollama_endpoint("http://[fd00:ec2::254]/").is_err());
+    }
+
+    #[test]
+    fn test_load_project_rules() {
+        let temp_dir = std::env::temp_dir().join(format!("waddle_rules_test_{}", uuid::Uuid::new_v4()));
+        let waddle_dir = temp_dir.join(".waddle");
+        std::fs::create_dir_all(&waddle_dir).unwrap();
+
+        // Initially no rules
+        assert!(load_project_rules(temp_dir.to_str().unwrap()).is_none());
+
+        // Create .waddle/rules.md
+        let rules_file = waddle_dir.join("rules.md");
+        std::fs::write(&rules_file, "Always use pnpm instead of npm.\nAlways run linter before push.").unwrap();
+
+        let loaded = load_project_rules(temp_dir.to_str().unwrap());
+        assert!(loaded.is_some());
+        let content = loaded.unwrap();
+        assert!(content.contains("Always use pnpm"));
+        assert!(content.contains("Always run linter"));
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
     }
 }

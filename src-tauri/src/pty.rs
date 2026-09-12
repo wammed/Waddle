@@ -742,9 +742,24 @@ pub fn git_get_branches(path_str: &str) -> Result<Vec<String>, String> {
 }
 
 pub fn git_checkout_branch(path_str: &str, branch: &str) -> Result<String, String> {
+    let branch = branch.trim();
+    if branch.is_empty()
+        || branch.starts_with('-')
+        || branch.starts_with('/')
+        || branch.ends_with('/')
+        || branch.ends_with(".lock")
+        || branch.contains('\0')
+        || branch.contains('\n')
+        || branch.contains('\r')
+        || branch.contains("..")
+        || branch.contains("@{")
+        || branch.chars().any(|c| c.is_ascii_control() || matches!(c, ' ' | '~' | '^' | ':' | '?' | '*' | '[' | '\\'))
+    {
+        return Err("Invalid git branch ref format".to_string());
+    }
     let repo_dir = get_effective_repo_dir(path_str);
     let output = std::process::Command::new("git")
-        .args(["checkout", "--", branch])
+        .args(["checkout", branch])
         .current_dir(&repo_dir)
         .output()
         .map_err(|e| format!("Failed to run git checkout: {}", e))?;
@@ -908,6 +923,41 @@ mod tests {
         assert!(res2.unwrap_err().starts_with("EACCES"));
 
         let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_git_checkout_branch_ref_validation() {
+        let dummy_dir = std::env::temp_dir();
+        let path = dummy_dir.to_str().unwrap();
+
+        // Invalid branch names must be rejected immediately without invoking git
+        let invalid_cases = [
+            "-b",
+            "--orphan",
+            "-D",
+            "",
+            "   ",
+            "feature/../secret",
+            "heads/branch@{1}",
+            "feature branch",
+            "feature\nbranch",
+            "feature\0branch",
+            "feature~1",
+            "feature^2",
+            "feature:name",
+            "feature?test",
+            "feature*glob",
+            "feature[0]",
+            "/leading-slash",
+            "trailing-slash/",
+            "branch.lock",
+        ];
+
+        for invalid in invalid_cases {
+            let res = git_checkout_branch(path, invalid);
+            assert!(res.is_err(), "Branch '{}' should have been rejected", invalid);
+            assert_eq!(res.unwrap_err(), "Invalid git branch ref format");
+        }
     }
 }
 

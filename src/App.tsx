@@ -11,6 +11,9 @@ import { GitQuickPopover } from './components/GitQuickPopover';
 import { GitDiffModal } from './components/GitDiffModal';
 import { SettingsModal } from './components/SettingsModal';
 import { TestPlanModal } from './components/TestPlanModal';
+import { SessionTimelineModal } from './components/SessionTimelineModal';
+import { PipelineBuilderModal } from './components/PipelineBuilderModal';
+import { RichPreviewModal } from './components/RichPreviewModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { AppConfig, SystemInfo, TerminalContext } from './types';
 import { TauriApi } from './services/tauriApi';
@@ -85,6 +88,38 @@ export function App() {
   const [isTestPlanOpen, setIsTestPlanOpen] = useState(false);
   const [isFileTreeOpen, setIsFileTreeOpen] = useState(true);
   const [targetEditorFile, setTargetEditorFile] = useState<string | null>(null);
+
+  // New Modals: Timeline, Pipeline Builder, Rich Preview
+  const [isTimelineOpen, setIsTimelineOpen] = useState(false);
+  const [isPipelineBuilderOpen, setIsPipelineBuilderOpen] = useState(false);
+  const [richPreviewState, setRichPreviewState] = useState<{
+    isOpen: boolean;
+    filePath: string;
+    fileName: string;
+    content: string;
+  }>({
+    isOpen: false,
+    filePath: '',
+    fileName: '',
+    content: '',
+  });
+
+  const handleRichPreview = useCallback(async (filePath: string, fileName: string, content?: string) => {
+    let fileContent = content;
+    if (fileContent === undefined) {
+      try {
+        fileContent = await TauriApi.readFile(filePath);
+      } catch (e) {
+        fileContent = `(ファイルの読み出しに失敗しました: ${e})`;
+      }
+    }
+    setRichPreviewState({
+      isOpen: true,
+      filePath,
+      fileName,
+      content: fileContent,
+    });
+  }, []);
 
   // Git Popover and Diff Modal
   const [isGitPopoverOpen, setIsGitPopoverOpen] = useState(false);
@@ -184,6 +219,8 @@ export function App() {
     setIsEditorOpen,
     setIsFileTreeOpen,
     setIsSettingsOpen,
+    setIsTimelineOpen,
+    setIsPipelineBuilderOpen,
   });
 
   // Apply Theme CSS variables
@@ -299,6 +336,8 @@ export function App() {
           onOpenSettings={() => setIsSettingsOpen(true)}
           onRefreshAll={handleFullWorkspaceRefresh}
           onOpenTestPlan={() => setIsTestPlanOpen(true)}
+          onOpenTimeline={() => setIsTimelineOpen(true)}
+          onOpenPipelineBuilder={() => setIsPipelineBuilderOpen(true)}
           isEditorOpen={isEditorOpen}
           isAiSidebarOpen={isAiSidebarOpen}
           isFileTreeOpen={isFileTreeOpen}
@@ -325,6 +364,7 @@ export function App() {
             onOpenDiff={(filePath, isStaged) => {
               setDiffModalState({ isOpen: true, filePath, isStaged });
             }}
+            onRichPreview={(filePath, fileName) => handleRichPreview(filePath, fileName)}
           />
 
           {/* Central Terminal / Editor Area */}
@@ -395,6 +435,7 @@ export function App() {
                 output={errorAlert.output}
                 exitCode={errorAlert.exitCode}
                 context={currentAiContext}
+                autoAnalyze={config.terminal.watchdog_auto_analyze !== false}
                 onDismiss={() => setErrorAlert(null)}
                 onInsertCommand={handleInsertCommand}
                 onExecuteCommand={handleExecuteCommand}
@@ -431,6 +472,7 @@ export function App() {
             onExecuteInTerminal={handleExecuteCommand}
             onInsertInTerminal={handleInsertCommand}
             targetFilePath={targetEditorFile}
+            onRichPreview={handleRichPreview}
           />
 
           {/* AI Sidebar (Copilot) */}
@@ -519,6 +561,32 @@ export function App() {
       <TestPlanModal
         isOpen={isTestPlanOpen}
         onClose={() => setIsTestPlanOpen(false)}
+      />
+
+      {/* Session Command Timeline Modal (Ctrl+Shift+H) */}
+      <SessionTimelineModal
+        isOpen={isTimelineOpen}
+        onClose={() => setIsTimelineOpen(false)}
+        onRunCommand={handleExecuteCommand}
+        theme={config.terminal.theme}
+      />
+
+      {/* Visual Pipeline Builder Modal (Ctrl+Shift+P) */}
+      <PipelineBuilderModal
+        isOpen={isPipelineBuilderOpen}
+        onClose={() => setIsPipelineBuilderOpen(false)}
+        onExecute={handleExecuteCommand}
+      />
+
+      {/* Rich Preview Modal (Markdown / CSV / JSON) */}
+      <RichPreviewModal
+        isOpen={richPreviewState.isOpen}
+        onClose={() =>
+          setRichPreviewState((prev) => ({ ...prev, isOpen: false }))
+        }
+        filePath={richPreviewState.filePath}
+        fileName={richPreviewState.fileName}
+        content={richPreviewState.content}
       />
       </div>
     </I18nProvider>
