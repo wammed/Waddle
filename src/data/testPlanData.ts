@@ -1266,7 +1266,8 @@ export const TEST_CASES: TestCase[] = [
     procedureJa: 'Ctrl+Shift+P でパイプラインビルダーを開き、ビルド・テスト・デプロイ等のコマンドステップを連続登録して「パイプライン実行」をクリック。',
     expected: 'Steps run in ordered sequence; halts on error if stopOnError is checked; outputs stream live into current active pane.',
     expectedJa: '登録されたステップが順次実行され、エラー発生時の停止制御やリアルタイム出力確認がターミナルペインで行える。',
-    type: 'Manual',
+    type: 'Automated / Manual',
+    command: 'node scratch/test_pipeline_builder.mjs',
   },
   {
     id: 'TC-ENH-06',
@@ -1280,7 +1281,7 @@ export const TEST_CASES: TestCase[] = [
     expected: "Tauri get_project_rules command loads rules, badge '.waddle/rules.md active' displays in modal, and AI prompt automatically incorporates project constraints.",
     expectedJa: 'バックエンドからプロジェクト規約が自動読み込みされ、AI プロンプトに文脈として組み込まれ、規約に準拠したコマンドが生成される。',
     type: 'Automated / Manual',
-    command: 'cargo test --manifest-path src-tauri/Cargo.toml test_project_rules',
+    command: 'cargo test --manifest-path src-tauri/Cargo.toml test_load_project_rules',
   },
 ];
 
