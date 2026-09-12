@@ -66,8 +66,10 @@ Welcome to the comprehensive feature guide for **Waddle**, the AI-integrated, pr
   - Keeps `~/.config/waddle/config.json` featherlight (~480 bytes) while automatically migrating legacy Base64 wallpaper strings.
 - **Sub-Millisecond 0ms Startup**:
   - Asynchronous background image decoding (`decoding="async"`, `loading="eager"`) off the main thread with GPU hardware isolation (`contain: strict`).
-- **Display Adjustments**:
-  - Slider controls for opacity (10%–100%) and frosted glass blur (0–20px).
+- **Drag & Drop Wallpaper Application (`TC-THM-03`)**:
+  - Drag and drop image files directly from your desktop or file manager into the dedicated drop zone in Settings (`getCurrentWebview().onDragDropEvent`).
+- **60 FPS Real-Time Live Preview (`TC-THM-04`)**:
+  - Slider adjustments for opacity (10%–100%) and frosted glass blur (0–20px) bind directly to CSS variables (`--live-wallpaper-opacity`, `--live-wallpaper-blur`) in real time behind the modal.
   - Automated contrast overlay (`rgba(10, 14, 22, alpha)`) ensures crisp terminal text readability across all background images.
 
 ---
@@ -81,7 +83,11 @@ Welcome to the comprehensive feature guide for **Waddle**, the AI-integrated, pr
   - **Language Badges**: Color-coded badges for 20+ file formats (TS, TSX, RS, PY, JSON, MD, CSS, HTML, SH, YML, TOML, SQL, GO, C, CPP, IMG, ZIP, CFG, LOCK).
   - **Interactive Breadcrumbs**: Visual path segments allowing one-click navigation to any parent folder.
   - **Tree Indent Guides**: Structural guide lines indicating folder nesting levels.
-  - **Item Metadata**: Displays formatted file sizes (e.g., `4.2 KB`) and folder child counts (e.g., `(12)`).
+  - **Item Metadata & Dynamic Count Badges**: Displays formatted file sizes (e.g., `4.2 KB`) and folder child counts (e.g., `(12)` or `(500/600)` when capped).
+- **Large Directory Safety Guard & Dynamic Pagination (`TC-FILE-04`)**:
+  - Automatically caps directory listing to an initial safe limit of 500 items to prevent WebKitGTK DOM memory bloat when expanding massive directories (`node_modules`, `/usr/bin`).
+  - Folders with remaining items display a cyber-styled interactive button `[+] Load more (N remaining)...` at the bottom of the listing.
+  - Clicking "Load more" dynamically loads the next 500 items (+500 -> 1000 -> 1500...) on demand without UI freezes.
 - **Embedded Search & Hidden File Filtering**:
   - Real-time search filter for file names.
   - Toggle dotfiles (`.gitignore`, `.env`, etc.) with one click.
@@ -101,6 +107,9 @@ Welcome to the comprehensive feature guide for **Waddle**, the AI-integrated, pr
 
 - **Embedded Split Workspace**:
   - Toggles a side-by-side editing canvas directly within Waddle without switching windows.
+- **Prism.js Syntax Highlighting (`TC-FILE-07`)**:
+  - Integrated tokenization and color highlighting for 15+ programming languages (TS/JS, Rust, Python, Bash, JSON, Markdown, CSS, HTML, C/C++, etc.).
+  - Dual-layer composition: background syntax-colored `<pre>` layer aligned pixel-perfectly underneath a transparent editable `<textarea>` (`-webkit-text-fill-color: transparent !important;`), delivering silky-smooth typing with full syntax rendering.
 - **File Management**:
   - Quick open from working directory, path input, and shortcut saving (`Ctrl + S`).
 - **Run in Terminal**:
@@ -189,14 +198,23 @@ Welcome to the comprehensive feature guide for **Waddle**, the AI-integrated, pr
 
 - **Rust PTY Engine**:
   - Built on `portable-pty` with asynchronous read loops on Tokio background threads.
-- **32KB Output Coalescing**:
-  - PTY output buffer coalesces high-throughput terminal stream into 32KB chunks, minimizing Tauri IPC overhead while keeping interactive keystroke latency at 0ms.
+- **Kernel-Cooperative Backpressure Flow Control (`pause_pty`/`resume_pty`) (`TC-PTY-02`, `TC-PERF-03`)**:
+  - Actively monitors xterm.js unrendered buffer queue (`_pendingData`).
+  - When pending data exceeds 256KB, invokes `pause_pty` to pause the Rust reader thread. The Linux kernel PTY master buffer (~64KB) fills naturally, causing the Linux kernel to suspend the producer process (`yes`, unbuffered stream) in `TASK_INTERRUPTIBLE` sleep.
+  - Once xterm.js finishes rendering and drops below 64KB, invokes `resume_pty` to resume stream consumption.
+  - **Result**: Keeps application resident memory (RES) flat-capped at **266MB–305MB** (reducing memory usage by ~80% from 1.5GB) without memory bloat or IPC queue saturation.
+- **0ms Instant `Ctrl+C` Queue Purge**:
+  - Upon receiving `\x03` (SIGINT), immediately purges xterm's internal `_writeBuffer` and callbacks in 0ms, and drops lagging IPC packets (>256B) arriving within 150ms.
+  - Eliminates 20–30 second UI freezes, returning to the prompt within **60ms** while dropping CPU utilization from 231% to **0.7%–1.3%**.
+- **60 FPS Saturated Output Pacing**:
+  - Rust reader paces continuous 32KB saturated bursts at 16–20ms (60 FPS refresh rate) while maintaining instantaneous 0ms response for interactive commands (<32KB).
 - **UTF-8 Multi-Byte Boundary Protection**:
   - Uses `std::str::from_utf8` validation with `valid_up_to` to carry incomplete multi-byte slices across read cycles, preventing `\u{FFFD}` glyph corruption for Japanese, CJK, and emojis.
 - **Process Group Termination**:
   - Signals the entire process group (`-pid`) with `SIGHUP` and `SIGTERM`/`SIGKILL` on tab/pane close, guaranteeing zero zombie processes or orphaned background tasks.
 - **2D Canvas Acceleration**:
   - Uses `@xterm/addon-canvas` for instant 0ms startup without GPU shader compilation pauses or WebKitGTK Wayland transparency stalls.
+  - Supports `@xterm/addon-unicode11` (`allowProposedApi: true`) for accurate double-width emoji rendering (`TC-PTY-03`).
 
 ---
 
@@ -414,13 +432,14 @@ Welcome to the comprehensive feature guide for **Waddle**, the AI-integrated, pr
 
 ---
 
-### 20. 🐕 Autonomous AI Error Watchdog & 1-Click Fix
+### 20. 🐕 Autonomous AI Error Watchdog & 1-Click Fix (`TC-ENH-04`)
 
 - **Detection Engine**:
-  - Automatically captures non-zero process exit codes and common CLI error patterns (`error:`, `fatal:`, `command not found`, `syntax error`) in the PTY output stream.
+  - Automatically captures non-zero process exit codes and common CLI error patterns (`error:`, `fatal:`, `command not found`, `syntax error`, `Traceback`, `ModuleNotFoundError`, `failed to push`) in the PTY output stream.
+  - **Command Output Slicing**: Scans only output generated after the most recent command prompt, eliminating false positives from historical scrollback.
 - **Diagnosis & Fix**:
   - An unobtrusive diagnostic toast/banner appears at the bottom of the active terminal with root-cause analysis.
-  - Clicking "Fix with AI" prompts local Ollama to diagnose the issue and generates the exact corrective command ready for 1-click execution.
+  - The AI Copilot sidebar displays a quick action card (`⚠️ Last Error: {cmd} [Fix with AI]`) enabling instant 1-click remediation prompt dispatch to Ollama.
 
 ---
 

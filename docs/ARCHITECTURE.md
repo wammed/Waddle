@@ -118,6 +118,19 @@ Waddle is built on a hybrid architecture combining a high-performance **Rust bac
   - Read boundaries can split multi-byte UTF-8 codepoints (Japanese characters require 3 bytes, emojis require 4 bytes).
   - If a buffer ends on an incomplete UTF-8 byte sequence, `std::str::from_utf8` reports `valid_up_to`. Valid bytes are emitted immediately, and remainder bytes are held in an accumulator buffer to be prepended to the next read cycle.
   - This eliminates replacement character (`\u{FFFD}`) artifacts.
+- **Kernel-Cooperative Backpressure Flow Control (`pause_pty`/`resume_pty`)**:
+  - Monitors xterm.js unrendered buffer queue (`_pendingData`).
+  - When `_pendingData > 256KB`, triggers `pause_pty`, suspending the Tokio PTY reader thread.
+  - The Linux kernel PTY master buffer (~64KB) fills, causing the kernel to place the child producer process (`yes`, unbounded streams) into `TASK_INTERRUPTIBLE` sleep at the `write()` system call level.
+  - When xterm.js callbacks finish rendering and drop below 64KB, `resume_pty` awakens the reader thread.
+  - Prevents IPC memory runaway, keeping resident memory (RES) bounded to **266MB–305MB** (reducing memory usage by ~80% from 1.5GB).
+- **0ms Instant `Ctrl+C` Queue Purge**:
+  - `\x03` (SIGINT) input instantly zeroes xterm's internal `_writeBuffer`, `_callbacks`, and `_pendingData` in 0ms.
+  - Rust reader discards saturated chunks and terminates child command.
+  - Frontend drops in-flight lagging IPC packets (>256B) arriving within 150ms.
+  - Restores terminal prompt within **60ms** and returns CPU usage to **0.7%–1.3%**.
+- **60 FPS Saturated Output Pacing**:
+  - Paces 32KB saturated bursts at 16–20ms (60 FPS) to prevent UI thread lockup while keeping interactive keystrokes at 0ms.
 - **Process Group Termination & Zombie Prevention**:
   - PTY sessions run as a dedicated process group (`setpgid`).
   - Upon closing a tab, pane, or application exit, Waddle sends `libc::kill(-pid, SIGHUP)` to the negative PID (targeting the whole process group).
@@ -233,6 +246,18 @@ Waddle is built on a hybrid architecture combining a high-performance **Rust bac
 - **Pipeline Layering Order & Canvas Renderer Intercepts**:
   - Inside `.xterm-screen`, the graphics canvas is mounted beneath the text layer: **Terminal Background / Wallpaper → Kitty Graphics Canvas Layer → Text/Glyphs Layer → Cursor Layer**.
   - **Exclusive Unicode Placeholder Pass (`U+10EEEE`)**: Resolves the true `CanvasRenderer` through xterm v5 `MutableDisposable` (`_renderer.value`), hooking `TextRenderLayer.prototype._drawForeground` to render placeholder texture quads directly at exact cell coordinates while skipping standard font glyph lookup and rasterization, completely suppressing missing-glyph "tofu" boxes with multi-layer defense in `BaseRenderLayer` and `CursorRenderLayer`.
+
+---
+
+### 6. File System & Embedded Editor Subsystem
+
+- **Bounded Directory Listing & Pagination (`read_directory`)**:
+  - `read_directory(path, show_hidden, limit)` returns `DirectoryListing { entries, total_count, has_more }`.
+  - Enforces a safe default ceiling of 500 entries, preventing WebKitGTK DOM memory bloat on massive trees (`node_modules`, `/usr/bin`).
+  - Client can request dynamic on-demand expansion (+500 items) via interactive `[+] Load more...` button.
+- **Dual-Layer Syntax Highlighting Architecture**:
+  - Overlay design with background `<pre>` Prism.js tokenized markup and foreground transparent editable `<textarea>` (`-webkit-text-fill-color: transparent !important;`).
+  - Delivers zero-latency native typing while rendering synchronized syntax colors across 15+ programming languages without complex rich text engines.
 
 ---
 

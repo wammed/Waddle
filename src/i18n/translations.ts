@@ -102,6 +102,7 @@ export interface Translations {
     revealInFileManager: string;
     copyRelativePath: string;
     copyAbsolutePath: string;
+    loadMore: (remaining: number) => string;
   };
   editor: {
     title: string;
@@ -391,6 +392,7 @@ export const translations: Record<Language, Translations> = {
       revealInFileManager: 'Reveal in File Manager',
       copyRelativePath: 'Copy Relative Path',
       copyAbsolutePath: 'Copy Absolute Path',
+      loadMore: (remaining) => `Load more (${remaining} remaining)...`,
     },
     editor: {
       title: 'Editor',
@@ -680,6 +682,7 @@ export const translations: Record<Language, Translations> = {
       revealInFileManager: 'Reveal in File Manager',
       copyRelativePath: 'Copy Relative Path',
       copyAbsolutePath: 'Copy Absolute Path',
+      loadMore: (remaining) => `Load more (${remaining} remaining)...`,
     },
     editor: {
       title: 'Editor',
@@ -969,6 +972,7 @@ export const translations: Record<Language, Translations> = {
       revealInFileManager: 'ファイルマネージャーで表示',
       copyRelativePath: '相対パスをコピー',
       copyAbsolutePath: '絶対パスをコピー',
+      loadMore: (remaining) => `さらに読み込む (残り ${remaining} 件)...`,
     },
     editor: {
       title: 'Editor',

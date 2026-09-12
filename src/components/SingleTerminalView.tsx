@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useCallback, useState } from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
+import { Unicode11Addon } from '@xterm/addon-unicode11';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { CanvasAddon } from '@xterm/addon-canvas';
 import { SearchAddon } from '@xterm/addon-search';
@@ -56,6 +57,7 @@ export const SingleTerminalView: React.FC<SingleTerminalViewProps> = ({
   const outputBufferRef = useRef<string>('');
   const lastCommandRef = useRef<string>('');
   const lastReportedCommandRef = useRef<string>('');
+  const commandOutputStartIndexRef = useRef<number>(0);
 
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -175,11 +177,19 @@ export const SingleTerminalView: React.FC<SingleTerminalViewProps> = ({
       allowTransparency: true,
       convertEol: true,
       smoothScrollDuration: 0,
+      allowProposedApi: true,
     });
 
     const fitAddon = new FitAddon();
     const searchAddon = new SearchAddon();
+    const unicode11Addon = new Unicode11Addon();
     term.loadAddon(fitAddon);
+    term.loadAddon(unicode11Addon);
+    try {
+      term.unicode.activeVersion = '11';
+    } catch (err) {
+      console.warn('Failed to set unicode activeVersion to 11:', err);
+    }
     term.loadAddon(
       new WebLinksAddon((_event, uri) => {
         openUrl(uri).catch((err) => {
@@ -416,6 +426,7 @@ export const SingleTerminalView: React.FC<SingleTerminalViewProps> = ({
         if (inputLine.trim().length > 0) {
           const executedCmd = inputLine.trim();
           lastCommandRef.current = executedCmd;
+          commandOutputStartIndexRef.current = outputBufferRef.current.length;
           onUpdatePaneRef.current({ lastCommand: executedCmd });
           try {
             sessionHistory.addRecord({
@@ -431,8 +442,32 @@ export const SingleTerminalView: React.FC<SingleTerminalViewProps> = ({
         setTimeout(fetchCwdAndGit, 400);
       } else if (data === '\u007f' || data === '\b') {
         inputLine = inputLine.slice(0, -1);
-      } else if (data.length === 1 && data.charCodeAt(0) >= 32) {
-        inputLine += data;
+      } else if (data.includes('\x03')) {
+        // Ctrl+C pressed: clear pending debounces and reset inputLine immediately
+        interruptedAt = Date.now();
+        if (ptyOutputDebounce) {
+          clearTimeout(ptyOutputDebounce);
+          ptyOutputDebounce = null;
+        }
+        inputLine = '';
+
+        // Instantly purge xterm's internal write buffer to cancel backlogged rendering in 0ms
+        const wb = (term as any)?._core?._writeBuffer;
+        if (wb) {
+          wb._writeBuffer.length = 0;
+          wb._callbacks.length = 0;
+          wb._pendingData = 0;
+          wb._bufferOffset = 0;
+        }
+
+        // If PTY was paused due to backpressure, unpause immediately so shell prompt can pass through
+        if (isPtyPaused) {
+          isPtyPaused = false;
+          TauriApi.resumePty(pane.sessionId);
+        }
+      } else if (!data.startsWith('\x1b')) {
+        // Multi-character pasted text or normal character input
+        inputLine += data.replace(/[\r\n]/g, ' ');
       }
     });
 
@@ -440,28 +475,58 @@ export const SingleTerminalView: React.FC<SingleTerminalViewProps> = ({
     let unlistenOutput: (() => void) | undefined;
     let unlistenExit: (() => void) | undefined;
     let ptyOutputDebounce: ReturnType<typeof setTimeout> | null = null;
+    let isPtyPaused = false;
+    let interruptedAt = 0;
 
     TauriApi.onPtyOutput(pane.sessionId, (output) => {
+      // Discard runaway in-flight chunks that were queued in IPC before Ctrl+C took effect
+      if (interruptedAt > 0 && Date.now() - interruptedAt < 150) {
+        if (output.length > 256) {
+          return;
+        }
+      }
+
       // Intercept Kitty APC sequences before passing clean text to xterm
       let textToWrite = kittyManager ? kittyManager.filterPtyOutput(output) : output;
       if (textToWrite) {
-        // Real-time secret masking if enabled
-        if (config.terminal.mask_secrets !== false) {
+        // Real-time secret masking if enabled (capped at 16KB to avoid regex CPU starvation on runaway dumps)
+        if (config.terminal.mask_secrets !== false && textToWrite.length <= 16000) {
           textToWrite = maskSecrets(textToWrite).maskedText;
         }
-        term.write(textToWrite);
+
+        // Flow control: use xterm.js drain callback to resume PTY reading when backpressure clears
+        term.write(textToWrite, () => {
+          if (isPtyPaused) {
+            const wb = (term as any)?._core?._writeBuffer;
+            const pending = wb?._pendingData || 0;
+            if (pending < 64 * 1024) {
+              isPtyPaused = false;
+              TauriApi.resumePty(pane.sessionId);
+            }
+          }
+        });
+
+        // Flow control: if xterm's write buffer exceeds 256KB, pause PTY to let Linux kernel block child process
+        const wb = (term as any)?._core?._writeBuffer;
+        const pending = wb?._pendingData || 0;
+        if (!isPtyPaused && pending > 256 * 1024) {
+          isPtyPaused = true;
+          TauriApi.pausePty(pane.sessionId);
+        }
+
         outputBufferRef.current += textToWrite;
         if (outputBufferRef.current.length > 10000) {
           outputBufferRef.current = outputBufferRef.current.slice(-10000);
         }
-        onUpdatePaneRef.current({ lastOutput: outputBufferRef.current });
         detectErrorPatterns(textToWrite);
 
-        // Event-driven: refresh Git & CWD when command finishes and output settles
+        // Event-driven: refresh Git & CWD and sync pane's lastOutput when output settles,
+        // preventing React event loop starvation and high-throughput freezes
         if (ptyOutputDebounce) clearTimeout(ptyOutputDebounce);
         ptyOutputDebounce = setTimeout(() => {
+          onUpdatePaneRef.current({ lastOutput: outputBufferRef.current });
           fetchCwdAndGit();
-        }, 500);
+        }, 300);
       }
     }).then((unlisten) => {
       unlistenOutput = unlisten;
@@ -512,6 +577,9 @@ export const SingleTerminalView: React.FC<SingleTerminalViewProps> = ({
       onDataDisposable.dispose();
       if (unlistenOutput) unlistenOutput();
       if (unlistenExit) unlistenExit();
+      if (isPtyPaused) {
+        TauriApi.resumePty(pane.sessionId);
+      }
       if (kittyManager) {
         kittyManager.dispose();
         kittyManagerRef.current = null;
@@ -603,18 +671,28 @@ export const SingleTerminalView: React.FC<SingleTerminalViewProps> = ({
     const errorSignatures = [
       'command not found',
       ': No such file or directory',
+      'No such file or directory',
       ': Permission denied',
+      'Permission denied',
       'Segmentation fault (core dumped)',
-      'fatal: not a git repository',
+      'fatal:',
+      'error:',
+      'failed to push some refs',
+      'Traceback (most recent call last):',
       'SyntaxError:',
       'ReferenceError:',
+      'TypeError:',
+      'ModuleNotFoundError:',
+      'ImportError:',
       'panic: runtime error:',
     ];
 
-    const hasError = errorSignatures.some((sig) => chunk.includes(sig));
+    const chunkToScan = chunk.length > 4000 ? chunk.slice(-4000) : chunk;
+    const hasError = errorSignatures.some((sig) => chunkToScan.includes(sig));
     if (hasError) {
       lastReportedCommandRef.current = cmd;
-      onErrorDetectedRef.current(cmd, outputBufferRef.current, 1);
+      const cmdOutput = outputBufferRef.current.slice(commandOutputStartIndexRef.current).trim();
+      onErrorDetectedRef.current(cmd, cmdOutput || chunkToScan, 1);
     }
   };
 

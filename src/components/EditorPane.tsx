@@ -16,6 +16,83 @@ import { TauriApi } from '../services/tauriApi';
 import { useI18n } from '../i18n';
 import { DangerousCommandModal, isDangerousCommand } from './DangerousCommandModal';
 
+import Prism from 'prismjs';
+import 'prismjs/components/prism-typescript';
+import 'prismjs/components/prism-rust';
+import 'prismjs/components/prism-python';
+import 'prismjs/components/prism-bash';
+import 'prismjs/components/prism-json';
+import 'prismjs/components/prism-markdown';
+import 'prismjs/components/prism-css';
+import 'prismjs/components/prism-yaml';
+import 'prismjs/components/prism-toml';
+import 'prismjs/components/prism-c';
+import 'prismjs/components/prism-cpp';
+
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function getGrammarForFile(filename: string): { grammar: Prism.Grammar; lang: string } {
+  const ext = filename.split('.').pop()?.toLowerCase() || '';
+  switch (ext) {
+    case 'ts':
+    case 'tsx':
+      return { grammar: Prism.languages.typescript, lang: 'typescript' };
+    case 'js':
+    case 'jsx':
+    case 'mjs':
+    case 'cjs':
+      return { grammar: Prism.languages.javascript, lang: 'javascript' };
+    case 'rs':
+      return { grammar: Prism.languages.rust, lang: 'rust' };
+    case 'py':
+      return { grammar: Prism.languages.python, lang: 'python' };
+    case 'sh':
+    case 'bash':
+    case 'zsh':
+      return { grammar: Prism.languages.bash, lang: 'bash' };
+    case 'json':
+      return { grammar: Prism.languages.json, lang: 'json' };
+    case 'md':
+    case 'markdown':
+      return { grammar: Prism.languages.markdown, lang: 'markdown' };
+    case 'css':
+      return { grammar: Prism.languages.css, lang: 'css' };
+    case 'html':
+    case 'htm':
+      return { grammar: Prism.languages.html, lang: 'html' };
+    case 'yaml':
+    case 'yml':
+      return { grammar: Prism.languages.yaml, lang: 'yaml' };
+    case 'toml':
+      return { grammar: Prism.languages.toml, lang: 'toml' };
+    case 'c':
+    case 'h':
+      return { grammar: Prism.languages.c, lang: 'c' };
+    case 'cpp':
+    case 'cc':
+    case 'cxx':
+    case 'hpp':
+      return { grammar: Prism.languages.cpp, lang: 'cpp' };
+    default:
+      return { grammar: Prism.languages.javascript || Prism.languages.clike, lang: 'clike' };
+  }
+}
+
+function highlightSyntax(code: string, filename: string): string {
+  if (!code) return '';
+  try {
+    const { grammar, lang } = getGrammarForFile(filename);
+    if (grammar) {
+      return Prism.highlight(code, grammar, lang);
+    }
+  } catch (err) {
+    console.warn('Prism highlight error:', err);
+  }
+  return escapeHtml(code);
+}
+
 interface EditorPaneProps {
   isOpen: boolean;
   onClose: () => void;
@@ -56,6 +133,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const lineNumbersRef = useRef<HTMLDivElement>(null);
+  const highlightRef = useRef<HTMLPreElement>(null);
 
   // Refresh directory files
   const loadDirectoryFiles = async () => {
@@ -204,12 +282,22 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
     }
   };
 
-  // Sync scroll between textarea and line numbers
+  // Sync scroll between textarea, line numbers, and syntax highlight layer
   const handleScroll = () => {
-    if (textareaRef.current && lineNumbersRef.current) {
-      lineNumbersRef.current.scrollTop = textareaRef.current.scrollTop;
+    if (textareaRef.current) {
+      if (lineNumbersRef.current) {
+        lineNumbersRef.current.scrollTop = textareaRef.current.scrollTop;
+      }
+      if (highlightRef.current) {
+        highlightRef.current.scrollTop = textareaRef.current.scrollTop;
+        highlightRef.current.scrollLeft = textareaRef.current.scrollLeft;
+      }
     }
   };
+
+  const highlightedHtml = React.useMemo(() => {
+    return highlightSyntax(content, filePath);
+  }, [content, filePath]);
 
   const lineCount = Math.max(1, content.split('\n').length);
   const lineNumbers = Array.from({ length: lineCount }, (_, i) => i + 1);
@@ -395,7 +483,8 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
         <div
           ref={lineNumbersRef}
           style={{
-            width: '40px',
+            width: '44px',
+            minWidth: '44px',
             padding: '10px 6px',
             textAlign: 'right',
             color: 'var(--fg-dim)',
@@ -406,6 +495,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
             overflowY: 'hidden',
             background: 'rgba(0, 0, 0, 0.15)',
             borderRight: '1px solid var(--border)',
+            boxSizing: 'border-box',
           }}
         >
           {lineNumbers.map((n) => (
@@ -413,35 +503,74 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
           ))}
         </div>
 
-        {/* Text Area */}
-        <textarea
-          ref={textareaRef}
-          value={content}
-          onChange={(e) => {
-            setContent(e.target.value);
-            setIsDirty(true);
-          }}
-          onKeyDown={handleKeyDown}
-          onScroll={handleScroll}
-          spellCheck={false}
+        {/* Code Viewport with perfectly synchronized overlay */}
+        <div
           style={{
             flex: 1,
+            position: 'relative',
             height: '100%',
-            padding: '10px',
-            background: 'transparent',
-            color: 'var(--fg-main)',
-            border: 'none',
-            outline: 'none',
-            fontFamily: config.terminal.font_family,
-            fontSize: `${config.terminal.font_size}px`,
-            lineHeight: '1.5',
-            resize: 'none',
-            whiteSpace: 'pre',
-            overflowWrap: 'normal',
-            overflowX: 'auto',
+            overflow: 'hidden',
           }}
-          placeholder={t.editor.textareaPlaceholder}
-        />
+        >
+          {/* Syntax Highlighted Overlay */}
+          <pre
+            ref={highlightRef}
+            aria-hidden="true"
+            dangerouslySetInnerHTML={{ __html: highlightedHtml + '\n' }}
+            style={{
+              position: 'absolute',
+              inset: 0,
+              margin: 0,
+              padding: '10px',
+              background: 'transparent',
+              color: 'var(--fg-main)',
+              fontFamily: config.terminal.font_family,
+              fontSize: `${config.terminal.font_size}px`,
+              lineHeight: '1.5',
+              whiteSpace: 'pre',
+              overflow: 'hidden',
+              pointerEvents: 'none',
+              userSelect: 'none',
+              boxSizing: 'border-box',
+            }}
+          />
+
+          {/* Text Area */}
+          <textarea
+            ref={textareaRef}
+            value={content}
+            onChange={(e) => {
+              setContent(e.target.value);
+              setIsDirty(true);
+            }}
+            onKeyDown={handleKeyDown}
+            onScroll={handleScroll}
+            spellCheck={false}
+            style={{
+              position: 'absolute',
+              inset: 0,
+              width: '100%',
+              height: '100%',
+              margin: 0,
+              padding: '10px',
+              background: 'transparent',
+              color: 'transparent',
+              WebkitTextFillColor: 'transparent',
+              caretColor: 'var(--fg-main)',
+              border: 'none',
+              outline: 'none',
+              fontFamily: config.terminal.font_family,
+              fontSize: `${config.terminal.font_size}px`,
+              lineHeight: '1.5',
+              resize: 'none',
+              whiteSpace: 'pre',
+              overflow: 'auto',
+              boxSizing: 'border-box',
+              zIndex: 1,
+            }}
+            placeholder={t.editor.textareaPlaceholder}
+          />
+        </div>
       </div>
 
       {/* AI Edit Modal Popup */}

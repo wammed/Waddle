@@ -45,6 +45,30 @@ To prevent accidental exposure or malicious script extraction, Waddle completely
 ### 3. Advance Path Validation
 Path validation is performed **before** checking file existence or invoking underlying system calls, preventing path probing and information disclosure attacks.
 
+### 4. Large Directory Bounded Pagination (Client DoS Prevention)
+Browsing massive directories (such as `node_modules` or system libraries with tens of thousands of entries) could cause client-side WebKitGTK DOM memory exhaustion and application hangs. Waddle's `read_directory` backend command enforces an initial hard cap of 500 entries with explicit pagination metadata (`DirectoryListing { entries, total_count, has_more }`). Clients must explicitly request user-driven incremental pagination (`limit`), preventing automated or accidental memory exhaustion DoS attacks.
+
+---
+
+## ⚡ PTY Flow Control & Memory Exhaustion Defense
+
+Terminal emulators are susceptible to Denial of Service (DoS) attacks when untrusted processes generate unbounded output streams at maximum CPU speed (e.g., `yes`, unbuffered `cat /dev/urandom`, or infinite loops). Without flow control, output saturates IPC queues and browser buffers, consuming gigabytes of RAM and locking up the UI thread.
+
+### 1. Kernel-Cooperative Backpressure Flow Control (`pause_pty` / `resume_pty`)
+- **Queue-Depth Monitoring**: The terminal view constantly monitors xterm.js unrendered buffer queue depth (`_pendingData`).
+- **Producer Throttling**: When unrendered data exceeds **256 KB**, Waddle invokes `pause_pty`, suspending the Tokio PTY reader thread. Because the reader stops reading from the PTY master, the Linux kernel PTY master buffer (~64 KB) fills naturally.
+- **Kernel-Level Process Blocking**: Once the kernel buffer is full, the Linux kernel automatically suspends the producer process in `TASK_INTERRUPTIBLE` sleep at the `write()` system call level. The process cannot generate any additional data until the buffer is drained.
+- **Automatic Stream Resumption**: Once xterm.js renders the buffer and pending data drops below **64 KB**, Waddle calls `resume_pty`, awakening the reader thread.
+- **Security & Resource Impact**: Physical memory is flat-capped at **266 MB–305 MB** (preventing runaway 1.5GB+ memory exhaustion) regardless of how fast or long the child process runs.
+
+### 2. 0ms Instant `Ctrl+C` (SIGINT) Queue Purging
+- When a user sends `\x03` (SIGINT), Waddle immediately zeroes xterm's internal `_writeBuffer`, `_callbacks`, and `_pendingData` in **0ms**.
+- Saturated chunks in the PTY reader pipeline are discarded, and lagging IPC chunks (>256B) arriving within 150ms are dropped.
+- Completely prevents the UI thread from locking up for 20–30 seconds while trying to render stale backlog after the user has already requested termination. Prompt returns within **60ms**, and CPU immediately drops to **0.7%–1.3%**.
+
+### 3. Saturated Output Pacing
+- The PTY reader paces continuous 32KB saturated bursts at 16–20ms (60 FPS) to ensure the WebKitGTK rendering pipeline remains responsive to user interaction and window events at all times.
+
 ---
 
 ## 🤖 AI Safety & Prompt Injection Defenses

@@ -23,6 +23,7 @@ import { AppConfig, Language, OllamaStatus } from '../types';
 import { THEMES } from '../theme';
 import { TauriApi } from '../services/tauriApi';
 import { useI18n, translations } from '../i18n';
+import { getCurrentWebview } from '@tauri-apps/api/webview';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -170,6 +171,66 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen]);
 
+  // Tauri native Window Drag and Drop listener for Linux WebKitGTK
+  useEffect(() => {
+    if (!isOpen) return;
+    let isMounted = true;
+    let unlistenFn: (() => void) | null = null;
+
+    try {
+      getCurrentWebview().onDragDropEvent(async (event) => {
+        if (!isMounted) return;
+        const payload = event.payload;
+        if (payload.type === 'enter' || payload.type === 'over') {
+          setIsDraggingOver(true);
+        } else if (payload.type === 'leave') {
+          setIsDraggingOver(false);
+        } else if (payload.type === 'drop') {
+          setIsDraggingOver(false);
+          const paths = payload.paths;
+          if (paths && paths.length > 0) {
+            const rawPath = paths[0];
+            try {
+              await TauriApi.validateWallpaperPath(rawPath);
+              setWallpaperError(null);
+              setBgMode('custom');
+              setCustomBgPath(rawPath);
+              setFormData((prev) => ({
+                ...prev,
+                terminal: { ...prev.terminal, background_image: rawPath },
+              }));
+              document.documentElement.style.setProperty(
+                '--live-wallpaper-opacity',
+                String(formData.terminal.background_opacity ?? 0.85)
+              );
+            } catch (err: any) {
+              console.warn('Dropped wallpaper validation failed:', err);
+              const errMsg = typeof err === 'string' ? err : err?.message || String(err);
+              setWallpaperError(errMsg);
+            }
+          }
+        }
+      }).then((unlisten) => {
+        if (isMounted) {
+          unlistenFn = unlisten;
+        } else {
+          unlisten();
+        }
+      }).catch((e) => {
+        console.warn('onDragDropEvent listener failed:', e);
+      });
+    } catch (e) {
+      console.warn('getCurrentWebview not available:', e);
+    }
+
+    return () => {
+      isMounted = false;
+      if (unlistenFn) {
+        unlistenFn();
+      }
+    };
+  }, [isOpen, formData.terminal.background_opacity]);
+
   if (!isOpen) return null;
 
   const handleBgModeChange = (mode: 'none' | 'preset_cyberpunk' | 'custom') => {
@@ -257,17 +318,50 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     setIsDraggingOver(false);
     setWallpaperError(null);
 
+    // 1. Try extracting local file path from text/uri-list or text/plain (standard Linux desktop file managers)
+    const uriList = e.dataTransfer.getData('text/uri-list') || e.dataTransfer.getData('text/plain');
+    let localPath = '';
+    if (uriList) {
+      const firstLine = uriList.split('\n')[0].trim();
+      if (firstLine.startsWith('file://')) {
+        localPath = decodeURIComponent(firstLine.replace(/^file:\/\//, ''));
+      } else if (firstLine.startsWith('/')) {
+        localPath = firstLine;
+      }
+    }
+
     const file = e.dataTransfer.files?.[0];
+    if (!localPath && (file as any)?.path) {
+      localPath = (file as any).path;
+    }
+
+    if (localPath) {
+      try {
+        await TauriApi.validateWallpaperPath(localPath);
+        setCustomBgPath(localPath);
+        setFormData((prev) => ({
+          ...prev,
+          terminal: { ...prev.terminal, background_image: localPath },
+        }));
+        return;
+      } catch (err: any) {
+        console.warn('Direct path drop validation failed, attempting byte read:', err);
+      }
+    }
+
     if (file) {
       try {
         const buffer = await file.arrayBuffer();
-        const bytes = new Uint8Array(buffer);
-        const savedPath = await TauriApi.saveWallpaperFile(file.name, bytes);
-        setCustomBgPath(savedPath);
-        setFormData((prev) => ({
-          ...prev,
-          terminal: { ...prev.terminal, background_image: savedPath },
-        }));
+        if (buffer && buffer.byteLength > 0) {
+          const bytes = new Uint8Array(buffer);
+          const savedPath = await TauriApi.saveWallpaperFile(file.name, bytes);
+          setCustomBgPath(savedPath);
+          setFormData((prev) => ({
+            ...prev,
+            terminal: { ...prev.terminal, background_image: savedPath },
+          }));
+          return;
+        }
       } catch (err: any) {
         console.error('Failed to save dropped wallpaper:', err);
         const errMsg = typeof err === 'string' ? err : err?.message || String(err);
@@ -870,6 +964,49 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <option value="custom" style={{ background: '#181e2e', color: '#f8fafc' }}>{t.settings.wallpaperCustom}</option>
               </select>
 
+              {/* Prominent Wallpaper Drag & Drop Zone */}
+              <div
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setIsDraggingOver(true);
+                }}
+                onDragLeave={() => setIsDraggingOver(false)}
+                onDrop={handleDrop}
+                onClick={handleBrowseClick}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  marginTop: '8px',
+                  padding: '14px 12px',
+                  borderRadius: '8px',
+                  border: isDraggingOver
+                    ? '2px dashed var(--accent, #38bdf8)'
+                    : '1px dashed rgba(56, 189, 248, 0.3)',
+                  backgroundColor: isDraggingOver
+                    ? 'rgba(56, 189, 248, 0.14)'
+                    : 'rgba(24, 30, 46, 0.6)',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  textAlign: 'center',
+                }}
+                title="Drop image file here or click Browse"
+              >
+                <ImageIcon size={20} color="var(--accent, #38bdf8)" />
+                <div style={{ fontSize: '12px', color: '#f8fafc', fontWeight: 500 }}>
+                  {isDraggingOver
+                    ? 'Drop image here to apply'
+                    : customBgPath
+                    ? customBgPath.split('/').pop()
+                    : 'Drag & drop image here or click Browse'}
+                </div>
+                <div style={{ fontSize: '11px', color: '#94a3b8' }}>
+                  Supports PNG, JPG, WebP (auto-saved to wallpapers)
+                </div>
+              </div>
+
               {bgMode === 'custom' && (
                 <div style={{ marginTop: '6px' }}>
                   <div
@@ -954,11 +1091,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       value={formData.terminal.background_opacity ?? 0.85}
                       onChange={(e) => {
                         const val = parseFloat(e.target.value);
+                        const opacity = isNaN(val) ? 0.85 : val;
+                        document.documentElement.style.setProperty('--live-wallpaper-opacity', String(opacity));
+                        document.documentElement.style.setProperty('--live-wallpaper-contrast-opacity', String(Math.max(0.2, 1 - opacity)));
                         setFormData((prev) => ({
                           ...prev,
                           terminal: {
                             ...prev.terminal,
-                            background_opacity: isNaN(val) ? 0.85 : val,
+                            background_opacity: opacity,
                           },
                         }));
                       }}
@@ -977,11 +1117,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       value={formData.terminal.background_blur ?? 0}
                       onChange={(e) => {
                         const val = parseInt(e.target.value, 10);
+                        const blur = isNaN(val) ? 0 : val;
+                        document.documentElement.style.setProperty('--live-wallpaper-blur', `${Math.min(blur, 10)}px`);
                         setFormData((prev) => ({
                           ...prev,
                           terminal: {
                             ...prev.terminal,
-                            background_blur: isNaN(val) ? 0 : val,
+                            background_blur: blur,
                           },
                         }));
                       }}

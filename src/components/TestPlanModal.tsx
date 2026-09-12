@@ -70,15 +70,17 @@ export const TestPlanModal: React.FC<TestPlanModalProps> = ({ isOpen, onClose })
   const [isMdPreviewOpen, setIsMdPreviewOpen] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Auto-save to localStorage
+  // Debounced auto-save to localStorage to prevent main thread blocking on keystroke
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.localStorage) {
+    if (typeof window === 'undefined' || !window.localStorage) return;
+    const timer = setTimeout(() => {
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(record));
       } catch (e) {
         console.error('Failed to save test plan record:', e);
       }
-    }
+    }, 300);
+    return () => clearTimeout(timer);
   }, [record]);
 
   // Handle escape key

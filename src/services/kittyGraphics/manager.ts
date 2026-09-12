@@ -34,6 +34,8 @@ export class KittyGraphicsManager {
   private screenElement: HTMLElement | null = null;
   private canvasAddon?: any;
   private onPtyWrite?: (data: string) => void;
+  private isHookInstalled: boolean = false;
+  private isCanvasClear: boolean = true;
 
   constructor(
     term: Terminal,
@@ -64,6 +66,7 @@ export class KittyGraphicsManager {
 
   public setCanvasAddon(addon: any): void {
     this.canvasAddon = addon;
+    this.isHookInstalled = false;
     this.installCanvasRendererHook();
   }
 
@@ -135,7 +138,6 @@ export class KittyGraphicsManager {
     this.disposables.push(() => scrollDisp.dispose());
 
     const renderDisp = this.term.onRender(() => {
-      this.installCanvasRendererHook();
       this.render();
     });
     this.disposables.push(() => renderDisp.dispose());
@@ -148,6 +150,7 @@ export class KittyGraphicsManager {
   }
 
   public installCanvasRendererHook(): void {
+    if (this.isHookInstalled) return;
     try {
       const core = (this.term as any)._core;
       const renderService = core?._renderService;
@@ -158,6 +161,7 @@ export class KittyGraphicsManager {
         const origSetRenderer = renderService.setRenderer.bind(renderService);
         renderService.setRenderer = (r: any) => {
           origSetRenderer(r);
+          this.isHookInstalled = false;
           this.installCanvasRendererHook();
         };
       }
@@ -400,6 +404,7 @@ export class KittyGraphicsManager {
           };
         }
       }
+      this.isHookInstalled = true;
     } catch (err) {
       console.warn('Failed to install canvas renderer hook for Unicode placeholders:', err);
     }
@@ -522,7 +527,6 @@ export class KittyGraphicsManager {
    */
   public filterPtyOutput(chunk: string): string {
     if (this.isDisposed) return chunk;
-    this.installCanvasRendererHook();
 
     const { cleanText, commands } = this.parser.parse(chunk, (cmd, textBefore) => {
       return this.generatePlaceholderSequence(cmd, textBefore);
@@ -1288,6 +1292,7 @@ export class KittyGraphicsManager {
     };
 
     this.placements.set(placementId, placement);
+    this.isCanvasClear = false;
 
     const cached = this.cache.get(imageId);
     if (cached?.frames && cached.frames.length >= 2 && !cached.animation?.isPlaying) {
@@ -1300,6 +1305,17 @@ export class KittyGraphicsManager {
   public render() {
     if (this.isDisposed || !this.canvas || !this.ctx || !this.screenElement) return;
 
+    // Fast-path: if no images or placements are active, skip canvas redraw if already clear
+    if (this.placements.size === 0 && this.cache.size === 0) {
+      if (this.isCanvasClear) return;
+      const width = this.screenElement.clientWidth;
+      const height = this.screenElement.clientHeight;
+      this.ctx.clearRect(0, 0, width, height);
+      this.isCanvasClear = true;
+      return;
+    }
+
+    this.isCanvasClear = false;
     this.installCanvasRendererHook();
     this.syncCanvasSize();
 

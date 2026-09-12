@@ -51,6 +51,16 @@ async fn start_pty(state: State<'_, AppState>, session_id: String) -> Result<(),
 }
 
 #[tauri::command]
+async fn pause_pty(state: State<'_, AppState>, session_id: String) -> Result<(), String> {
+    state.pty_manager.pause_pty(&session_id).await
+}
+
+#[tauri::command]
+async fn resume_pty(state: State<'_, AppState>, session_id: String) -> Result<(), String> {
+    state.pty_manager.resume_pty(&session_id).await
+}
+
+#[tauri::command]
 async fn write_pty(
     state: State<'_, AppState>,
     session_id: String,
@@ -394,11 +404,22 @@ pub struct FileEntry {
     pub modified: Option<u64>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DirectoryListing {
+    pub entries: Vec<FileEntry>,
+    pub total_count: usize,
+    pub has_more: bool,
+}
+
 #[tauri::command]
-fn read_directory(path: String, show_hidden: bool) -> Result<Vec<FileEntry>, String> {
+fn read_directory(path: String, show_hidden: bool, limit: Option<usize>) -> Result<DirectoryListing, String> {
     let p = Path::new(&path);
     if !p.exists() || !p.is_dir() {
-        return Ok(Vec::new());
+        return Ok(DirectoryListing {
+            entries: Vec::new(),
+            total_count: 0,
+            has_more: false,
+        });
     }
 
     let canonical = resolve_canonical_path(p);
@@ -479,12 +500,19 @@ fn read_directory(path: String, show_hidden: bool) -> Result<Vec<FileEntry>, Str
             .then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase()))
     });
 
-    // Limit to 500 entries to prevent frontend UI lockup on massive directories
-    if entries_list.len() > 500 {
-        entries_list.truncate(500);
+    let total_count = entries_list.len();
+    let max_limit = limit.unwrap_or(500);
+    let has_more = total_count > max_limit;
+
+    if has_more {
+        entries_list.truncate(max_limit);
     }
 
-    Ok(entries_list)
+    Ok(DirectoryListing {
+        entries: entries_list,
+        total_count,
+        has_more,
+    })
 }
 
 #[tauri::command]
@@ -824,6 +852,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             create_pty,
             start_pty,
+            pause_pty,
+            resume_pty,
             write_pty,
             resize_pty,
             close_pty,
@@ -890,20 +920,20 @@ mod tests {
         assert!(create_file(hidden_file.clone()).is_ok());
 
         // 3. Read directory without hidden
-        let entries = read_directory(dir_path.clone(), false).expect("read_directory failed");
-        let names: Vec<String> = entries.iter().map(|e| e.name.clone()).collect();
+        let listing = read_directory(dir_path.clone(), false, None).expect("read_directory failed");
+        let names: Vec<String> = listing.entries.iter().map(|e| e.name.clone()).collect();
         assert!(names.contains(&"test_folder".to_string()));
         assert!(names.contains(&"alpha.txt".to_string()));
         assert!(names.contains(&"beta.py".to_string()));
         assert!(!names.contains(&".hidden".to_string()));
 
         // Folders should come first
-        assert!(entries[0].is_dir);
-        assert_eq!(entries[0].name, "test_folder");
+        assert!(listing.entries[0].is_dir);
+        assert_eq!(listing.entries[0].name, "test_folder");
 
         // 4. Read directory with hidden
-        let entries_with_hidden = read_directory(dir_path.clone(), true).expect("read_directory failed");
-        let all_names: Vec<String> = entries_with_hidden.iter().map(|e| e.name.clone()).collect();
+        let listing_with_hidden = read_directory(dir_path.clone(), true, None).expect("read_directory failed");
+        let all_names: Vec<String> = listing_with_hidden.entries.iter().map(|e| e.name.clone()).collect();
         assert!(all_names.contains(&".hidden".to_string()));
 
         // 5. Rename entry
@@ -1093,26 +1123,26 @@ mod tests {
     #[test]
     fn test_read_directory_path_probing_protection() {
         // 1. Virtual / kernel filesystem access must be rejected
-        assert!(read_directory("/proc".to_string(), true).is_err());
-        assert!(read_directory("/proc/sys".to_string(), true).is_err());
-        assert!(read_directory("/sys".to_string(), true).is_err());
-        assert!(read_directory("/dev".to_string(), true).is_err());
+        assert!(read_directory("/proc".to_string(), true, None).is_err());
+        assert!(read_directory("/proc/sys".to_string(), true, None).is_err());
+        assert!(read_directory("/sys".to_string(), true, None).is_err());
+        assert!(read_directory("/dev".to_string(), true, None).is_err());
 
         if let Some(home) = dirs::home_dir() {
             // 2. Sensitive key vault directories must be rejected
             let gpg_private = home.join(".gnupg").join("private-keys-v1.d");
             let _ = fs::create_dir_all(&gpg_private);
-            assert!(read_directory(gpg_private.to_string_lossy().to_string(), true).is_err());
+            assert!(read_directory(gpg_private.to_string_lossy().to_string(), true, None).is_err());
 
             let keyrings_dir = home.join(".local").join("share").join("keyrings");
             let _ = fs::create_dir_all(&keyrings_dir);
-            assert!(read_directory(keyrings_dir.to_string_lossy().to_string(), true).is_err());
+            assert!(read_directory(keyrings_dir.to_string_lossy().to_string(), true, None).is_err());
 
             // 3. ~/.ssh directory should not expose private keys
             let ssh_dir = home.join(".ssh");
             if ssh_dir.is_dir() {
-                if let Ok(entries) = read_directory(ssh_dir.to_string_lossy().to_string(), true) {
-                    for entry in entries {
+                if let Ok(listing) = read_directory(ssh_dir.to_string_lossy().to_string(), true, None) {
+                    for entry in listing.entries {
                         let name = &entry.name;
                         let is_safe = name == "config"
                             || name.starts_with("known_hosts")
@@ -1123,6 +1153,29 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn test_read_directory_pagination_limit() {
+        let temp_dir = std::env::temp_dir().join(format!("waddle_test_page_{}", uuid::Uuid::new_v4()));
+        let _ = fs::create_dir_all(&temp_dir);
+        for i in 0..12 {
+            let _ = fs::File::create(temp_dir.join(format!("file_{:02}.txt", i)));
+        }
+
+        // Limit 5
+        let res5 = read_directory(temp_dir.to_string_lossy().to_string(), false, Some(5)).unwrap();
+        assert_eq!(res5.total_count, 12);
+        assert_eq!(res5.entries.len(), 5);
+        assert!(res5.has_more);
+
+        // Limit 15
+        let res15 = read_directory(temp_dir.to_string_lossy().to_string(), false, Some(15)).unwrap();
+        assert_eq!(res15.total_count, 12);
+        assert_eq!(res15.entries.len(), 12);
+        assert!(!res15.has_more);
+
+        let _ = fs::remove_dir_all(&temp_dir);
     }
 }
 

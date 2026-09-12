@@ -211,3 +211,9 @@ export interface FileEntry {
   readonly: boolean;
   modified?: number;
 }
+
+export interface DirectoryListing {
+  entries: FileEntry[];
+  total_count: number;
+  has_more: boolean;
+}

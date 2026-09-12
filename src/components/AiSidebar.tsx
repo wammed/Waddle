@@ -12,6 +12,8 @@ import {
   Download,
   FileText,
   FileJson,
+  AlertCircle,
+  Sparkles,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -111,6 +113,20 @@ export const AiSidebar: React.FC<AiSidebarProps> = ({
     }
   };
   const activeStreamCleanupRef = useRef<(() => void) | null>(null);
+
+  const hasErrorInRecentOutput = React.useMemo(() => {
+    if (!context.recent_output) return false;
+    const lower = context.recent_output.toLowerCase();
+    return (
+      lower.includes('error') ||
+      lower.includes('fatal') ||
+      lower.includes('failed') ||
+      lower.includes('command not found') ||
+      lower.includes('permission denied') ||
+      lower.includes('no such file') ||
+      lower.includes('traceback')
+    );
+  }, [context.recent_output]);
 
   useEffect(() => {
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -353,6 +369,50 @@ export const AiSidebar: React.FC<AiSidebarProps> = ({
       </div>
 
       <div className="chat-input-area">
+        {/* Quick Error Diagnostic Chip */}
+        {hasErrorInRecentOutput && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: '8px',
+              padding: '6px 10px',
+              background: 'rgba(244, 63, 94, 0.1)',
+              border: '1px solid rgba(244, 63, 94, 0.3)',
+              borderRadius: '6px',
+              fontSize: '11px',
+              color: '#fda4af',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <AlertCircle size={12} color="#f43f5e" />
+              <span>直前のエラー: <code>{context.recent_command || 'Command'}</code></span>
+            </div>
+            <button
+              type="button"
+              className="action-btn"
+              style={{
+                fontSize: '10px',
+                padding: '2px 8px',
+                background: 'rgba(244, 63, 94, 0.2)',
+                border: '1px solid rgba(244, 63, 94, 0.4)',
+                color: '#f8fafc',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+              onClick={() => {
+                const errSnippet = context.recent_output ? context.recent_output.slice(-1000).trim() : '';
+                setInput(`直前のコマンド \`${context.recent_command || ''}\` で以下のエラーが発生しました。原因と具体的な修正コマンドを教えてください:\n\n\`\`\`\n${errSnippet}\n\`\`\``);
+              }}
+            >
+              <Sparkles size={10} color="#38bdf8" style={{ marginRight: 3 }} />
+              エラー修正を質問
+            </button>
+          </div>
+        )}
+
         <div className="chat-input-box">
           <textarea
             className="chat-textarea"

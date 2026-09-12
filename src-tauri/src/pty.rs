@@ -53,6 +53,8 @@ struct Session {
     last_known_cwd: String,
     shell: String,
     start_tx: Arc<parking_lot::Mutex<Option<std::sync::mpsc::Sender<()>>>>,
+    interrupt_requested: Arc<AtomicBool>,
+    paused: Arc<AtomicBool>,
 }
 
 /// Scans output from the child process for Kitty Graphics Protocol escape sequences (`\x1b_G`).
@@ -272,6 +274,10 @@ impl PtyManager {
 
         let alive = Arc::new(AtomicBool::new(true));
         let alive_clone = Arc::clone(&alive);
+        let interrupt_requested = Arc::new(AtomicBool::new(false));
+        let interrupt_requested_clone = Arc::clone(&interrupt_requested);
+        let paused = Arc::new(AtomicBool::new(false));
+        let paused_clone = Arc::clone(&paused);
         let app_clone = app.clone();
         let session_id_clone = id.clone();
 
@@ -289,15 +295,52 @@ impl PtyManager {
             let mut buffer = [0u8; 32768];
             let mut pending_bytes: Vec<u8> = Vec::new();
             let mut pending_kitty_prefix = String::new();
+            let mut saturated_streak: u32 = 0;
             let event_name = format!("pty-output-{}", session_id_clone);
 
             while alive_clone.load(Ordering::SeqCst) {
+                // Backpressure flow control: if frontend is overwhelmed, wait until resumed.
+                // If user presses Ctrl+C while paused, immediately unpause to let shell prompt through.
+                while paused_clone.load(Ordering::SeqCst) && alive_clone.load(Ordering::SeqCst) {
+                    if interrupt_requested_clone.load(Ordering::SeqCst) {
+                        paused_clone.store(false, Ordering::SeqCst);
+                        break;
+                    }
+                    thread::sleep(std::time::Duration::from_millis(5));
+                }
+
+                if interrupt_requested_clone.swap(false, Ordering::SeqCst) {
+                    pending_bytes.clear();
+                    pending_kitty_prefix.clear();
+                    saturated_streak = 0;
+                }
+
                 match reader.read(&mut buffer) {
                     Ok(0) => {
                         // EOF
                         break;
                     }
                     Ok(n) => {
+                        // Rate-limit runaway throughput when buffer is completely saturated (32KB),
+                        // letting the kernel PTY buffer naturally throttle the child process.
+                        // 16ms matches 60 FPS monitor refresh rate (~1.9 MB/s max).
+                        // Normal interactive commands (< 32KB) have 0ms latency.
+                        if n == buffer.len() {
+                            saturated_streak = saturated_streak.saturating_add(1);
+                            let sleep_ms = if saturated_streak > 5 { 20 } else { 16 };
+                            thread::sleep(std::time::Duration::from_millis(sleep_ms));
+                        } else {
+                            saturated_streak = 0;
+                        }
+
+                        // If user sent Ctrl+C during read or sleep, discard this runaway chunk!
+                        if interrupt_requested_clone.swap(false, Ordering::SeqCst) {
+                            pending_bytes.clear();
+                            pending_kitty_prefix.clear();
+                            saturated_streak = 0;
+                            continue;
+                        }
+
                         let chunk = &buffer[..n];
                         let to_process = if pending_bytes.is_empty() {
                             chunk.to_vec()
@@ -380,6 +423,8 @@ impl PtyManager {
             last_known_cwd: target_cwd.to_string_lossy().to_string(),
             shell: shell_cmd.clone(),
             start_tx,
+            interrupt_requested,
+            paused,
         };
 
         let session_info = PtySessionInfo {
@@ -405,11 +450,35 @@ impl PtyManager {
         }
     }
 
+    pub async fn pause_pty(&self, session_id: &str) -> Result<(), String> {
+        let sessions = self.sessions.lock().await;
+        if let Some(session) = sessions.get(session_id) {
+            session.paused.store(true, Ordering::SeqCst);
+            Ok(())
+        } else {
+            Err("Session not found".to_string())
+        }
+    }
+
+    pub async fn resume_pty(&self, session_id: &str) -> Result<(), String> {
+        let sessions = self.sessions.lock().await;
+        if let Some(session) = sessions.get(session_id) {
+            session.paused.store(false, Ordering::SeqCst);
+            Ok(())
+        } else {
+            Err("Session not found".to_string())
+        }
+    }
+
     pub async fn write(&self, session_id: &str, data: &str) -> Result<(), String> {
         let sessions = self.sessions.lock().await;
         if let Some(session) = sessions.get(session_id) {
             if let Some(tx) = session.start_tx.lock().take() {
                 let _ = tx.send(());
+            }
+            if data.contains('\x03') {
+                session.interrupt_requested.store(true, Ordering::SeqCst);
+                session.paused.store(false, Ordering::SeqCst);
             }
             let mut writer = session.writer.lock();
             writer

@@ -4,6 +4,7 @@ import {
   AppConfig,
   ChatMessage,
   CommandSuggestion,
+  DirectoryListing,
   ErrorExplanation,
   FileEntry,
   GitStatus,
@@ -45,6 +46,24 @@ export const TauriApi = {
     if (!isTauri()) return;
     try {
       await invoke('start_pty', { sessionId });
+    } catch {
+      // ignore
+    }
+  },
+
+  async pausePty(sessionId: string): Promise<void> {
+    if (!isTauri()) return;
+    try {
+      await invoke('pause_pty', { sessionId });
+    } catch {
+      // ignore
+    }
+  },
+
+  async resumePty(sessionId: string): Promise<void> {
+    if (!isTauri()) return;
+    try {
+      await invoke('resume_pty', { sessionId });
     } catch {
       // ignore
     }
@@ -199,16 +218,21 @@ export const TauriApi = {
     return await invoke('write_file', { path, content });
   },
 
-  async readDirectory(path: string, showHidden = false): Promise<FileEntry[]> {
+  async readDirectory(path: string, showHidden = false, limit?: number): Promise<DirectoryListing> {
     if (!isTauri()) {
-      return [
+      const mockEntries: FileEntry[] = [
         { name: 'src', path: `${path}/src`, is_dir: true, is_symlink: false, size: 4096, readonly: false },
         { name: 'public', path: `${path}/public`, is_dir: true, is_symlink: false, size: 4096, readonly: false },
         { name: 'package.json', path: `${path}/package.json`, is_dir: false, is_symlink: false, size: 1024, readonly: false },
         { name: 'README.md', path: `${path}/README.md`, is_dir: false, is_symlink: false, size: 2048, readonly: false },
       ];
+      return {
+        entries: mockEntries,
+        total_count: mockEntries.length,
+        has_more: false,
+      };
     }
-    return await invoke<FileEntry[]>('read_directory', { path, showHidden });
+    return await invoke<DirectoryListing>('read_directory', { path, showHidden, limit });
   },
 
   async createFile(path: string): Promise<void> {
@@ -238,8 +262,8 @@ export const TauriApi = {
 
   async listDirectoryFiles(path: string): Promise<string[]> {
     try {
-      const entries = await this.readDirectory(path, false);
-      return entries.map((e) => (e.is_dir ? `${e.name}/` : e.name));
+      const listing = await this.readDirectory(path, false);
+      return listing.entries.map((e) => (e.is_dir ? `${e.name}/` : e.name));
     } catch {
       return [];
     }

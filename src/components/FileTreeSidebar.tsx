@@ -25,8 +25,9 @@ import {
   Edit2,
   ExternalLink,
   Check,
+  PlusCircle,
 } from 'lucide-react';
-import { FileEntry, GitStatus, GitFileEntry } from '../types';
+import { DirectoryListing, FileEntry, GitStatus, GitFileEntry } from '../types';
 import { TauriApi } from '../services/tauriApi';
 import { useI18n } from '../i18n';
 
@@ -97,7 +98,8 @@ export const FileTreeSidebar: React.FC<FileTreeSidebarProps> = ({
   const [showHidden, setShowHidden] = useState(false);
   const [searchFilter, setSearchFilter] = useState('');
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
-  const [directoryCache, setDirectoryCache] = useState<Record<string, FileEntry[]>>({});
+  const [directoryCache, setDirectoryCache] = useState<Record<string, DirectoryListing>>({});
+  const [folderLimits, setFolderLimits] = useState<Record<string, number>>({});
   const [loadingPaths, setLoadingPaths] = useState<Set<string>>(new Set());
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
 
@@ -156,11 +158,12 @@ export const FileTreeSidebar: React.FC<FileTreeSidebarProps> = ({
 
   // Load a directory's contents
   const loadDirectory = useCallback(
-    async (path: string) => {
+    async (path: string, customLimit?: number) => {
       setLoadingPaths((prev) => new Set(prev).add(path));
       try {
-        const entries = await TauriApi.readDirectory(path, showHidden);
-        setDirectoryCache((prev) => ({ ...prev, [path]: entries }));
+        const limit = customLimit ?? folderLimits[path] ?? 500;
+        const listing = await TauriApi.readDirectory(path, showHidden, limit);
+        setDirectoryCache((prev) => ({ ...prev, [path]: listing }));
       } catch (err) {
         console.warn(`Failed to read directory: ${path}`, err);
       } finally {
@@ -171,7 +174,19 @@ export const FileTreeSidebar: React.FC<FileTreeSidebarProps> = ({
         });
       }
     },
-    [showHidden]
+    [showHidden, folderLimits]
+  );
+
+  // Load next page of directory items (+500)
+  const handleLoadMore = useCallback(
+    async (folderPath: string, e: React.MouseEvent) => {
+      e.stopPropagation();
+      const currentLimit = folderLimits[folderPath] ?? 500;
+      const nextLimit = currentLimit + 500;
+      setFolderLimits((prev) => ({ ...prev, [folderPath]: nextLimit }));
+      await loadDirectory(folderPath, nextLimit);
+    },
+    [folderLimits, loadDirectory]
   );
 
   // Initial load / refresh of root and expanded directories
@@ -456,8 +471,11 @@ export const FileTreeSidebar: React.FC<FileTreeSidebarProps> = ({
   };
 
   // Recursive Tree Node renderer
-  const renderTree = (parentPath: string, depth = 0) => {
-    const entries = directoryCache[parentPath] || [];
+  const renderTree = (parentPath: string, depth: number = 0) => {
+    const listing = directoryCache[parentPath];
+    const entries = listing ? listing.entries : [];
+    const hasMore = listing ? listing.has_more : false;
+    const remainingCount = listing ? listing.total_count - listing.entries.length : 0;
     const filtered = searchFilter.trim()
       ? entries.filter((e) =>
           e.name.toLowerCase().includes(searchFilter.toLowerCase().trim())
@@ -502,8 +520,11 @@ export const FileTreeSidebar: React.FC<FileTreeSidebarProps> = ({
           const isLoading = loadingPaths.has(entry.path);
           const gitEntry = !isDir ? getGitEntryForPath(entry.path) : undefined;
           const hasFolderChanges = isDir && folderHasGitChanges(entry.path);
-          const folderChildrenCount = isDir && directoryCache[entry.path]
-            ? directoryCache[entry.path].length
+          const cachedListing = isDir ? directoryCache[entry.path] : undefined;
+          const folderChildrenDisplay = cachedListing
+            ? cachedListing.has_more
+              ? `${cachedListing.entries.length}/${cachedListing.total_count}`
+              : `${cachedListing.total_count}`
             : null;
 
           return (
@@ -572,9 +593,9 @@ export const FileTreeSidebar: React.FC<FileTreeSidebarProps> = ({
                 </span>
 
                 {/* Folder Item Count Badge */}
-                {isDir && folderChildrenCount !== null && (
+                {isDir && folderChildrenDisplay !== null && (
                   <span className="tree-folder-count">
-                    ({folderChildrenCount})
+                    ({folderChildrenDisplay})
                   </span>
                 )}
 
@@ -681,6 +702,32 @@ export const FileTreeSidebar: React.FC<FileTreeSidebarProps> = ({
             </div>
           );
         })}
+
+        {/* Load more button if folder has more items */}
+        {hasMore && (
+          <div
+            className="tree-load-more-row"
+            style={{
+              paddingLeft: `${depth * 14 + 28}px`,
+            }}
+            onClick={(e) => handleLoadMore(parentPath, e)}
+            title={`Load next 500 entries (${remainingCount} remaining)`}
+          >
+            {loadingPaths.has(parentPath) ? (
+              <>
+                <Loader2 size={12} className="animate-spin" color="var(--accent)" />
+                <span className="tree-load-more-text">{t.common.loading}...</span>
+              </>
+            ) : (
+              <>
+                <PlusCircle size={12} color="var(--accent)" />
+                <span className="tree-load-more-text">
+                  {t.fileTree.loadMore(remainingCount)}
+                </span>
+              </>
+            )}
+          </div>
+        )}
 
         {filtered.length === 0 && !loadingPaths.has(parentPath) && (
           <div

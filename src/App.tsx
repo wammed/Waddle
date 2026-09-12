@@ -104,13 +104,25 @@ export function App() {
     content: '',
   });
 
+  const openedFromSettingsRef = useRef(false);
+
   const handleCloseAiCommand = useCallback(() => setIsAiCommandOpen(false), []);
   const handleCloseSettings = useCallback(() => setIsSettingsOpen(false), []);
-  const handleCloseTestPlan = useCallback(() => setIsTestPlanOpen(false), []);
+  const handleCloseTestPlan = useCallback(() => {
+    setIsTestPlanOpen(false);
+    if (openedFromSettingsRef.current) {
+      openedFromSettingsRef.current = false;
+      setIsSettingsOpen(true);
+    }
+  }, []);
   const handleCloseTimeline = useCallback(() => setIsTimelineOpen(false), []);
   const handleClosePipelineBuilder = useCallback(() => setIsPipelineBuilderOpen(false), []);
   const handleCloseRichPreview = useCallback(() => setRichPreviewState((prev) => ({ ...prev, isOpen: false })), []);
-  const handleOpenTestPlan = useCallback(() => setIsTestPlanOpen(true), []);
+  const handleOpenTestPlan = useCallback(() => {
+    openedFromSettingsRef.current = true;
+    setIsSettingsOpen(false);
+    setIsTestPlanOpen(true);
+  }, []);
 
   const handleRichPreview = useCallback(async (filePath: string, fileName: string, content?: string) => {
     let fileContent = content;
@@ -381,7 +393,7 @@ export function App() {
               <div
                 className="terminal-wallpaper-layer"
                 style={{
-                  opacity: config.terminal.background_opacity ?? 0.85,
+                  opacity: `var(--live-wallpaper-opacity, ${config.terminal.background_opacity ?? 0.85})`,
                 }}
               >
                 <img
@@ -391,28 +403,12 @@ export function App() {
                   loading="eager"
                   style={{
                     position: 'absolute',
-                    inset:
-                      config.terminal.background_blur && config.terminal.background_blur > 0
-                        ? '-20px'
-                        : 0,
-                    width:
-                      config.terminal.background_blur && config.terminal.background_blur > 0
-                        ? 'calc(100% + 40px)'
-                        : '100%',
-                    height:
-                      config.terminal.background_blur && config.terminal.background_blur > 0
-                        ? 'calc(100% + 40px)'
-                        : '100%',
+                    inset: '-20px',
+                    width: 'calc(100% + 40px)',
+                    height: 'calc(100% + 40px)',
                     objectFit: 'cover',
-                    filter:
-                      config.terminal.background_blur && config.terminal.background_blur > 0
-                        ? `blur(${Math.min(config.terminal.background_blur, 10)}px)`
-                        : undefined,
+                    filter: `blur(var(--live-wallpaper-blur, ${Math.min(config.terminal.background_blur ?? 0, 10)}px))`,
                     transform: 'translate3d(0, 0, 0)',
-                    willChange:
-                      config.terminal.background_blur && config.terminal.background_blur > 0
-                        ? 'filter'
-                        : undefined,
                     pointerEvents: 'none',
                     userSelect: 'none',
                   }}
@@ -426,10 +422,10 @@ export function App() {
                 style={{
                   position: 'absolute',
                   inset: 0,
-                  backgroundColor: `rgba(10, 14, 22, ${Math.max(
+                  backgroundColor: `rgba(10, 14, 22, var(--live-wallpaper-contrast-opacity, ${Math.max(
                     0.2,
                     1 - (config.terminal.background_opacity ?? 0.85)
-                  )})`,
+                  )}))`,
                   pointerEvents: 'none',
                   zIndex: 0,
                 }}
@@ -548,52 +544,64 @@ export function App() {
       )}
 
       {/* AI Command Generator Modal (Ctrl+K) */}
-      <AiCommandModal
-        isOpen={isAiCommandOpen}
-        onClose={handleCloseAiCommand}
-        context={currentAiContext}
-        onInsertCommand={handleInsertCommand}
-        onExecuteCommand={handleExecuteCommand}
-      />
+      {isAiCommandOpen && (
+        <AiCommandModal
+          isOpen={isAiCommandOpen}
+          onClose={handleCloseAiCommand}
+          context={currentAiContext}
+          onInsertCommand={handleInsertCommand}
+          onExecuteCommand={handleExecuteCommand}
+        />
+      )}
 
       {/* Settings Modal */}
-      <SettingsModal
-        isOpen={isSettingsOpen}
-        onClose={handleCloseSettings}
-        config={config}
-        onSaveConfig={handleUpdateConfig}
-        onOpenTestPlan={handleOpenTestPlan}
-      />
+      {isSettingsOpen && (
+        <SettingsModal
+          isOpen={isSettingsOpen}
+          onClose={handleCloseSettings}
+          config={config}
+          onSaveConfig={handleUpdateConfig}
+          onOpenTestPlan={handleOpenTestPlan}
+        />
+      )}
 
       {/* Test Verification Form Modal */}
-      <TestPlanModal
-        isOpen={isTestPlanOpen}
-        onClose={handleCloseTestPlan}
-      />
+      {isTestPlanOpen && (
+        <TestPlanModal
+          isOpen={isTestPlanOpen}
+          onClose={handleCloseTestPlan}
+        />
+      )}
 
       {/* Session Command Timeline Modal (Ctrl+Shift+H) */}
-      <SessionTimelineModal
-        isOpen={isTimelineOpen}
-        onClose={handleCloseTimeline}
-        onRunCommand={handleExecuteCommand}
-        theme={config.terminal.theme}
-      />
+      {isTimelineOpen && (
+        <SessionTimelineModal
+          isOpen={isTimelineOpen}
+          onClose={handleCloseTimeline}
+          onRunCommand={handleExecuteCommand}
+          theme={config.terminal.theme}
+        />
+      )}
 
       {/* Visual Pipeline Builder Modal (Ctrl+Shift+P) */}
-      <PipelineBuilderModal
-        isOpen={isPipelineBuilderOpen}
-        onClose={handleClosePipelineBuilder}
-        onExecute={handleExecuteCommand}
-      />
+      {isPipelineBuilderOpen && (
+        <PipelineBuilderModal
+          isOpen={isPipelineBuilderOpen}
+          onClose={handleClosePipelineBuilder}
+          onExecute={handleExecuteCommand}
+        />
+      )}
 
       {/* Rich Preview Modal (Markdown / CSV / JSON) */}
-      <RichPreviewModal
-        isOpen={richPreviewState.isOpen}
-        onClose={handleCloseRichPreview}
-        filePath={richPreviewState.filePath}
-        fileName={richPreviewState.fileName}
-        content={richPreviewState.content}
-      />
+      {richPreviewState.isOpen && (
+        <RichPreviewModal
+          isOpen={richPreviewState.isOpen}
+          onClose={handleCloseRichPreview}
+          filePath={richPreviewState.filePath}
+          fileName={richPreviewState.fileName}
+          content={richPreviewState.content}
+        />
+      )}
       </div>
     </I18nProvider>
   );
