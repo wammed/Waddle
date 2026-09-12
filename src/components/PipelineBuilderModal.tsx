@@ -12,6 +12,7 @@ import {
   ChevronUp,
   ChevronDown,
 } from 'lucide-react';
+import { useI18n } from '../i18n';
 
 interface PipelineStage {
   id: string;
@@ -96,6 +97,8 @@ export const PipelineBuilderModal: React.FC<PipelineBuilderModalProps> = ({
   onExecute,
   initialCommand,
 }) => {
+  const { language } = useI18n();
+  const isJa = language === 'ja';
   const [stages, setStages] = useState<PipelineStage[]>([
     { id: '1', command: 'cat app.log', explanation: 'ファイル内容を出力' },
     { id: '2', command: 'grep -i "error"', explanation: 'エラー行のみ抽出' },
@@ -237,10 +240,10 @@ export const PipelineBuilderModal: React.FC<PipelineBuilderModalProps> = ({
             <SlidersHorizontal size={20} color="#89b4fa" />
             <div>
               <div style={{ fontWeight: 600, fontSize: '15px', color: '#cdd6f4' }}>
-                ビジュアル パイプライン ビルダー (Visual Pipeline Builder)
+                {isJa ? 'ビジュアル パイプライン ビルダー (Visual Pipeline Builder)' : 'Visual Pipeline Builder'}
               </div>
               <div style={{ fontSize: '11px', color: '#a6adc8' }}>
-                Linuxコマンドをパイプ (|) で視覚的に繋げて複雑な集計・加工処理を構築
+                {isJa ? 'Linuxコマンドをパイプ (|) で視覚的に繋げて複雑な集計・加工処理を構築' : 'Visually chain Linux commands with pipes (|) to build data processing pipelines'}
               </div>
             </div>
           </div>
@@ -284,7 +287,7 @@ export const PipelineBuilderModal: React.FC<PipelineBuilderModalProps> = ({
             }}
           >
             <Sparkles size={12} />
-            プリセット:
+            {isJa ? 'プリセット:' : 'Presets:'}
           </span>
           {COMMON_PRESETS.map((p, idx) => (
             <button
@@ -459,7 +462,7 @@ export const PipelineBuilderModal: React.FC<PipelineBuilderModalProps> = ({
               }}
             >
               <Plus size={14} />
-              パイプ (|) を追加
+              {isJa ? 'パイプ (|) を追加' : 'Add Pipe (|)'}
             </button>
 
             <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', flex: 1, padding: '4px 0' }}>
@@ -499,7 +502,7 @@ export const PipelineBuilderModal: React.FC<PipelineBuilderModalProps> = ({
         >
           <div>
             <div style={{ fontSize: '11px', color: '#6c7086', marginBottom: '4px', fontWeight: 600 }}>
-              合成コマンドプレビュー:
+              {isJa ? '合成コマンドプレビュー:' : 'Composed Command Preview:'}
             </div>
             <div
               style={{
@@ -514,7 +517,7 @@ export const PipelineBuilderModal: React.FC<PipelineBuilderModalProps> = ({
                 whiteSpace: 'nowrap',
               }}
             >
-              $ {fullPipelineCommand || '# コマンドを入力してください'}
+              $ {fullPipelineCommand || (isJa ? '# コマンドを入力してください' : '# Enter command steps')}
             </div>
           </div>
 
@@ -535,7 +538,7 @@ export const PipelineBuilderModal: React.FC<PipelineBuilderModalProps> = ({
               }}
             >
               {copied ? <Check size={14} /> : <Copy size={14} />}
-              {copied ? 'コピー完了' : 'コマンドをコピー'}
+              {copied ? (isJa ? 'コピー完了' : 'Copied!') : (isJa ? 'コマンドをコピー' : 'Copy Command')}
             </button>
 
             <button
@@ -556,7 +559,7 @@ export const PipelineBuilderModal: React.FC<PipelineBuilderModalProps> = ({
               }}
             >
               <Play size={13} fill="#11111b" />
-              ターミナルで即時実行
+              {isJa ? 'ターミナルで即時実行' : 'Run in Terminal'}
             </button>
           </div>
         </div>

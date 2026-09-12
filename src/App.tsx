@@ -104,6 +104,14 @@ export function App() {
     content: '',
   });
 
+  const handleCloseAiCommand = useCallback(() => setIsAiCommandOpen(false), []);
+  const handleCloseSettings = useCallback(() => setIsSettingsOpen(false), []);
+  const handleCloseTestPlan = useCallback(() => setIsTestPlanOpen(false), []);
+  const handleCloseTimeline = useCallback(() => setIsTimelineOpen(false), []);
+  const handleClosePipelineBuilder = useCallback(() => setIsPipelineBuilderOpen(false), []);
+  const handleCloseRichPreview = useCallback(() => setRichPreviewState((prev) => ({ ...prev, isOpen: false })), []);
+  const handleOpenTestPlan = useCallback(() => setIsTestPlanOpen(true), []);
+
   const handleRichPreview = useCallback(async (filePath: string, fileName: string, content?: string) => {
     let fileContent = content;
     if (fileContent === undefined) {
@@ -335,7 +343,6 @@ export function App() {
           onToggleFileTree={() => setIsFileTreeOpen((prev) => !prev)}
           onOpenSettings={() => setIsSettingsOpen(true)}
           onRefreshAll={handleFullWorkspaceRefresh}
-          onOpenTestPlan={() => setIsTestPlanOpen(true)}
           onOpenTimeline={() => setIsTimelineOpen(true)}
           onOpenPipelineBuilder={() => setIsPipelineBuilderOpen(true)}
           isEditorOpen={isEditorOpen}
@@ -543,7 +550,7 @@ export function App() {
       {/* AI Command Generator Modal (Ctrl+K) */}
       <AiCommandModal
         isOpen={isAiCommandOpen}
-        onClose={() => setIsAiCommandOpen(false)}
+        onClose={handleCloseAiCommand}
         context={currentAiContext}
         onInsertCommand={handleInsertCommand}
         onExecuteCommand={handleExecuteCommand}
@@ -552,21 +559,22 @@ export function App() {
       {/* Settings Modal */}
       <SettingsModal
         isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
+        onClose={handleCloseSettings}
         config={config}
         onSaveConfig={handleUpdateConfig}
+        onOpenTestPlan={handleOpenTestPlan}
       />
 
       {/* Test Verification Form Modal */}
       <TestPlanModal
         isOpen={isTestPlanOpen}
-        onClose={() => setIsTestPlanOpen(false)}
+        onClose={handleCloseTestPlan}
       />
 
       {/* Session Command Timeline Modal (Ctrl+Shift+H) */}
       <SessionTimelineModal
         isOpen={isTimelineOpen}
-        onClose={() => setIsTimelineOpen(false)}
+        onClose={handleCloseTimeline}
         onRunCommand={handleExecuteCommand}
         theme={config.terminal.theme}
       />
@@ -574,16 +582,14 @@ export function App() {
       {/* Visual Pipeline Builder Modal (Ctrl+Shift+P) */}
       <PipelineBuilderModal
         isOpen={isPipelineBuilderOpen}
-        onClose={() => setIsPipelineBuilderOpen(false)}
+        onClose={handleClosePipelineBuilder}
         onExecute={handleExecuteCommand}
       />
 
       {/* Rich Preview Modal (Markdown / CSV / JSON) */}
       <RichPreviewModal
         isOpen={richPreviewState.isOpen}
-        onClose={() =>
-          setRichPreviewState((prev) => ({ ...prev, isOpen: false }))
-        }
+        onClose={handleCloseRichPreview}
         filePath={richPreviewState.filePath}
         fileName={richPreviewState.fileName}
         content={richPreviewState.content}

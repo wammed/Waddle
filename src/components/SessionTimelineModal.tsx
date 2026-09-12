@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { SessionCommandRecord } from '../types';
 import { sessionHistory } from '../services/sessionHistory';
+import { useI18n } from '../i18n';
 
 interface SessionTimelineModalProps {
   isOpen: boolean;
@@ -28,6 +29,8 @@ export const SessionTimelineModal: React.FC<SessionTimelineModalProps> = ({
   onClose,
   onRunCommand,
 }) => {
+  const { language } = useI18n();
+  const isJa = language === 'ja';
   const [records, setRecords] = useState<SessionCommandRecord[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'success' | 'error'>('all');
@@ -155,10 +158,10 @@ export const SessionTimelineModal: React.FC<SessionTimelineModalProps> = ({
             <History size={20} color="#89b4fa" />
             <div>
               <div style={{ fontWeight: 600, fontSize: '15px', color: '#cdd6f4' }}>
-                セッション タイムトラベル (Session Timeline)
+                {isJa ? 'セッション タイムトラベル (Session Timeline)' : 'Session Command Timeline'}
               </div>
               <div style={{ fontSize: '11px', color: '#a6adc8' }}>
-                過去に実行したコマンドの履歴・実行結果・ワンクリック再実行
+                {isJa ? '過去に実行したコマンドの履歴・実行結果・ワンクリック再実行' : 'Track command history, status, and 1-click re-execution'}
               </div>
             </div>
           </div>
@@ -180,7 +183,7 @@ export const SessionTimelineModal: React.FC<SessionTimelineModalProps> = ({
                 }}
               >
                 <Trash2 size={12} />
-                全履歴クリア
+                {isJa ? '全履歴クリア' : 'Clear History'}
               </button>
             )}
             <button
@@ -226,7 +229,7 @@ export const SessionTimelineModal: React.FC<SessionTimelineModalProps> = ({
             />
             <input
               type="text"
-              placeholder="コマンド名・ディレクトリ・出力から検索..."
+              placeholder={isJa ? 'コマンド名・ディレクトリ・出力から検索...' : 'Search command, directory, output...'}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               style={{
@@ -260,10 +263,10 @@ export const SessionTimelineModal: React.FC<SessionTimelineModalProps> = ({
                 }}
               >
                 {st === 'all'
-                  ? 'すべて'
+                  ? (isJa ? 'すべて' : 'All')
                   : st === 'success'
-                  ? '✓ 成功 (0)'
-                  : '✗ エラー (≠0)'}
+                  ? (isJa ? '✓ 成功 (0)' : '✓ Success (0)')
+                  : (isJa ? '✗ エラー (≠0)' : '✗ Error (≠0)')}
               </button>
             ))}
           </div>
@@ -289,7 +292,9 @@ export const SessionTimelineModal: React.FC<SessionTimelineModalProps> = ({
                 fontSize: '13px',
               }}
             >
-              {searchQuery ? '一致するコマンドが見つかりませんでした' : '実行履歴がまだありません'}
+              {searchQuery
+                ? (isJa ? '一致するコマンドが見つかりませんでした' : 'No matching commands found')
+                : (isJa ? '実行履歴がまだありません' : 'No command history yet')}
             </div>
           ) : (
             filteredRecords.map((rec) => {
@@ -413,7 +418,7 @@ export const SessionTimelineModal: React.FC<SessionTimelineModalProps> = ({
 
                       <button
                         onClick={() => handleCopy(rec.id, rec.command)}
-                        title="コマンドをコピー"
+                        title={isJa ? 'コマンドをコピー' : 'Copy command'}
                         style={{
                           background: 'transparent',
                           border: '1px solid #313244',
@@ -434,7 +439,7 @@ export const SessionTimelineModal: React.FC<SessionTimelineModalProps> = ({
                           onRunCommand(rec.command);
                           onClose();
                         }}
-                        title="ターミナルで再実行"
+                        title={isJa ? 'ターミナルで再実行' : 'Re-run in terminal'}
                         style={{
                           background: 'rgba(137, 180, 250, 0.15)',
                           border: '1px solid rgba(137, 180, 250, 0.3)',
@@ -450,7 +455,7 @@ export const SessionTimelineModal: React.FC<SessionTimelineModalProps> = ({
                         }}
                       >
                         <Play size={10} />
-                        再実行
+                        {isJa ? '再実行' : 'Re-run'}
                       </button>
                     </div>
                   </div>
@@ -497,7 +502,9 @@ export const SessionTimelineModal: React.FC<SessionTimelineModalProps> = ({
                         }}
                       >
                         {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-                        {isExpanded ? '出力を閉じる' : '出力プレビュー'}
+                        {isExpanded
+                          ? (isJa ? '出力を閉じる' : 'Hide output')
+                          : (isJa ? '出力プレビュー' : 'Output preview')}
                       </button>
                     )}
                   </div>

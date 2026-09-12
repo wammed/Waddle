@@ -17,6 +17,7 @@ import {
   GitBranch,
   ShieldCheck,
   Zap,
+  ClipboardCheck,
 } from 'lucide-react';
 import { AppConfig, Language, OllamaStatus } from '../types';
 import { THEMES } from '../theme';
@@ -28,6 +29,7 @@ interface SettingsModalProps {
   onClose: () => void;
   config: AppConfig;
   onSaveConfig: (newConfig: AppConfig) => void;
+  onOpenTestPlan?: () => void;
 }
 
 const inputStyle: React.CSSProperties = {
@@ -86,6 +88,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onClose,
   config,
   onSaveConfig,
+  onOpenTestPlan,
 }) => {
   const { t: globalT } = useI18n();
   const [formData, setFormData] = useState<AppConfig>({ ...config });
@@ -100,17 +103,25 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [isDraggingOver, setIsDraggingOver] = useState<boolean>(false);
   const [isCustomFont, setIsCustomFont] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const prevIsOpenRef = useRef(false);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   const fetchOllamaStatus = async (endpoint?: string) => {
     setIsCheckingOllama(true);
     try {
       const status = await TauriApi.checkOllamaStatus(endpoint || formData.ai.ollama_endpoint);
       setOllamaStatus(status);
-      if (status.models.length > 0 && (!formData.ai.ollama_model || !status.models.includes(formData.ai.ollama_model))) {
-        setFormData((prev) => ({
-          ...prev,
-          ai: { ...prev.ai, ollama_model: status.models[0] },
-        }));
+      if (status.models.length > 0) {
+        setFormData((prev) => {
+          if (!prev.ai.ollama_model || !status.models.includes(prev.ai.ollama_model)) {
+            return {
+              ...prev,
+              ai: { ...prev.ai, ollama_model: status.models[0] },
+            };
+          }
+          return prev;
+        });
       }
     } catch (err) {
       console.warn('Ollama status check error:', err);
@@ -119,13 +130,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
+  // Only initialize form data when modal transitions from closed to open
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && !prevIsOpenRef.current) {
       setFormData({ ...config });
       setWallpaperError(null);
       setIsDraggingOver(false);
       fetchOllamaStatus(config.ai.ollama_endpoint);
-      const isKnownPreset = getFontOptions(selectedLang).some((f) => f.value === config.terminal.font_family);
+      const initialLang = config.general?.language || 'en-US';
+      const isKnownPreset = getFontOptions(initialLang).some((f) => f.value === config.terminal.font_family);
       setIsCustomFont(!isKnownPreset && config.terminal.font_family !== 'custom');
 
       // Initialize background image state
@@ -140,17 +153,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         setBgMode('custom');
         setCustomBgPath(bg);
       }
-
-      const handleKeyDown = (e: KeyboardEvent) => {
-        if (e.key === 'Escape') {
-          e.preventDefault();
-          onClose();
-        }
-      };
-      window.addEventListener('keydown', handleKeyDown);
-      return () => window.removeEventListener('keydown', handleKeyDown);
     }
-  }, [isOpen, onClose]);
+    prevIsOpenRef.current = isOpen;
+  }, [isOpen, config]);
+
+  // Keydown Escape handler decoupled from form data lifecycle
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onCloseRef.current();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -264,12 +282,31 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       if (formData.terminal.background_image && bgMode === 'custom') {
         await TauriApi.validateWallpaperPath(formData.terminal.background_image);
       }
-      await TauriApi.saveConfig(formData);
-      onSaveConfig(formData);
+      const sanitizedConfig: AppConfig = {
+        ...formData,
+        general: {
+          ...formData.general,
+          language: formData.general?.language || 'en-US',
+        },
+        terminal: {
+          ...formData.terminal,
+          font_size: Math.max(10, Math.min(32, formData.terminal.font_size || 14)),
+        },
+        kitty_graphics: formData.kitty_graphics
+          ? {
+              ...formData.kitty_graphics,
+              max_dimension: Math.max(1024, Math.min(8192, formData.kitty_graphics.max_dimension || 4096)),
+              max_payload_mb: Math.max(4, Math.min(64, formData.kitty_graphics.max_payload_mb || 16)),
+              cache_limit_mb: Math.max(64, Math.min(1024, formData.kitty_graphics.cache_limit_mb || 256)),
+            }
+          : undefined,
+      };
+      await TauriApi.saveConfig(sanitizedConfig);
+      onSaveConfig(sanitizedConfig);
       setSavedSuccess(true);
       setTimeout(() => {
         setSavedSuccess(false);
-        onClose();
+        onCloseRef.current();
       }, 700);
     } catch (err: any) {
       console.error('Failed to save config:', err);
@@ -315,15 +352,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 className="form-select"
                 style={inputStyle}
                 value={selectedLang}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
+                onChange={(e) => {
+                  const newLang = e.target.value as Language;
+                  setFormData((prev) => ({
+                    ...prev,
                     general: {
-                      ...formData.general,
-                      language: e.target.value as Language,
+                      ...prev.general,
+                      language: newLang,
                     },
-                  })
-                }
+                  }));
+                }}
               >
                 <option value="en-US" style={{ background: '#181e2e', color: '#f8fafc' }}>
                   {t.settings.languages.enUS}
@@ -360,28 +398,25 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 {ollamaStatus?.available ? (
-                  <CheckCircle2 size={16} color="#10b981" />
+                  <CheckCircle2 size={16} style={{ color: '#10b981' }} />
                 ) : (
-                  <AlertCircle size={16} color="#f43f5e" />
+                  <AlertCircle size={16} style={{ color: '#f43f5e' }} />
                 )}
                 <div>
-                  {ollamaStatus?.available ? (
-                    <span style={{ color: '#34d399', fontWeight: 600 }}>
-                      {t.settings.ollamaConnected(ollamaStatus.version || '0.x', ollamaStatus.models.length)}
-                    </span>
-                  ) : (
-                    <span style={{ color: '#fda4af', fontWeight: 600 }}>
-                      {t.settings.ollamaDisconnected}
-                    </span>
-                  )}
+                  <div style={{ fontWeight: 600, color: '#f8fafc' }}>
+                    {ollamaStatus?.available
+                      ? t.settings.ollamaConnected(ollamaStatus.version || '0.x', ollamaStatus.models.length)
+                      : t.settings.ollamaDisconnected}
+                  </div>
                 </div>
               </div>
 
               <button
-                className="btn-secondary"
-                style={{ padding: '4px 10px', fontSize: '11px', background: '#1b2234', color: '#f8fafc' }}
-                onClick={() => fetchOllamaStatus(formData.ai.ollama_endpoint)}
+                type="button"
+                onClick={() => fetchOllamaStatus()}
                 disabled={isCheckingOllama}
+                className="btn-secondary"
+                style={{ padding: '6px 10px', fontSize: '12px' }}
               >
                 <RefreshCw size={12} className={isCheckingOllama ? 'animate-spin' : ''} />
                 <span>{t.settings.ollamaRefetch}</span>
@@ -391,9 +426,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             {!ollamaStatus?.available && (
               <div
                 style={{
+                  marginTop: '10px',
+                  padding: '10px 12px',
                   fontSize: '12px',
                   color: '#94a3b8',
-                  padding: '8px 12px',
+                  border: '1px dashed rgba(244, 63, 94, 0.3)',
                   background: 'rgba(0, 0, 0, 0.4)',
                   borderRadius: '6px',
                   lineHeight: 1.6,
@@ -411,12 +448,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 style={inputStyle}
                 placeholder="http://localhost:11434"
                 value={formData.ai.ollama_endpoint}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    ai: { ...formData.ai, ollama_endpoint: e.target.value },
-                  })
-                }
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setFormData((prev) => ({
+                    ...prev,
+                    ai: { ...prev.ai, ollama_endpoint: val },
+                  }));
+                }}
               />
             </div>
 
@@ -460,12 +498,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   className="form-select"
                   style={inputStyle}
                   value={formData.ai.ollama_model}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      ai: { ...formData.ai, ollama_model: e.target.value },
-                    })
-                  }
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setFormData((prev) => ({
+                      ...prev,
+                      ai: { ...prev.ai, ollama_model: val },
+                    }));
+                  }}
                 >
                   {ollamaStatus.models.map((model) => (
                     <option key={model} value={model} style={{ background: '#181e2e', color: '#f8fafc' }}>
@@ -480,12 +519,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   style={inputStyle}
                   placeholder="llama3.2 / deepseek-r1 / qwen2.5-coder"
                   value={formData.ai.ollama_model}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      ai: { ...formData.ai, ollama_model: e.target.value },
-                    })
-                  }
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setFormData((prev) => ({
+                      ...prev,
+                      ai: { ...prev.ai, ollama_model: val },
+                    }));
+                  }}
                 />
               )}
             </div>
@@ -498,12 +538,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 max="1.0"
                 step="0.05"
                 value={formData.ai.temperature}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    ai: { ...formData.ai, temperature: parseFloat(e.target.value) },
-                  })
-                }
+                onChange={(e) => {
+                  const val = parseFloat(e.target.value);
+                  setFormData((prev) => ({
+                    ...prev,
+                    ai: { ...prev.ai, temperature: isNaN(val) ? 0.2 : val },
+                  }));
+                }}
               />
             </div>
 
@@ -532,12 +573,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <input
                   type="checkbox"
                   checked={formData.ai.enable_project_rules ?? true}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      ai: { ...formData.ai, enable_project_rules: e.target.checked },
-                    })
-                  }
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setFormData((prev) => ({
+                      ...prev,
+                      ai: { ...prev.ai, enable_project_rules: checked },
+                    }));
+                  }}
                   style={{ opacity: 0, width: 0, height: 0 }}
                 />
                 <span style={{
@@ -592,12 +634,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     className="form-select"
                     style={inputStyle}
                     value={formData.terminal.theme}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        terminal: { ...formData.terminal, theme: e.target.value },
-                      })
-                    }
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setFormData((prev) => ({
+                        ...prev,
+                        terminal: { ...prev.terminal, theme: val },
+                      }));
+                    }}
                   >
                     <optgroup label={t.settings.neonThemesGroup}>
                       {neonThemes.map((th) => (
@@ -696,14 +739,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 style={inputStyle}
                 value={isCustomFont ? 'custom' : formData.terminal.font_family}
                 onChange={(e) => {
-                  if (e.target.value === 'custom') {
+                  const val = e.target.value;
+                  if (val === 'custom') {
                     setIsCustomFont(true);
                   } else {
                     setIsCustomFont(false);
-                    setFormData({
-                      ...formData,
-                      terminal: { ...formData.terminal, font_family: e.target.value },
-                    });
+                    setFormData((prev) => ({
+                      ...prev,
+                      terminal: { ...prev.terminal, font_family: val },
+                    }));
                   }
                 }}
               >
@@ -721,12 +765,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   style={{ ...inputStyle, marginTop: '6px' }}
                   placeholder={t.settings.customFontPlaceholder}
                   value={formData.terminal.font_family}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      terminal: { ...formData.terminal, font_family: e.target.value },
-                    })
-                  }
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setFormData((prev) => ({
+                      ...prev,
+                      terminal: { ...prev.terminal, font_family: val },
+                    }));
+                  }}
                 />
               )}
 
@@ -760,16 +805,26 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   style={inputStyle}
                   min={10}
                   max={32}
-                  value={formData.terminal.font_size}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
+                  value={formData.terminal.font_size || ''}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value, 10);
+                    setFormData((prev) => ({
+                      ...prev,
                       terminal: {
-                        ...formData.terminal,
-                        font_size: parseInt(e.target.value) || 14,
+                        ...prev.terminal,
+                        font_size: isNaN(val) ? 0 : val,
                       },
-                    })
-                  }
+                    }));
+                  }}
+                  onBlur={() => {
+                    setFormData((prev) => ({
+                      ...prev,
+                      terminal: {
+                        ...prev.terminal,
+                        font_size: Math.max(10, Math.min(32, prev.terminal.font_size || 14)),
+                      },
+                    }));
+                  }}
                 />
               </div>
 
@@ -779,15 +834,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   className="form-select"
                   style={inputStyle}
                   value={formData.terminal.cursor_style}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
+                  onChange={(e) => {
+                    const val = e.target.value as any;
+                    setFormData((prev) => ({
+                      ...prev,
                       terminal: {
-                        ...formData.terminal,
-                        cursor_style: e.target.value as any,
+                        ...prev.terminal,
+                        cursor_style: val,
                       },
-                    })
-                  }
+                    }));
+                  }}
                 >
                   <option value="block" style={{ background: '#181e2e', color: '#f8fafc' }}>{t.settings.cursorBlock}</option>
                   <option value="underline" style={{ background: '#181e2e', color: '#f8fafc' }}>{t.settings.cursorUnderline}</option>
@@ -896,15 +952,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       max="1.0"
                       step="0.05"
                       value={formData.terminal.background_opacity ?? 0.85}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value);
+                        setFormData((prev) => ({
+                          ...prev,
                           terminal: {
-                            ...formData.terminal,
-                            background_opacity: parseFloat(e.target.value),
+                            ...prev.terminal,
+                            background_opacity: isNaN(val) ? 0.85 : val,
                           },
-                        })
-                      }
+                        }));
+                      }}
                     />
                   </div>
 
@@ -918,15 +975,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       max="20"
                       step="1"
                       value={formData.terminal.background_blur ?? 0}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value, 10);
+                        setFormData((prev) => ({
+                          ...prev,
                           terminal: {
-                            ...formData.terminal,
-                            background_blur: parseInt(e.target.value) || 0,
+                            ...prev.terminal,
+                            background_blur: isNaN(val) ? 0 : val,
                           },
-                        })
-                      }
+                        }));
+                      }}
                     />
                   </div>
                 </div>
@@ -958,12 +1016,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <input
                   type="checkbox"
                   checked={formData.terminal.mask_secrets ?? true}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      terminal: { ...formData.terminal, mask_secrets: e.target.checked },
-                    })
-                  }
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setFormData((prev) => ({
+                      ...prev,
+                      terminal: { ...prev.terminal, mask_secrets: checked },
+                    }));
+                  }}
                   style={{ opacity: 0, width: 0, height: 0 }}
                 />
                 <span style={{
@@ -1013,12 +1072,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <input
                   type="checkbox"
                   checked={formData.terminal.watchdog_auto_analyze ?? true}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      terminal: { ...formData.terminal, watchdog_auto_analyze: e.target.checked },
-                    })
-                  }
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setFormData((prev) => ({
+                      ...prev,
+                      terminal: { ...prev.terminal, watchdog_auto_analyze: checked },
+                    }));
+                  }}
                   style={{ opacity: 0, width: 0, height: 0 }}
                 />
                 <span style={{
@@ -1074,15 +1134,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <input
                   type="checkbox"
                   checked={formData.git?.enabled ?? true}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setFormData((prev) => ({
+                      ...prev,
                       git: {
-                        enabled: e.target.checked,
-                        restrict_to_github: formData.git?.restrict_to_github ?? true,
+                        enabled: checked,
+                        restrict_to_github: prev.git?.restrict_to_github ?? true,
                       },
-                    })
-                  }
+                    }));
+                  }}
                   style={{ opacity: 0, width: 0, height: 0 }}
                 />
                 <span style={{
@@ -1130,15 +1191,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <input
                   type="checkbox"
                   checked={formData.git?.restrict_to_github ?? true}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setFormData((prev) => ({
+                      ...prev,
                       git: {
-                        enabled: formData.git?.enabled ?? true,
-                        restrict_to_github: e.target.checked,
+                        enabled: prev.git?.enabled ?? true,
+                        restrict_to_github: checked,
                       },
-                    })
-                  }
+                    }));
+                  }}
                   style={{ opacity: 0, width: 0, height: 0 }}
                 />
                 <span style={{
@@ -1195,18 +1257,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   type="checkbox"
                   id="toggle-kitty-enabled"
                   checked={formData.kitty_graphics?.enabled ?? true}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setFormData((prev) => ({
+                      ...prev,
                       kitty_graphics: {
-                        enabled: e.target.checked,
-                        max_dimension: formData.kitty_graphics?.max_dimension ?? 4096,
-                        max_payload_mb: formData.kitty_graphics?.max_payload_mb ?? 16,
-                        cache_limit_mb: formData.kitty_graphics?.cache_limit_mb ?? 256,
-                        allowed_dir: formData.kitty_graphics?.allowed_dir ?? '$HOME/Pictures',
+                        enabled: checked,
+                        max_dimension: prev.kitty_graphics?.max_dimension ?? 4096,
+                        max_payload_mb: prev.kitty_graphics?.max_payload_mb ?? 16,
+                        cache_limit_mb: prev.kitty_graphics?.cache_limit_mb ?? 256,
+                        allowed_dir: prev.kitty_graphics?.allowed_dir ?? '$HOME/Pictures',
                       },
-                    })
-                  }
+                    }));
+                  }}
                   style={{ opacity: 0, width: 0, height: 0 }}
                 />
                 <span style={{
@@ -1245,19 +1308,32 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   min={1024}
                   max={8192}
                   step={512}
-                  value={formData.kitty_graphics?.max_dimension ?? 4096}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
+                  value={formData.kitty_graphics?.max_dimension || ''}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value, 10);
+                    setFormData((prev) => ({
+                      ...prev,
                       kitty_graphics: {
-                        enabled: formData.kitty_graphics?.enabled ?? true,
-                        max_dimension: Math.max(1024, Math.min(8192, parseInt(e.target.value) || 4096)),
-                        max_payload_mb: formData.kitty_graphics?.max_payload_mb ?? 16,
-                        cache_limit_mb: formData.kitty_graphics?.cache_limit_mb ?? 256,
-                        allowed_dir: formData.kitty_graphics?.allowed_dir ?? '$HOME/Pictures',
+                        enabled: prev.kitty_graphics?.enabled ?? true,
+                        max_dimension: isNaN(val) ? 0 : val,
+                        max_payload_mb: prev.kitty_graphics?.max_payload_mb ?? 16,
+                        cache_limit_mb: prev.kitty_graphics?.cache_limit_mb ?? 256,
+                        allowed_dir: prev.kitty_graphics?.allowed_dir ?? '$HOME/Pictures',
                       },
-                    })
-                  }
+                    }));
+                  }}
+                  onBlur={() => {
+                    setFormData((prev) => ({
+                      ...prev,
+                      kitty_graphics: {
+                        enabled: prev.kitty_graphics?.enabled ?? true,
+                        max_dimension: Math.max(1024, Math.min(8192, prev.kitty_graphics?.max_dimension || 4096)),
+                        max_payload_mb: prev.kitty_graphics?.max_payload_mb ?? 16,
+                        cache_limit_mb: prev.kitty_graphics?.cache_limit_mb ?? 256,
+                        allowed_dir: prev.kitty_graphics?.allowed_dir ?? '$HOME/Pictures',
+                      },
+                    }));
+                  }}
                 />
               </div>
 
@@ -1273,19 +1349,32 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   min={4}
                   max={64}
                   step={4}
-                  value={formData.kitty_graphics?.max_payload_mb ?? 16}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
+                  value={formData.kitty_graphics?.max_payload_mb || ''}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value, 10);
+                    setFormData((prev) => ({
+                      ...prev,
                       kitty_graphics: {
-                        enabled: formData.kitty_graphics?.enabled ?? true,
-                        max_dimension: formData.kitty_graphics?.max_dimension ?? 4096,
-                        max_payload_mb: Math.max(4, Math.min(64, parseInt(e.target.value) || 16)),
-                        cache_limit_mb: formData.kitty_graphics?.cache_limit_mb ?? 256,
-                        allowed_dir: formData.kitty_graphics?.allowed_dir ?? '$HOME/Pictures',
+                        enabled: prev.kitty_graphics?.enabled ?? true,
+                        max_dimension: prev.kitty_graphics?.max_dimension ?? 4096,
+                        max_payload_mb: isNaN(val) ? 0 : val,
+                        cache_limit_mb: prev.kitty_graphics?.cache_limit_mb ?? 256,
+                        allowed_dir: prev.kitty_graphics?.allowed_dir ?? '$HOME/Pictures',
                       },
-                    })
-                  }
+                    }));
+                  }}
+                  onBlur={() => {
+                    setFormData((prev) => ({
+                      ...prev,
+                      kitty_graphics: {
+                        enabled: prev.kitty_graphics?.enabled ?? true,
+                        max_dimension: prev.kitty_graphics?.max_dimension ?? 4096,
+                        max_payload_mb: Math.max(4, Math.min(64, prev.kitty_graphics?.max_payload_mb || 16)),
+                        cache_limit_mb: prev.kitty_graphics?.cache_limit_mb ?? 256,
+                        allowed_dir: prev.kitty_graphics?.allowed_dir ?? '$HOME/Pictures',
+                      },
+                    }));
+                  }}
                 />
               </div>
 
@@ -1301,19 +1390,32 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   min={64}
                   max={1024}
                   step={64}
-                  value={formData.kitty_graphics?.cache_limit_mb ?? 256}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
+                  value={formData.kitty_graphics?.cache_limit_mb || ''}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value, 10);
+                    setFormData((prev) => ({
+                      ...prev,
                       kitty_graphics: {
-                        enabled: formData.kitty_graphics?.enabled ?? true,
-                        max_dimension: formData.kitty_graphics?.max_dimension ?? 4096,
-                        max_payload_mb: formData.kitty_graphics?.max_payload_mb ?? 16,
-                        cache_limit_mb: Math.max(64, Math.min(1024, parseInt(e.target.value) || 256)),
-                        allowed_dir: formData.kitty_graphics?.allowed_dir ?? '$HOME/Pictures',
+                        enabled: prev.kitty_graphics?.enabled ?? true,
+                        max_dimension: prev.kitty_graphics?.max_dimension ?? 4096,
+                        max_payload_mb: prev.kitty_graphics?.max_payload_mb ?? 16,
+                        cache_limit_mb: isNaN(val) ? 0 : val,
+                        allowed_dir: prev.kitty_graphics?.allowed_dir ?? '$HOME/Pictures',
                       },
-                    })
-                  }
+                    }));
+                  }}
+                  onBlur={() => {
+                    setFormData((prev) => ({
+                      ...prev,
+                      kitty_graphics: {
+                        enabled: prev.kitty_graphics?.enabled ?? true,
+                        max_dimension: prev.kitty_graphics?.max_dimension ?? 4096,
+                        max_payload_mb: prev.kitty_graphics?.max_payload_mb ?? 16,
+                        cache_limit_mb: Math.max(64, Math.min(1024, prev.kitty_graphics?.cache_limit_mb || 256)),
+                        allowed_dir: prev.kitty_graphics?.allowed_dir ?? '$HOME/Pictures',
+                      },
+                    }));
+                  }}
                 />
               </div>
             </div>
@@ -1330,34 +1432,35 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   style={inputStyle}
                   placeholder="$HOME/Pictures"
                   value={formData.kitty_graphics?.allowed_dir ?? '$HOME/Pictures'}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setFormData((prev) => ({
+                      ...prev,
                       kitty_graphics: {
-                        enabled: formData.kitty_graphics?.enabled ?? true,
-                        max_dimension: formData.kitty_graphics?.max_dimension ?? 4096,
-                        max_payload_mb: formData.kitty_graphics?.max_payload_mb ?? 16,
-                        cache_limit_mb: formData.kitty_graphics?.cache_limit_mb ?? 256,
-                        allowed_dir: e.target.value,
+                        enabled: prev.kitty_graphics?.enabled ?? true,
+                        max_dimension: prev.kitty_graphics?.max_dimension ?? 4096,
+                        max_payload_mb: prev.kitty_graphics?.max_payload_mb ?? 16,
+                        cache_limit_mb: prev.kitty_graphics?.cache_limit_mb ?? 256,
+                        allowed_dir: val,
                       },
-                    })
-                  }
+                    }));
+                  }}
                 />
                 <button
                   type="button"
                   className="btn-secondary"
                   style={{ padding: '6px 10px', fontSize: '11px', whiteSpace: 'nowrap', background: '#1b2234', color: '#f8fafc' }}
                   onClick={() =>
-                    setFormData({
-                      ...formData,
+                    setFormData((prev) => ({
+                      ...prev,
                       kitty_graphics: {
-                        enabled: formData.kitty_graphics?.enabled ?? true,
-                        max_dimension: formData.kitty_graphics?.max_dimension ?? 4096,
-                        max_payload_mb: formData.kitty_graphics?.max_payload_mb ?? 16,
-                        cache_limit_mb: formData.kitty_graphics?.cache_limit_mb ?? 256,
+                        enabled: prev.kitty_graphics?.enabled ?? true,
+                        max_dimension: prev.kitty_graphics?.max_dimension ?? 4096,
+                        max_payload_mb: prev.kitty_graphics?.max_payload_mb ?? 16,
+                        cache_limit_mb: prev.kitty_graphics?.cache_limit_mb ?? 256,
                         allowed_dir: '$HOME/Pictures',
                       },
-                    })
+                    }))
                   }
                 >
                   {t.common.clear || 'Reset'}
@@ -1403,6 +1506,66 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               )}
             </div>
           </div>
+
+          {/* Quality Assurance & Test Verification Section */}
+          {onOpenTestPlan && (
+            <div className="settings-section">
+              <div className="section-title">
+                <ClipboardCheck size={14} style={{ display: 'inline', marginRight: 6, color: '#00f0ff' }} />
+                {t.settings.testPlanSectionTitle}
+              </div>
+
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '14px 16px',
+                  background: 'linear-gradient(135deg, rgba(0, 240, 255, 0.06), rgba(56, 189, 248, 0.04))',
+                  border: '1px solid rgba(0, 240, 255, 0.25)',
+                  borderRadius: '8px',
+                  marginTop: '6px',
+                }}
+              >
+                <div style={{ paddingRight: '16px' }}>
+                  <div style={{ fontSize: '13px', fontWeight: 600, color: '#f8fafc', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>{t.settings.testPlanCardTitle}</span>
+                    <span style={{ fontSize: '10px', background: 'rgba(0, 240, 255, 0.2)', color: '#00f0ff', padding: '1px 6px', borderRadius: '4px', fontWeight: 700 }}>
+                      81 Tests
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#94a3b8', lineHeight: 1.5 }}>
+                    {t.settings.testPlanCardDesc}
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  id="btn-open-test-plan-from-settings"
+                  className="btn-secondary"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '8px 14px',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    whiteSpace: 'nowrap',
+                    background: 'rgba(0, 240, 255, 0.12)',
+                    border: '1px solid rgba(0, 240, 255, 0.4)',
+                    color: '#00f0ff',
+                    cursor: 'pointer',
+                    borderRadius: '6px',
+                    transition: 'all 0.2s ease',
+                  }}
+                  onClick={onOpenTestPlan}
+                >
+                  <ClipboardCheck size={14} />
+                  <span>{t.settings.testPlanBtn}</span>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="modal-footer" style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>

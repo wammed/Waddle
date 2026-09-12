@@ -154,6 +154,27 @@
     - **Zlib / Deflate 圧縮展開 (`o=z`) の実装**: Fastfetch が送信する zlib 圧縮 RGBA ペイロード（`o=z`）を Web Standard `DecompressionStream('deflate')`（および `'deflate-raw'` フォールバック）でストリーミング展開するデコーダーを `src/services/kittyGraphics/decoder.ts` に実装。Decompression Bomb 対策として累積展開サイズが `maxPayloadBytes`（16MB）を超過した場合は即座に `reader.cancel()` して `EBADMSG` を送出。
     - **包括的テストケース追加**: `docs/TEST_PLAN.md`, `docs/TEST_PLAN.ja.md`, `src/data/testPlanData.ts` に `TC-KITTY-15`（プロトコル機能問い合わせ & 0ms 即時クエリ応答）を追加（全81項目へ拡充）。
     - **単体テスト & リリースビルド**: Rust 単体テスト全 36 件すべてパス（PTY 迎撃テスト 6 件追加）、`cargo clippy` 警告 0 件、`npm run build` エラー 0 件。本番バイナリを `/home/susie/.local/bin/waddle` へ `install -m 755` で正常配備。
+28. **設定画面 (`SettingsModal`) の入力状態初期化競合・言語選択リセット・数値クランプ問題の解消**:
+    - **原因究明**: WebKitGTK 環境下でセレクトボックス操作やウィンドウフォーカス変更に伴い `fetchCwdAndGit()` / `onUpdatePaneRef.current` が発火し、親コンポーネント（`App`）が再レンダリングされていた。`App.tsx` 内でモーダルに渡す `onClose={() => setIsSettingsOpen(false)}` が毎レンダリングごとに新しい参照を生成していたため、`SettingsModal` 内の `useEffect([isOpen, onClose])` がトリガーされ、ユーザーが言語や入力項目を変更するたびに `setFormData({ ...config })` によって初期値（日本語等）へ即座に巻き戻っていた。また Kitty Graphics 等の数値入力欄において `onChange` 内で `Math.max` を即時適用していたため、中間入力（例: 2048 入力時の 2）が最小値（1024）に即時クランプされ自由に入力できなかった。
+    - **改修内容**:
+      - `App.tsx`: 各種モーダル閉じるコールバック（`handleCloseSettings`, `handleCloseAiCommand`, `handleCloseTestPlan`, etc.）を `useCallback` で完全にメモ化。
+      - `SettingsModal.tsx`:
+        - `prevIsOpenRef` を導入し、モーダルが開いた瞬間（`isOpen && !prevIsOpenRef.current`）のみ `config` から `formData` を初期化するライフサイクルガードを確立。親の再描画によるフォーム入力の上書き・リセットを完全遮断。
+        - `Escape` キー監視をフォーム初期化から分離。
+        - 言語選択、Ollama設定、フォント、フォントサイズ、カーソルスタイル、背景画像・透過度・ブラー、シークレットマスキング、自律監視、Git連携、Kitty Graphics設定の全入力ハンドラを関数型更新（`setFormData(prev => ...)`）に統一。
+        - 数値入力欄（フォントサイズ、Kitty解像度・ペイロード・キャッシュ容量）の最小/最大値クランプを `onChange` から `onBlur` および `handleSave` 時へ遅延させ、タイピングやバックスペースを自由に行えるよう改善。
+        - 保存ボタン押下時、選択言語（`general.language`）を含む設定を正しくサニタイズしてディスク永続化し、`I18nProvider` 経由で UI 言語へ即時反映。
+      - `TitleBar.tsx` / `translations.ts`: タイトルバー右側の「パイプ」「履歴」ボタンのハードコードを解消し、`pipeline`, `pipelineTooltip`, `timeline`, `timelineTooltip` を `en-US`, `en-GB`, `ja` の翻訳辞書に追加して言語設定変更時に即座に「Pipeline」「Timeline」へ切り替わるよう完全多言語同期。さらに `SessionTimelineModal.tsx`, `PipelineBuilderModal.tsx` も `useI18n` に対応。
+    - **検証**: `npm run build`（型検査 0 エラー）、`cargo test`（36件全パス）、`npm run tauri build`（配備完了）。
+29. **テスト検証（Test Plan）ボタンのタイトルバーからの削除と設定画面への移設**:
+    - **ユーザー要望**: 「タイトルバー右側のテスト検証（Test Plan)のボタンを削除して代わりに設定画面からテスト入力フォームを開けるようにして」に基づき実施。
+    - **タイトルバー (`TitleBar.tsx`)**: 右側アクションボタン群から `#btn-test-plan` および `ClipboardCheck` アイコンを削除。`TitleBarProps` から不要となった `onOpenTestPlan` を除外してタイトルバーをスマートに整理。
+    - **設定画面 (`SettingsModal.tsx`)**:
+      - Kitty Graphics セクション下部に「品質検証・テスト計画 (QA & Testing)」セクションを新設。
+      - シアンハイライトの専用カード内に「包括的検証テスト入力フォーム」の概要説明、全81件のテストバッジ、および「テスト入力フォームを開く」ボタン（`#btn-open-test-plan-from-settings`）を配置。
+    - **多言語対応 (`src/i18n/translations.ts`)**: `testPlanSectionTitle`, `testPlanCardTitle`, `testPlanCardDesc`, `testPlanBtn` のキーを追加し、`en-US`, `en-GB`, `ja` で完全ローカライズ。
+    - **モーダル連携 (`App.tsx`)**: `handleOpenTestPlan` をメモ化して `SettingsModal` に渡すことで、ポータル（`zIndex: 9999`）経由で `TestPlanModal` が設定画面の上にスムーズに開く設計を確立。検証フォームを閉じても設定画面の入力状態は安全に保持。
+    - **検証**: `npm run build`、`cargo test`（全36件パス）、`npm run tauri build` 完了、`~/.local/bin/waddle` へ再配備完了。
 
 ---
 

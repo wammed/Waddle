@@ -13,7 +13,6 @@ import {
   LayoutGrid,
   Square,
   RotateCcw,
-  ClipboardCheck,
   History,
   SlidersHorizontal,
 } from 'lucide-react';
@@ -40,7 +39,6 @@ interface TitleBarProps {
   isFileTreeOpen: boolean;
   onToggleFileTree: () => void;
   onRefreshAll: () => void;
-  onOpenTestPlan: () => void;
   onOpenTimeline?: () => void;
   onOpenPipelineBuilder?: () => void;
 }
@@ -62,7 +60,6 @@ export const TitleBar: React.FC<TitleBarProps> = ({
   isFileTreeOpen,
   onToggleFileTree,
   onRefreshAll,
-  onOpenTestPlan,
   onOpenTimeline,
   onOpenPipelineBuilder,
 }) => {
@@ -207,25 +204,15 @@ export const TitleBar: React.FC<TitleBarProps> = ({
           <span>{t.titleBar.refreshAll}</span>
         </button>
 
-        <button
-          id="btn-test-plan"
-          className="action-btn"
-          onClick={onOpenTestPlan}
-          title={t.titleBar.testPlanTooltip}
-        >
-          <ClipboardCheck size={14} color="#00f0ff" />
-          <span>{t.titleBar.testPlan}</span>
-        </button>
-
         {onOpenPipelineBuilder && (
           <button
             id="btn-pipeline-builder"
             className="action-btn"
             onClick={onOpenPipelineBuilder}
-            title="パイプライン ビルダー (Ctrl+Shift+P)"
+            title={t.titleBar.pipelineTooltip}
           >
             <SlidersHorizontal size={14} color="#a6e3a1" />
-            <span>パイプ</span>
+            <span>{t.titleBar.pipeline}</span>
           </button>
         )}
 
@@ -234,10 +221,10 @@ export const TitleBar: React.FC<TitleBarProps> = ({
             id="btn-session-timeline"
             className="action-btn"
             onClick={onOpenTimeline}
-            title="セッション タイムライン (Ctrl+Shift+H)"
+            title={t.titleBar.timelineTooltip}
           >
             <History size={14} color="#89b4fa" />
-            <span>履歴</span>
+            <span>{t.titleBar.timeline}</span>
           </button>
         )}
 

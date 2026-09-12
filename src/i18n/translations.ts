@@ -38,6 +38,10 @@ export interface Translations {
     refreshAllTooltip: string;
     testPlan: string;
     testPlanTooltip: string;
+    pipeline: string;
+    pipelineTooltip: string;
+    timeline: string;
+    timelineTooltip: string;
     refreshModalTitle: string;
     refreshModalDesc: string;
     refreshModalBulletTabs: string;
@@ -258,6 +262,10 @@ export interface Translations {
     kittyAllowedDirLabel: string;
     kittyAllowedDirDesc: string;
     kittyAllowedDirWarning: string;
+    testPlanSectionTitle: string;
+    testPlanCardTitle: string;
+    testPlanCardDesc: string;
+    testPlanBtn: string;
   };
   errorBoundary: {
     fallbackTitle: string;
@@ -319,6 +327,10 @@ export const translations: Record<Language, Translations> = {
       refreshAllTooltip: 'Refresh workspace (tabs, panes, directory)',
       testPlan: 'Test Plan',
       testPlanTooltip: 'Open Comprehensive Test Verification Form',
+      pipeline: 'Pipeline',
+      pipelineTooltip: 'Visual Pipeline Builder (Ctrl+Shift+P)',
+      timeline: 'Timeline',
+      timelineTooltip: 'Session Command Timeline (Ctrl+Shift+H)',
       refreshModalTitle: 'Reset Entire Workspace?',
       refreshModalDesc: 'This will close all open tabs and split panes, terminate running processes, clear saved session state, and return to a fresh terminal in your home directory.',
       refreshModalBulletTabs: 'Close all tabs and split panes',
@@ -540,6 +552,10 @@ export const translations: Record<Language, Translations> = {
       kittyAllowedDirLabel: 'Allowed Local Image Directory (Sandbox)',
       kittyAllowedDirDesc: 'Strict sandbox for local file references (t=f). Only files inside this path and subdirectories can be read (default: $HOME/Pictures).',
       kittyAllowedDirWarning: 'System-critical directory detected! File access outside safe sandbox paths will be blocked.',
+      testPlanSectionTitle: 'Quality Assurance & Test Plan',
+      testPlanCardTitle: 'Interactive Test Verification Form',
+      testPlanCardDesc: 'Run, verify, and document all 81 automated and manual test cases covering PTY, splits, AI, Git, Kitty Graphics, and security controls.',
+      testPlanBtn: 'Open Test Form',
     },
     errorBoundary: {
       fallbackTitle: 'An error occurred in the component',
@@ -600,6 +616,10 @@ export const translations: Record<Language, Translations> = {
       refreshAllTooltip: 'Refresh workspace (tabs, panes, directory)',
       testPlan: 'Test Plan',
       testPlanTooltip: 'Open Comprehensive Test Verification Form',
+      pipeline: 'Pipeline',
+      pipelineTooltip: 'Visual Pipeline Builder (Ctrl+Shift+P)',
+      timeline: 'Timeline',
+      timelineTooltip: 'Session Command Timeline (Ctrl+Shift+H)',
       refreshModalTitle: 'Reset Entire Workspace?',
       refreshModalDesc: 'This will close all open tabs and split panes, terminate running processes, clear saved session state, and return to a fresh terminal in your home directory.',
       refreshModalBulletTabs: 'Close all tabs and split panes',
@@ -821,6 +841,10 @@ export const translations: Record<Language, Translations> = {
       kittyAllowedDirLabel: 'Allowed Local Image Directory (Sandbox)',
       kittyAllowedDirDesc: 'Strict sandbox for local file references (t=f). Only files inside this path and subdirectories can be read (default: $HOME/Pictures).',
       kittyAllowedDirWarning: 'System-critical directory detected! File access outside safe sandbox paths will be blocked.',
+      testPlanSectionTitle: 'Quality Assurance & Test Plan',
+      testPlanCardTitle: 'Interactive Test Verification Form',
+      testPlanCardDesc: 'Run, verify, and document all 81 automated and manual test cases covering PTY, splits, AI, Git, Kitty Graphics, and security controls.',
+      testPlanBtn: 'Open Test Form',
     },
     errorBoundary: {
       fallbackTitle: 'An error occurred in the component',
@@ -881,6 +905,10 @@ export const translations: Record<Language, Translations> = {
       refreshAllTooltip: '全タブ・ペイン・作業ディレクトリを初期状態にリフレッシュ',
       testPlan: 'テスト検証',
       testPlanTooltip: '包括的検証テスト入力フォームを開く',
+      pipeline: 'パイプ',
+      pipelineTooltip: 'パイプライン ビルダー (Ctrl+Shift+P)',
+      timeline: '履歴',
+      timelineTooltip: 'セッション タイムライン (Ctrl+Shift+H)',
       refreshModalTitle: 'ワークスペース全体をリフレッシュしますか？',
       refreshModalDesc: '開いているすべてのタブと分割ペインを閉じ、実行中のプロセスを終了して、セッション保存状態をクリアし、ホームディレクトリの新規単一ターミナルに戻します。',
       refreshModalBulletTabs: 'すべてのタブと分割ペインを閉じる',
@@ -1102,6 +1130,10 @@ export const translations: Record<Language, Translations> = {
       kittyAllowedDirLabel: 'ローカル画像読み取り許可ディレクトリ (Sandbox)',
       kittyAllowedDirDesc: 'ローカルファイル直接参照 (t=f) に対する厳格なサンドボックスです。このパス配下のファイルのみ参照可能（初期値: $HOME/Pictures）。../ 脱出やシンボリックリンク経由の脱出は遮断されます。',
       kittyAllowedDirWarning: 'システム重要ディレクトリが指定されています。セキュリティ保護のためサンドボックス外へのアクセスは遮断されます。',
+      testPlanSectionTitle: '品質検証・テスト計画 (QA & Testing)',
+      testPlanCardTitle: '包括的検証テスト入力フォーム',
+      testPlanCardDesc: 'PTY基盤、画面分割、AI、Git、Kitty画像プロトコル、セキュリティ多層防御など全81項目のテストケースの合否判定とエビデンス記録・レポート出力を行えます。',
+      testPlanBtn: 'テスト入力フォームを開く',
     },
     errorBoundary: {
       fallbackTitle: 'コンポーネントでエラーが発生しました',
