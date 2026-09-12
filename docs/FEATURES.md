@@ -299,13 +299,23 @@ Welcome to the comprehensive feature guide for **Waddle**, the AI-integrated, pr
   - State machine parser handles `\x1b_G<control_keys>;<payload>\x1b\` and `\x07` sequences.
   - Strips megabytes of Base64 graphics data from the PTY stream before reaching `@xterm/xterm`, preventing terminal freezing or DEC parser degradation.
   - Chunked transfer support: smoothly reassembles multi-chunk transmissions (`m=1` followed by `m=0`).
-  - Handshake & Query support (`a=q`): immediately answers protocol detection queries with `\x1b_Gi=<id>;OK\x1b\` without terminal stutter.
+  - **Zero-Latency (0ms) PTY Capability Probe Handshake (`a=q`)**:
+    - Rust PTY background reader directly intercepts capability queries (`\x1b_Gi=1,s=1,v=1,a=q;\x1b\` or any sequence with `a=q`) and writes `\x1b_Gi=<id>;ok\x1b\` back to child stdin with 0ms latency.
+    - Eliminates query timeout issues in CLI tools (`fastfetch`, `chafa`, `timg`), ensuring tools never fall back to ASCII art.
+    - Strips capability query sequences from terminal output before reaching frontend xterm.
+    - PTY window size handling (`TIOCGWINSZ`) reports non-zero cell pixel dimensions (`cols * 9`, `rows * 18`) so CLI font dimension detection (`getCharacterPixelDimensions()`) succeeds.
+  - Diagnostic logging: all incoming `\x1b_G` headers are logged on the Rust backend (`println!("[Kitty Graphics] Received header: {}", header)`).
+- **Web Standard zlib / Deflate Decompression (`o=z`)**:
+  - Full support for zlib-compressed payloads (`o=z`), used by tools like `fastfetch` (`"type": "kitty"`) to conserve terminal I/O bandwidth.
+  - Built-in streaming decompression using native `DecompressionStream('deflate')` with fallback to `'deflate-raw'`.
+  - Seamlessly decompresses compressed Base64 RGBA, RGB, or PNG streams before rasterization.
+  - Strictly enforces cumulative decompression bomb limits (`maxPayloadBytes`, default 16 MB) to protect system memory.
 - **Quiet (`q`) Parameter Specification Compliance**:
   - Full compliance with the Kitty Graphics quiet response protocol to prevent PTY escape sequence leakage into the user's shell:
     - `q=0` or omitted: Completely silent. No ACK/NAK or error response is written back to PTY stdin.
     - `q=1`: Errors only. Failures (`EBADMSG`, `ENOENT`, `EACCES`, `EFBIG`) return diagnostic responses; successful operations (`OK`) remain silent.
     - `q=2`: Verbose. Both `OK` and error responses are written back.
-    - Capability query probe (`a=q`): Always sends `\x1b_Gi=<id>;OK\x1b\` regardless of quiet level to ensure proper tool handshake.
+    - Capability query probe (`a=q` with `s=1,v=1`): Always sends `\x1b_Gi=<id>;ok\x1b\` regardless of quiet level to ensure proper tool handshake.
 - **Temporary File Auto-Deletion & Sandboxing (`t=t`)**:
   - CLI/TUI tools (such as Yazi and Neovim) transmit temporary files via `t=t`.
   - Waddle loads the file into memory and immediately unlinks it from disk (`std::fs::remove_file`) before dimension verification, preventing disk space accumulation or resource leaks even if decompression bomb limits fail.

@@ -153,6 +153,7 @@ The Kitty Graphics Protocol subsystem is hardened with multiple layers of sandbo
 ### 2. Decompression Bomb & Resolution Limits
 - **Max Image Dimensions**: Single image resolution is capped at **4096 × 4096 px** by default (configurable between 1024 and 8192 px).
 - **Header Pre-Inspection**: PNG `IHDR` chunk and JPEG `SOF` segments are parsed directly from raw binary headers before full image memory allocation. Oversized images are immediately rejected with `EBADMSG`.
+- **Zlib / Deflate Decompression Guard (`o=z`)**: Compressed payloads are streamed through Web Standard `DecompressionStream` with chunk-by-chunk cumulative byte accounting. If decompressed output exceeds `maxPayloadBytes`, decompression is aborted immediately (`reader.cancel()`) before uncompressed buffers are allocated, preventing zip-bomb memory exhaustion attacks.
 - **Base64 Payload Limit & Parser Buffer Cap**: Cumulative payload for single requests or chunked streams (`m=1`) is capped at **16 MB** (configurable between 4 and 64 MB). In addition, incomplete APC streams lacking terminators (`\x1b\` or `\x07`) are bounded by `maxPayloadBytes` and safely flushed, preventing memory leaks on corrupted inputs.
 
 ### 3. Texture Cache & GPU VRAM Management (LRU)
@@ -161,7 +162,8 @@ The Kitty Graphics Protocol subsystem is hardened with multiple layers of sandbo
 - **Explicit Memory Reclamation**: On eviction or image deletion (`a=d`), `ImageBitmap.close()` is explicitly invoked to immediately release GPU VRAM and WebKitGTK graphics buffers, preventing memory leaks.
 
 ### 4. PTY Stream Isolation & Command Serialization
-- **PTY Stream Separation**: APC escape sequences (`\x1b_G...`) are intercepted by a streaming parser before terminal rendering. Cleaned terminal output is delivered to xterm, preventing megabytes of Base64 text from degrading the terminal parser.
+- **PTY Stream Separation & Query Interception**: APC escape sequences (`\x1b_G...`) are intercepted by a streaming parser before terminal rendering. In addition, capability probes (`a=q`) from tools like Fastfetch are intercepted directly in the Rust PTY reader thread and answered immediately (`ok`) while being stripped from the terminal display stream, preventing escape sequence leakage or terminal parser stall.
+- **PTY Window Pixel Sizing (`TIOCGWINSZ`)**: PTY windows are initialized and resized with non-zero pixel dimensions (`cols * 9`, `rows * 18`) to prevent client tool crashes or zero-division errors when querying cell pixel ratios.
 - **Terminal Shell Escape Protection (`q` Quiet Parameter)**: Adheres strictly to the Kitty quiet protocol. By default (`q=0` or omitted), no ACK/NAK/error responses are sent back to PTY stdin, preventing escape sequence leakage and arbitrary command execution in the shell after client tools terminate.
 - **FIFO Command Serialization & In-Flight Tracking**: Commands are processed sequentially via a FIFO Promise queue, and placement commands (`a=p`) await in-flight decodes (`a=t`), preventing race conditions, cache desynchronization, and state manipulation vulnerabilities.
 

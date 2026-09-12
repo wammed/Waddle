@@ -196,9 +196,15 @@ Waddle は、高速・堅牢な **Rust バックエンド** と、最新の **Re
 +---------------------------------------------------------------------------------+
 ```
 
-- **遅延ゼロのストリーム事前分離**:
+- **遅延ゼロのストリーム事前分離 & 0ms Rust PTY 機能ハンドシェイク**:
   - 数MBに及ぶ Base64 画像データを含む APC エスケープシーケンス (`\x1b_G...`) を xterm 到達前にインターセプト。
   - 抽出後の通常テキストのみを `term.write()` へ送ることで、xterm パーサーの負荷とターミナルの描画遅延を防止。
+  - **超低遅延 PTY クエリ即時応答**: Rust PTY バックグラウンド読み込みループ（`process_kitty_output`）が機能問い合わせ（`\x1b_Gi=1,s=1,v=1,a=q;\x1b\` や `a=q` 含有シーケンス）を直接検知し、即座に `\x1b_Gi=<id>;ok\x1b\` を子プロセス stdin に 0ms で返送。`fastfetch`, `chafa`, `timg` などの CLI ツールでのタイムアウトによるアスキーアートフォールバックを防止。
+  - `create_pty` および `resize` において適切なセルピクセル寸法（`cols * 9`, `rows * 18`）を PTY に設定し、`TIOCGWINSZ` によるフォント寸法取得（`getCharacterPixelDimensions`）を正常化。
+- **Web 標準 zlib / Deflate 圧縮解凍 (`o=z`)**:
+  - `KittyDecoder` 内で Web 標準の `DecompressionStream('deflate')`（および `'deflate-raw'`）を活用したネイティブ解凍を実装。
+  - `fastfetch`（`"type": "kitty"`）等が送信する zlib 圧縮画像ストリーム（`o=z`）を自動検知して高速解凍。
+  - 解凍データ長に対する厳格な上限ガード（`maxPayloadBytes`、デフォルト 16 MB）を適用し、圧縮爆弾によるメモリ枯渇を防止。
 - **厳格なパス正規化とディレクトリサンドボックス**:
   - `t=f` 指定時、Rust 側で `std::fs::canonicalize` による `$HOME/Pictures` プレフィックス検証を実施。
   - `../` による脱出やサンドボックス外を指すシンボリックリンク経由のアクセスを `EACCES` / `ENOENT` で遮断。

@@ -149,6 +149,7 @@
 | **TC-KITTY-12** | 仮想配置 (`U=1`) | `U=1` で画像をロード。 | テキストバッファの空白専有を行わずに仮想配置サイズ・切り抜き情報が保持される。 | Scripted |
 | **TC-KITTY-13** | Unicode プレースホルダー (`U+10EEEE`) デコード | `U+10EEEE` にダイアクリティカルマークや TrueColor 前景色の画像 ID を付与。 | 行・列番号および画像 ID がデコードされ、プレースホルダーセルに画像がバインドされる。 | Scripted |
 | **TC-KITTY-14** | プレースホルダーの未定義グリフ（豆腐・□）排他抑止 | `U+10EEEE` を画面に出力し、レンダリング結果を確認。 | `TextRenderLayer._drawForeground` で文字描画がスキップされ、画像の上に豆腐が一切重ならない。 | Scripted / Manual |
+| **TC-KITTY-15** | プロトコル機能問い合わせ（Capability Probe）& 0ms 即時クエリ応答 | `fastfetch` (`"type": "kitty"`) の実行、または `\x1b_Gi=1,s=1,v=1,a=q;\x1b\` を送信。 | PTY 側で即座に `\x1b_Gi=1;ok\x1b\` が返信されアスキーアートにフォールバックせず画像表示される。ヘッダー情報が Rust バックエンドでログ記録される。 | Automated / Manual |
 
 ---
 

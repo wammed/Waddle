@@ -755,7 +755,10 @@ export class KittyGraphicsManager {
         // Query if an image exists in cache / manager, or probe protocol capability.
         // Protocol specifies that queries MUST receive a response regardless of quiet setting.
         const id = cmd.keys.i !== undefined ? cmd.keys.i : (cmd.keys.I !== undefined ? cmd.keys.I : 0);
-        if (id > 0) {
+        if (cmd.keys.s === 1 && cmd.keys.v === 1) {
+          // Protocol capability probe: ESC _ G i=1,s=1,v=1,a=q ; ESC \
+          this.sendPtyResponse(id || 1, 'ok', cmd.keys.q, true);
+        } else if (id > 0) {
           const pendingLoad = this.loadingImages.get(id);
           if (pendingLoad) {
             await pendingLoad;
@@ -764,7 +767,7 @@ export class KittyGraphicsManager {
           this.sendPtyResponse(id, exists ? 'OK' : 'ENOENT', cmd.keys.q, true);
         } else {
           // General protocol capability query probe (e.g. from fastfetch)
-          this.sendPtyResponse(0, 'OK', cmd.keys.q, true);
+          this.sendPtyResponse(0, 'ok', cmd.keys.q, true);
         }
         break;
       }

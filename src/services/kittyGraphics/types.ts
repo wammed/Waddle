@@ -21,6 +21,7 @@ export interface KittyControlKeys {
   w?: number; // Sub-rectangle width in source image (pixels)
   h?: number; // Sub-rectangle height in source image (pixels)
   U?: number; // Virtual placement flag (1 = virtual placement for Unicode placeholders)
+  o?: 'z'; // Compression: 'z' = zlib deflate
   raw?: Record<string, string>;
 }
 

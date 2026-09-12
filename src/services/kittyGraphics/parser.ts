@@ -248,6 +248,11 @@ export class KittyApcParser {
         case 'U':
           result.U = parseInt(val, 10);
           break;
+        case 'o':
+          if (val === 'z') {
+            result.o = 'z';
+          }
+          break;
       }
     }
 

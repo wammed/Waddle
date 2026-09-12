@@ -48,7 +48,7 @@
 - 📝 **簡易内蔵コードエディタ**: 2画面分割編集（`Ctrl + E`）、クイックオープン、AI リファクタリング（`Ctrl + Shift + K`）、ターミナル実行（安全チェック付き）。([詳細](docs/FEATURES.ja.md#4--簡易内蔵エディタ--ai-コード支援-ctrl--e))
 - 📂 **高機能ファイルツリー**: `/proc/<pid>/cwd` によるカレントディレクトリ自動追跡、言語別カラーバッジ、ブレッドクラム、インデントガイド、右クリックメニュー。([詳細](docs/FEATURES.ja.md#3--左側ファイルツリーサイドバー-ctrl--b))
 - 🐙 **Git & GitHub 統合ハブ**: ステータスバー連動ポップオーバー、1クリック Push/Pull、ローカル AI による Conventional Commit 自動生成、GUI Diff ビューワー。([詳細](docs/FEATURES.ja.md#14--git--github-連携ローカル-ai-コミット生成--pushpull-ポリシー))
-- 🖼️ **Kitty 画像プロトコル (Kitty Graphics)**: `fastfetch`, `yazi`, Neovim (`image.nvim`) などの CLI/TUI ツールからのターミナル直接画像描画に完全対応。厳格な `$HOME/Pictures` サンドボックスおよび展開爆弾対策ガードレールを標準統合。([詳細](docs/FEATURES.ja.md#16--kitty-画像プロトコル-kitty-graphics-protocol-完全対応--厳格なセキュリティサンドボックス))
+- 🖼️ **Kitty 画像プロトコル (Kitty Graphics)**: `fastfetch`, `yazi`, Neovim (`image.nvim`) などの CLI/TUI ツールからのターミナル直接画像描画に完全対応。Rust PTY による 0ms 即時クエリ応答（`a=q`）および Web 標準 zlib 解凍（`o=z`）を実装し、厳格な `$HOME/Pictures` サンドボックスと展開爆弾対策ガードレールを標準統合。([詳細](docs/FEATURES.ja.md#16--kitty-画像プロトコル-kitty-graphics-protocol-完全対応--厳格なセキュリティサンドボックス))
 - 🛡️ **リアルタイム機密情報マスク (Secret Masking)**: APIキー（GitHub, AWS, OpenAI等）やトークンを自動検知・即時マスクし、画面共有や動画撮影時の漏洩を防止。([詳細](docs/FEATURES.ja.md#17--リアルタイム機密情報マスク-secret-masking))
 - ⏳ **セッション タイムトラベル & 履歴復元 (`Ctrl + Shift + H`)**: 過去の実行コマンド、終了コード、CWD、出力をタイムライン形式でビジュアル化し、1クリックで状態復元やコマンド再実行。([詳細](docs/FEATURES.ja.md#18--セッション-タイムトラベル--スナップショット履歴-ctrl--shift--h))
 - 📊 **リッチデータ ビジュアライザ (Markdown / CSV / JSON)**: Markdown 組版、CSV ソート・検索テーブル、JSON 折りたたみツリーをエディタおよびツリーから1クリックで瞬時プレビュー。([詳細](docs/FEATURES.ja.md#19--リッチデータ-ビジュアライザ-markdown--csv--json-プレビュー))

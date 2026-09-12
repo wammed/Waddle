@@ -44,15 +44,20 @@ export class KittyDecoder {
     // 2. Direct Base64 transfer (t=d)
     const format = keys.f || 32;
 
+    let bytes = this.base64ToBytes(payload);
+    if (keys.o === 'z') {
+      bytes = await this.decompressZlib(bytes);
+    }
+
     if (format === 100) {
       // PNG
-      return await this.decodePng(payload);
+      return await this.decodePng(bytes);
     } else if (format === 32) {
       // RGBA
-      return await this.decodeRgba(payload, keys.s, keys.v);
+      return await this.decodeRgba(bytes, keys.s, keys.v);
     } else if (format === 24) {
       // RGB
-      return await this.decodeRgb(payload, keys.s, keys.v);
+      return await this.decodeRgb(bytes, keys.s, keys.v);
     } else {
       throw new Error(`Unsupported Kitty image format f=${format}`);
     }
@@ -95,9 +100,7 @@ export class KittyDecoder {
     };
   }
 
-  private async decodePng(payload: string): Promise<DecodedImage> {
-    const bytes = this.base64ToBytes(payload);
-
+  private async decodePng(bytes: Uint8Array): Promise<DecodedImage> {
     // Fast header check for PNG IHDR dimensions to prevent decompression bombs
     if (
       bytes.length >= 24 &&
@@ -136,7 +139,7 @@ export class KittyDecoder {
   }
 
   private async decodeRgba(
-    payload: string,
+    bytes: Uint8Array,
     width?: number,
     height?: number
   ): Promise<DecodedImage> {
@@ -150,7 +153,6 @@ export class KittyDecoder {
       );
     }
 
-    const bytes = this.base64ToBytes(payload);
     const expectedLength = width * height * 4;
 
     if (bytes.length < expectedLength) {
@@ -172,7 +174,7 @@ export class KittyDecoder {
   }
 
   private async decodeRgb(
-    payload: string,
+    bytes: Uint8Array,
     width?: number,
     height?: number
   ): Promise<DecodedImage> {
@@ -186,7 +188,6 @@ export class KittyDecoder {
       );
     }
 
-    const bytes = this.base64ToBytes(payload);
     const expectedRgbLength = width * height * 3;
 
     if (bytes.length < expectedRgbLength) {
@@ -220,6 +221,57 @@ export class KittyDecoder {
       height,
       byteSize: totalPixels * 4,
     };
+  }
+
+  /**
+   * Decompresses zlib/deflate payload using Web Standard DecompressionStream.
+   * Enforces decompression bomb limits to protect browser memory.
+   */
+  private async decompressZlib(compressedBytes: Uint8Array): Promise<Uint8Array> {
+    const doDecompress = async (format: 'deflate' | 'deflate-raw'): Promise<Uint8Array> => {
+      const ds = new DecompressionStream(format);
+      const writer = ds.writable.getWriter();
+      writer.write(compressedBytes as any).catch(() => {});
+      writer.close().catch(() => {});
+      const reader = ds.readable.getReader();
+      const chunks: Uint8Array[] = [];
+      let totalLength = 0;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (value) {
+          totalLength += value.length;
+          if (totalLength > this.maxPayloadBytes) {
+            try {
+              await reader.cancel();
+            } catch {
+              // ignore
+            }
+            throw new Error(
+              `EBADMSG: Decompressed zlib payload (${totalLength} bytes) exceeds limit (${this.maxPayloadBytes} bytes)`
+            );
+          }
+          chunks.push(value);
+        }
+      }
+      const decompressed = new Uint8Array(totalLength);
+      let offset = 0;
+      for (const chunk of chunks) {
+        decompressed.set(chunk, offset);
+        offset += chunk.length;
+      }
+      return decompressed;
+    };
+
+    try {
+      return await doDecompress('deflate');
+    } catch (err: any) {
+      try {
+        return await doDecompress('deflate-raw');
+      } catch {
+        throw new Error(`Failed to decompress zlib payload (o=z): ${err?.message || err}`);
+      }
+    }
   }
 
   private base64ToBytes(base64: string): Uint8Array {

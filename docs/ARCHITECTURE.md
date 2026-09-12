@@ -212,9 +212,15 @@ Waddle is built on a hybrid architecture combining a high-performance **Rust bac
 +---------------------------------------------------------------------------------+
 ```
 
-- **Zero-Lag Stream Separation**:
+- **Zero-Lag Stream Separation & 0ms Rust PTY Capability Handshake**:
   - APC escape sequences (`\x1b_G...`) carrying megabytes of Base64 image data are intercepted before reaching `@xterm/xterm`.
   - Stripped text is passed to `term.write()`, preventing parser bottlenecking and terminal lag.
+  - **Zero-Latency PTY Query Response**: The Rust PTY background reader (`process_kitty_output`) intercepts capability inquiries (`\x1b_Gi=1,s=1,v=1,a=q;\x1b\` or containing `a=q`) and responds immediately with `\x1b_Gi=<id>;ok\x1b\` to stdin (0ms latency), completely preventing CLI tools (`fastfetch`, `chafa`, `timg`) from timing out into ASCII fallback.
+  - Non-zero cell pixel dimensions (`cols * 9`, `rows * 18`) are populated in `create_pty` and `resize` to satisfy `TIOCGWINSZ` font dimension queries (`getCharacterPixelDimensions`).
+- **Web Standard zlib / Deflate Decompression (`o=z`)**:
+  - Direct native decompression using Web Standard `DecompressionStream('deflate')` (with `'deflate-raw'` fallback) inside `KittyDecoder`.
+  - Automatically handles compressed Base64 RGBA/RGB/PNG image streams (`o=z`) from CLI tools like `fastfetch` (`"type": "kitty"`).
+  - Enforces strict decompression bomb limits (`maxPayloadBytes`, default 16 MB) with instant stream cancellation upon threshold violation.
 - **Strict Path Canonicalization & Directory Jail**:
   - For `t=f`, the Rust backend verifies `$HOME/Pictures` prefix against `std::fs::canonicalize`.
   - Symlink escapes and `../` path traversal are strictly rejected with `EACCES` / `ENOENT`.

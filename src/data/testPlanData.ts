@@ -667,7 +667,7 @@ export const TEST_CASES: TestCase[] = [
     type: 'Manual',
   },
 
-  // Suite 7: Kitty Graphics Protocol (14)
+  // Suite 7: Kitty Graphics Protocol (15)
   {
     id: 'TC-KITTY-01',
     suiteId: 7,
@@ -859,6 +859,20 @@ export const TEST_CASES: TestCase[] = [
     expectedJa: 'TextRenderLayer._drawForeground で文字描画がスキップされ、画像の上に豆腐が一切重ならない。',
     type: 'Scripted / Manual',
     command: 'npx tsx scratch/test_unicode_placeholder.mjs',
+  },
+  {
+    id: 'TC-KITTY-15',
+    suiteId: 7,
+    suiteName: 'Kitty Graphics Protocol',
+    suiteNameJa: 'Kitty Graphics Protocol (完全サブシステム)',
+    title: 'Capability Probe & 0ms Query Response (Fastfetch / CLI Support)',
+    titleJa: 'プロトコル機能問い合わせ（Capability Probe）& 0ms 即時クエリ応答',
+    procedure: 'Run fastfetch with "type": "kitty" or send inquiry sequence `\\x1b_Gi=1,s=1,v=1,a=q;\\x1b\\\\`.',
+    procedureJa: 'fastfetch（"type": "kitty"）を実行するか、問い合わせシーケンス `\\x1b_Gi=1,s=1,v=1,a=q;\\x1b\\\\` を送信。',
+    expected: 'PTY immediately responds with `\\x1b_Gi=1;ok\\x1b\\\\` without fallback; header parameters logged on Rust backend.',
+    expectedJa: 'PTY が即座に `\\x1b_Gi=1;ok\\x1b\\\\` を返送してアスキーアートへフォールバックせず、Rust 側で受信ヘッダーがログ出力される。',
+    type: 'Automated / Manual',
+    command: 'cargo test test_kitty_query -- --nocapture',
   },
 
   // Suite 8: Security & Defense-in-Depth (15)

@@ -149,6 +149,7 @@ This document provides a comprehensive, end-to-end test plan for **Waddle**, cov
 | **TC-KITTY-12** | Virtual Placements (`U=1`) | Transmit graphic with `U=1`. | Image loads and retains slice metadata without reserving text buffer grid space. | Scripted |
 | **TC-KITTY-13** | Unicode Placeholder (`U+10EEEE`) Decoding | Output `U+10EEEE` with 297 diacritics or TrueColor foreground. | Row/col index and image ID resolve; texture slice binds to corresponding placeholder cells. | Scripted |
 | **TC-KITTY-14** | Placeholder Tofu (□) Glyph Suppression | Output `U+10EEEE` and inspect rendered character layer. | `TextRenderLayer._drawForeground` skips character pass; graphic renders without tofu box overwrite. | Scripted / Manual |
+| **TC-KITTY-15** | Capability Probe & 0ms Query Response (Fastfetch / CLI Support) | Run fastfetch with `"type": "kitty"` or send inquiry sequence `\x1b_Gi=1,s=1,v=1,a=q;\x1b\`. | PTY immediately responds with `\x1b_Gi=1;ok\x1b\` without fallback; header parameters logged on Rust backend. | Automated / Manual |
 
 ---
 

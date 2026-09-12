@@ -55,6 +55,153 @@ struct Session {
     start_tx: Arc<parking_lot::Mutex<Option<std::sync::mpsc::Sender<()>>>>,
 }
 
+/// Scans output from the child process for Kitty Graphics Protocol escape sequences (`\x1b_G`).
+///
+/// 1. Protocol Capability Query (`a=q` with `s=1,v=1` or `i=1` probe):
+///    Immediately writes the support acknowledgment `\x1b_Gi=<id>;ok\x1b\` back to the child PTY (stdin),
+///    and strips the query sequence from `decoded` so it is not echoed or passed to the frontend.
+/// 2. General `\x1b_G` sequences (e.g. image transmissions):
+///    Extracts and logs the header parameters (`println!("[Kitty Graphics] Received header: {}", header)`)
+///    to aid diagnostics and future decode/render architecture decisions.
+/// 3. Incomplete headers at the end of `decoded` (< 256 bytes) are held in `pending_prefix`
+///    and prepended to the next read chunk.
+pub fn process_kitty_output<W: Write + ?Sized>(
+    decoded: &mut String,
+    writer: &mut W,
+    pending_prefix: &mut String,
+) {
+    if !pending_prefix.is_empty() {
+        decoded.insert_str(0, pending_prefix);
+        pending_prefix.clear();
+    }
+
+    if !decoded.contains("\x1b_G") {
+        if decoded.ends_with("\x1b_") {
+            *pending_prefix = decoded.split_off(decoded.len() - 2);
+        } else if decoded.ends_with("\x1b") {
+            *pending_prefix = decoded.split_off(decoded.len() - 1);
+        }
+        return;
+    }
+
+    let mut search_idx = 0;
+    let mut to_remove_ranges: Vec<std::ops::Range<usize>> = Vec::new();
+
+    while let Some(rel_start) = decoded[search_idx..].find("\x1b_G") {
+        let start = search_idx + rel_start;
+        let header_start = start + 3; // Length of "\x1b_G"
+        let rest = &decoded[header_start..];
+
+        // Find delimiter ending the header: ';' or ST '\x1b\' or BEL '\x07'
+        let semi_pos = rest.find(';');
+        let mut term_pos = None;
+        let mut term_len = 0;
+
+        if let Some(pos) = rest.find("\x1b\\") {
+            term_pos = Some(pos);
+            term_len = 2;
+        }
+        if let Some(pos) = rest.find('\x07') {
+            if term_pos.is_none_or(|t| pos < t) {
+                term_pos = Some(pos);
+                term_len = 1;
+            }
+        }
+
+        let header_end = match (semi_pos, term_pos) {
+            (Some(s), Some(t)) => Some(s.min(t)),
+            (Some(s), None) => Some(s),
+            (None, Some(t)) => Some(t),
+            (None, None) => None,
+        };
+
+        if let Some(h_end) = header_end {
+            let header = &rest[..h_end];
+            println!("[Kitty Graphics] Received header: {}", header);
+
+            // Check if this is a query probe (a=q)
+            let mut is_query = false;
+            let mut query_id: Option<u32> = None;
+
+            for part in header.split(',') {
+                let part = part.trim();
+                let mut kv = part.split('=');
+                if let (Some(k), Some(v)) = (kv.next(), kv.next()) {
+                    let k = k.trim();
+                    let v = v.trim();
+                    if k.eq_ignore_ascii_case("a") && v.eq_ignore_ascii_case("q") {
+                        is_query = true;
+                    } else if k.eq_ignore_ascii_case("i") || k.eq_ignore_ascii_case("I") {
+                        query_id = v.parse::<u32>().ok();
+                    }
+                }
+            }
+
+            if is_query {
+                let id = query_id.unwrap_or(1);
+                let response = format!("\x1b_Gi={};ok\x1b\\", id);
+                if let Err(e) = writer.write_all(response.as_bytes()) {
+                    eprintln!("[Kitty Graphics] Error writing query response: {}", e);
+                } else if let Err(e) = writer.flush() {
+                    eprintln!("[Kitty Graphics] Error flushing query response: {}", e);
+                } else {
+                    println!("[Kitty Graphics] Responded to query: \\x1b_Gi={};ok\\x1b\\", id);
+                }
+
+                // Remove the query sequence from decoded
+                if let Some(t_pos) = term_pos {
+                    let seq_end = header_start + t_pos + term_len;
+                    to_remove_ranges.push(start..seq_end);
+                    search_idx = seq_end;
+                    continue;
+                } else if let Some(s_pos) = semi_pos {
+                    let after_semi = &rest[s_pos + 1..];
+                    if after_semi.starts_with("\x1b\\") {
+                        let seq_end = header_start + s_pos + 1 + 2;
+                        to_remove_ranges.push(start..seq_end);
+                        search_idx = seq_end;
+                        continue;
+                    } else if after_semi.starts_with('\x07') {
+                        let seq_end = header_start + s_pos + 1 + 1;
+                        to_remove_ranges.push(start..seq_end);
+                        search_idx = seq_end;
+                        continue;
+                    }
+                }
+            }
+
+            // For non-queries, advance search_idx past this header
+            search_idx = header_start + h_end + 1;
+        } else {
+            // Header is incomplete at end of buffer (< 256 bytes)
+            if rest.len() < 256 {
+                break;
+            } else {
+                search_idx = header_start;
+            }
+        }
+    }
+
+    // Drain removed ranges in reverse order so indices remain valid
+    for range in to_remove_ranges.into_iter().rev() {
+        if range.end <= decoded.len() {
+            decoded.drain(range);
+        }
+    }
+
+    // If an unclosed \x1b_G header remains at the end of decoded (< 256 bytes), hold it
+    if let Some(start) = decoded.rfind("\x1b_G") {
+        let rest = &decoded[start + 3..];
+        if !rest.contains(';') && !rest.contains("\x1b\\") && !rest.contains('\x07') && rest.len() < 256 {
+            *pending_prefix = decoded.split_off(start);
+        }
+    } else if decoded.ends_with("\x1b_") {
+        *pending_prefix = decoded.split_off(decoded.len() - 2);
+    } else if decoded.ends_with("\x1b") {
+        *pending_prefix = decoded.split_off(decoded.len() - 1);
+    }
+}
+
 pub struct PtyManager {
     sessions: Arc<Mutex<HashMap<String, Session>>>,
 }
@@ -75,11 +222,13 @@ impl PtyManager {
         shell: Option<String>,
     ) -> Result<PtySessionInfo, String> {
         let pty_system = native_pty_system();
+        let pixel_width = cols.saturating_mul(9);
+        let pixel_height = rows.saturating_mul(18);
         let pty_size = PtySize {
             rows,
             cols,
-            pixel_width: 0,
-            pixel_height: 0,
+            pixel_width,
+            pixel_height,
         };
 
         let pair = pty_system
@@ -118,6 +267,9 @@ impl PtyManager {
             .take_writer()
             .map_err(|e| format!("Failed to take PTY writer: {}", e))?;
 
+        let writer = Arc::new(parking_lot::Mutex::new(writer));
+        let writer_clone = Arc::clone(&writer);
+
         let alive = Arc::new(AtomicBool::new(true));
         let alive_clone = Arc::clone(&alive);
         let app_clone = app.clone();
@@ -136,6 +288,7 @@ impl PtyManager {
             let mut reader = reader;
             let mut buffer = [0u8; 32768];
             let mut pending_bytes: Vec<u8> = Vec::new();
+            let mut pending_kitty_prefix = String::new();
             let event_name = format!("pty-output-{}", session_id_clone);
 
             while alive_clone.load(Ordering::SeqCst) {
@@ -184,9 +337,16 @@ impl PtyManager {
                             }
                         }
 
-                        if !decoded.is_empty() {
-                            if let Err(e) = app_clone.emit(&event_name, &decoded) {
-                                eprintln!("Error emitting PTY output: {}", e);
+                        if !decoded.is_empty() || !pending_kitty_prefix.is_empty() {
+                            {
+                                let mut w = writer_clone.lock();
+                                process_kitty_output(&mut decoded, &mut *w, &mut pending_kitty_prefix);
+                            }
+
+                            if !decoded.is_empty() {
+                                if let Err(e) = app_clone.emit(&event_name, &decoded) {
+                                    eprintln!("Error emitting PTY output: {}", e);
+                                }
                             }
                         }
                     }
@@ -197,7 +357,10 @@ impl PtyManager {
                 }
             }
 
-            // Flush any remaining pending bytes if EOF occurs
+            // Flush any remaining pending bytes or incomplete kitty prefix if EOF occurs
+            if !pending_kitty_prefix.is_empty() {
+                pending_bytes.extend_from_slice(pending_kitty_prefix.as_bytes());
+            }
             if !pending_bytes.is_empty() {
                 let remaining_text = String::from_utf8_lossy(&pending_bytes).to_string();
                 let _ = app_clone.emit(&event_name, remaining_text);
@@ -212,7 +375,7 @@ impl PtyManager {
             id: id.clone(),
             pid,
             master: Arc::new(parking_lot::Mutex::new(pair.master)),
-            writer: Arc::new(parking_lot::Mutex::new(writer)),
+            writer,
             alive,
             last_known_cwd: target_cwd.to_string_lossy().to_string(),
             shell: shell_cmd.clone(),
@@ -263,12 +426,14 @@ impl PtyManager {
         let sessions = self.sessions.lock().await;
         if let Some(session) = sessions.get(session_id) {
             let master = session.master.lock();
+            let pixel_width = cols.saturating_mul(9);
+            let pixel_height = rows.saturating_mul(18);
             master
                 .resize(PtySize {
                     rows,
                     cols,
-                    pixel_width: 0,
-                    pixel_height: 0,
+                    pixel_width,
+                    pixel_height,
                 })
                 .map_err(|e| format!("Failed to resize PTY: {}", e))?;
             Ok(())
@@ -958,6 +1123,90 @@ mod tests {
             assert!(res.is_err(), "Branch '{}' should have been rejected", invalid);
             assert_eq!(res.unwrap_err(), "Invalid git branch ref format");
         }
+    }
+
+    #[test]
+    fn test_kitty_query_probe_fastfetch() {
+        let mut decoded = "\x1b_Gi=1,s=1,v=1,a=q;\x1b\\".to_string();
+        let mut writer = Vec::new();
+        let mut pending = String::new();
+
+        process_kitty_output(&mut decoded, &mut writer, &mut pending);
+
+        assert_eq!(writer, b"\x1b_Gi=1;ok\x1b\\");
+        assert_eq!(decoded, "");
+        assert_eq!(pending, "");
+    }
+
+    #[test]
+    fn test_kitty_query_probe_bel_terminator() {
+        let mut decoded = "\x1b_Gi=1,s=1,v=1,a=q;\x07".to_string();
+        let mut writer = Vec::new();
+        let mut pending = String::new();
+
+        process_kitty_output(&mut decoded, &mut writer, &mut pending);
+
+        assert_eq!(writer, b"\x1b_Gi=1;ok\x1b\\");
+        assert_eq!(decoded, "");
+        assert_eq!(pending, "");
+    }
+
+    #[test]
+    fn test_kitty_query_custom_id_and_key_order() {
+        let mut decoded = "\x1b_Ga=q,s=1,v=1,i=42;\x1b\\".to_string();
+        let mut writer = Vec::new();
+        let mut pending = String::new();
+
+        process_kitty_output(&mut decoded, &mut writer, &mut pending);
+
+        assert_eq!(writer, b"\x1b_Gi=42;ok\x1b\\");
+        assert_eq!(decoded, "");
+        assert_eq!(pending, "");
+    }
+
+    #[test]
+    fn test_kitty_query_embedded_in_stream() {
+        let mut decoded = "Hello \x1b_Gi=1,s=1,v=1,a=q;\x1b\\World".to_string();
+        let mut writer = Vec::new();
+        let mut pending = String::new();
+
+        process_kitty_output(&mut decoded, &mut writer, &mut pending);
+
+        assert_eq!(writer, b"\x1b_Gi=1;ok\x1b\\");
+        assert_eq!(decoded, "Hello World");
+        assert_eq!(pending, "");
+    }
+
+    #[test]
+    fn test_kitty_image_data_preservation() {
+        let original = "\x1b_Ga=T,f=32,s=100,v=200,o=z,m=1;eNrsvQ==\x1b\\".to_string();
+        let mut decoded = original.clone();
+        let mut writer = Vec::new();
+        let mut pending = String::new();
+
+        process_kitty_output(&mut decoded, &mut writer, &mut pending);
+
+        assert!(writer.is_empty(), "No response should be written for image data");
+        assert_eq!(decoded, original, "Image sequence must be preserved for frontend");
+        assert_eq!(pending, "");
+    }
+
+    #[test]
+    fn test_kitty_chunk_split() {
+        let mut chunk1 = "\x1b_Gi=1,s=1,".to_string();
+        let mut writer = Vec::new();
+        let mut pending = String::new();
+
+        process_kitty_output(&mut chunk1, &mut writer, &mut pending);
+        assert_eq!(chunk1, "");
+        assert_eq!(pending, "\x1b_Gi=1,s=1,");
+        assert!(writer.is_empty());
+
+        let mut chunk2 = "v=1,a=q;\x1b\\".to_string();
+        process_kitty_output(&mut chunk2, &mut writer, &mut pending);
+        assert_eq!(chunk2, "");
+        assert_eq!(pending, "");
+        assert_eq!(writer, b"\x1b_Gi=1;ok\x1b\\");
     }
 }
 

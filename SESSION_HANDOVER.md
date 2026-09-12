@@ -146,6 +146,14 @@
     - **Waddle デスクトップ組み込みモーダル (`src/components/TestPlanModal.tsx`)**: タイトルバー右側のクイックボタン（`#btn-test-plan`）からワンクリックで呼び出せるサイバーパンク/ネオン調のフル機能検証モーダル。アプリを操作しながらリアルタイムに検証結果を記録可能。
     - **共有テストデータ (`src/data/testPlanData.ts`)**: 全 80 テストケースの型定義・データセット・Markdown レポート生成ロジックを集約。
     - **ビルド・検証**: `npm run build`（型エラー0件）、`cargo test`（24件全パス）、`cargo clippy`（警告0件）。
+27. **Kitty Graphics Protocol の Fastfetch 機能問い合わせ（Capability Probe: `a=q`）即時応答・PTY 解像度設定・zlib 展開（`o=z`）対応**:
+    - ユーザー要望「Fastfetch等の画像表示に対応するための Kitty Graphics Protocol の最小限のクエリ応答機能を実装してください」「fastfetchのconfig.jsonc内で、logo typeをkittyで指定すると表示されず、autoでの指定なら表示されるのはなぜ？」「各ドキュメント（README等）を更新して」に基づき実施。
+    - **Fastfetch 挙動の解明**: Fastfetch はターミナルプロセス名（`kitty`, `wezterm`, `ghostty` 等）を直接判定しており、Waddle 内部では `supportsKitty` が判定されないため、`"type": "auto"` 時は Chafa（Unicode 24-bit ハーフブロック文字）へフォールバックして描画されていた。一方 `"type": "kitty"` を指定すると Kitty Graphics シーケンスを zlib 圧縮（`o=z`）付きで送信するが、以前の Waddle デコーダーが zlib 展開に対応しておらず `EBADMSG` エラーとなっていた原因を特定。
+    - **Rust PTY リーダースレッドでの 0ms 即時クエリ迎撃**: `src-tauri/src/pty.rs` の PTY 読み取りループに `process_kitty_output` を組み込み、クライアントからの機能問い合わせシーケンス（`\x1b_Gi=1,s=1,v=1,a=q;\x1b\` 等）を即座に検知。PTY マスター（標準入力）へ `\x1b_Gi=<id>;ok\x1b\` を 0ms で直接書き戻し、同時に端末画面出力ストリームから問い合わせシーケンスを完全除去。シーケンス受信ヘッダーを `[Kitty Graphics] Received header: ...` としてログ出力。
+    - **PTY ウィンドウピクセル寸法通知 (`TIOCGWINSZ`)**: PTY スレーブ作成時（`create_pty`）およびリサイズ時（`resize`）に、文字セル解像度（`ws_xpixel = cols * 9`, `ws_ypixel = rows * 18`）をカーネルに通知。CLI ツール側のセルピクセル比計算におけるゼロ除算や判定失敗を防止。
+    - **Zlib / Deflate 圧縮展開 (`o=z`) の実装**: Fastfetch が送信する zlib 圧縮 RGBA ペイロード（`o=z`）を Web Standard `DecompressionStream('deflate')`（および `'deflate-raw'` フォールバック）でストリーミング展開するデコーダーを `src/services/kittyGraphics/decoder.ts` に実装。Decompression Bomb 対策として累積展開サイズが `maxPayloadBytes`（16MB）を超過した場合は即座に `reader.cancel()` して `EBADMSG` を送出。
+    - **包括的テストケース追加**: `docs/TEST_PLAN.md`, `docs/TEST_PLAN.ja.md`, `src/data/testPlanData.ts` に `TC-KITTY-15`（プロトコル機能問い合わせ & 0ms 即時クエリ応答）を追加（全81項目へ拡充）。
+    - **単体テスト & リリースビルド**: Rust 単体テスト全 36 件すべてパス（PTY 迎撃テスト 6 件追加）、`cargo clippy` 警告 0 件、`npm run build` エラー 0 件。本番バイナリを `/home/susie/.local/bin/waddle` へ `install -m 755` で正常配備。
 
 ---
 
@@ -201,12 +209,19 @@
 - **GPU/VRAM 上限管理 (LRU)**: 256MB キャッシュ総枠内で LRU 管理。解放時・削除時 (`a=d`) に必ず明示的に `ImageBitmap.close()` を呼び出し、WebKitGTK および GPU メモリリークを防止。
 - **合成パイプライン**: `.xterm-screen` の最背面にキャンバスをマウントし、「セル背景色 → 画像レイヤー → セルテキスト/グリフ → カーソル」の階層合成を実現。
 
+### H. Fastfetch / CLI 向け Kitty 機能問い合わせ即時応答・PTY 解像度設定・zlib 圧縮展開
+- **対象ファイル**: [`src-tauri/src/pty.rs`](file:///home/susie/GitHUB/wammed/Waddle/src-tauri/src/pty.rs), [`src/services/kittyGraphics/decoder.ts`](file:///home/susie/GitHUB/wammed/Waddle/src/services/kittyGraphics/decoder.ts), [`src/services/kittyGraphics/manager.ts`](file:///home/susie/GitHUB/wammed/Waddle/src/services/kittyGraphics/manager.ts), [`src/services/kittyGraphics/parser.ts`](file:///home/susie/GitHUB/wammed/Waddle/src/services/kittyGraphics/parser.ts), [`src/services/kittyGraphics/types.ts`](file:///home/susie/GitHUB/wammed/Waddle/src/services/kittyGraphics/types.ts), [`src/data/testPlanData.ts`](file:///home/susie/GitHUB/wammed/Waddle/src/data/testPlanData.ts)
+- **Rust PTY リーダースレッドでの 0ms 迎撃**: PTY マスターの書き込みハンドル `Arc<Mutex<Box<dyn Write + Send>>>` をリーダースレッドへ共有。クライアントが送信した `\x1b_G...a=q;\x1b\` を検知すると、即座に `\x1b_Gi=<id>;ok\x1b\` をマスターに書き戻し、データストリームからシーケンスを削除して xterm へのエスケープ漏れをゼロ化。
+- **TIOCGWINSZ ピクセル解像度のカーネル通知**: `winsize` の `ws_xpixel` / `ws_ypixel` を `cols * 9` / `rows * 18` で初期化・更新し、`ioctl(TIOCGWINSZ)` を行う CLI ツールに正常なセル解像度を提供。
+- **Web Standard DecompressionStream ストリーミング展開**: `o=z` 指定時に zlib/deflate データをチャンクごとに伸張。累積バイト数が `maxPayloadBytes`（16MB）に達した場合は `reader.cancel()` を呼び出して展開を即時中断し、Zip 爆弾メモリ枯渇を防止。
+
 ---
 
 ## 4. 変更された重要ファイル一覧
 
 | ファイルパス | 主な役割・変更内容 |
 |---|---|
+| `src-tauri/src/pty.rs` | PTY プロセス生成・管理、ウィンドウ解像度（TIOCGWINSZ）通知、Kitty 機能問い合わせ即時迎撃（`process_kitty_output`） |
 | `src-tauri/src/kitty.rs` | Kitty サンドボックスファイルリーダー、パス正規化、シンボリックリンク脱出防止、ヘッダー検査、単体テスト |
 | `src-tauri/src/config.rs` | `KittyGraphicsConfig` 構造体（有効化、最大寸法、ペイロード上限、キャッシュ上限、許可ディレクトリ） |
 | `src-tauri/src/lib.rs` | `kitty_read_file` Tauri コマンドの登録および公開 |
@@ -214,20 +229,20 @@
 | `src/services/tauriApi.ts` | `kittyReadFile` フロントエンド API ラッパー |
 | `src/services/kittyGraphics/types.ts` | Kitty Graphics プロトコルキー・配置・画像レコードの型定義 |
 | `src/services/kittyGraphics/parser.ts` | APC ストリーミングパーサー（ST/BEL対応、Base64分離、チャンク化結合バッファリング） |
-| `src/services/kittyGraphics/decoder.ts` | 画像デコーダー（PNG/RGBA/RGB/ファイル参照、展開爆弾検証、ImageBitmap生成） |
+| `src/services/kittyGraphics/decoder.ts` | 画像デコーダー（PNG/RGBA/RGB/zlib展開 `o=z`、展開爆弾検証、ImageBitmap生成） |
 | `src/services/kittyGraphics/lruCache.ts` | LRU テクスチャキャッシュ（256MB上限、明示的 `bitmap.close()` メモリ解放） |
 | `src/services/kittyGraphics/manager.ts` | Kitty Graphics マネージャー（Canvasマウント、スクロール連動、クエリ即時応答、配置管理） |
 | `src/components/SingleTerminalView.tsx` | PTY ストリームの APC インターセプト、Canvas オーバーレイ統合、ライフサイクル管理 |
 | `src/components/SettingsModal.tsx` | Kitty Graphics 設定セクション（トグル、最大寸法、ペイロード、キャッシュ、許可パス、危険パス警告） |
-| `src/components/TestPlanModal.tsx` | Waddle アプリ内組み込みテスト検証モーダル（全80項目、リアルタイム合否記録、コマンドコピー、localStorage連携） |
-| `src/data/testPlanData.ts` | テスト計画全80項目のデータ定義、集計、エビデンス Markdown レポート生成ユーティリティ |
+| `src/components/TestPlanModal.tsx` | Waddle アプリ内組み込みテスト検証モーダル（全81項目、リアルタイム合否記録、コマンドコピー、localStorage連携） |
+| `src/data/testPlanData.ts` | テスト計画全81項目（TC-KITTY-15含む）のデータ定義、集計、エビデンス Markdown レポート生成ユーティリティ |
 | `tools/test_form.html` | ブラウザで単体稼働するスタンドアロン包括的テスト検証 Web フォーム（全80項目、Markdown/JSONエクスポート） |
 | `src/i18n/translations.ts` | 日英多言語辞書（Kitty 画像プロトコル設定文言・テストフォーム文言） |
-| `docs/FEATURES.md` & `.ja.md` | 機能仕様書への第16項「Kitty Graphics Protocol」詳細解説の追加 |
-| `docs/ARCHITECTURE.md` & `.ja.md` | アーキテクチャ図および第5項「Kitty Graphics Subsystem & Pipeline」設計の追加 |
-| `docs/TEST_PLAN.md` & `.ja.md` | 完成前検証用 包括的テスト計画書（全80テストケース・期待結果・検証手順・セキュリティ強化項目） |
-| `SECURITY.md` & `.ja.md` | セキュリティ仕様書への「Kitty Graphics Protocol Security & Resource Guards」および最新6大セキュリティ強化項目の追加 |
-| `README.md` & `.ja.md` | ルート README への Kitty Graphics Protocol ハイライト追加 |
+| `docs/FEATURES.md` & `.ja.md` | 機能仕様書への第16項「Kitty Graphics Protocol」詳細解説（PTY即時迎撃・zlib展開含む）の追加 |
+| `docs/ARCHITECTURE.md` & `.ja.md` | アーキテクチャ図および第5項「Kitty Graphics Subsystem & Pipeline」（PTYリーダースレッド迎撃・DecompressionStream）設計の追加 |
+| `docs/TEST_PLAN.md` & `.ja.md` | 完成前検証用 包括的テスト計画書（全81テストケース・TC-KITTY-15追加・セキュリティ強化項目） |
+| `SECURITY.md` & `.ja.md` | セキュリティ仕様書への「Kitty Graphics Protocol Security & Resource Guards」（zlib展開爆弾防護・PTY迎撃）の追加 |
+| `README.md` & `.ja.md` | ルート README への Kitty Graphics Protocol ハイライト（CLI/TUIツール対応・0ms迎撃）追加 |
 
 ---
 
@@ -237,7 +252,7 @@
 # フロントエンドの型検査 & 本番ビルド (Vite + TypeScript) - 警告/エラー0件でビルド完了
 npm run build
 
-# Rust バックエンドの単体テスト (全24件すべてパス、うち Kitty セキュリティテスト7件)
+# Rust バックエンドの単体テスト (全36件すべてパス、うち Kitty セキュリティテスト7件、PTY迎撃テスト6件)
 cargo test --manifest-path src-tauri/Cargo.toml
 
 # Rust の Clippy 静的解析 (警告0件)
@@ -281,7 +296,7 @@ npm run tauri dev
    - パストラバーサル防止、保護対象パス、危険コマンド検知パターン、Webview CSP、ネットワーク境界ポリシーの更新。
 5. **包括的検証テスト計画書**:
    - [`docs/TEST_PLAN.md`](file:///home/susie/GitHUB/wammed/Waddle/docs/TEST_PLAN.md) & [`docs/TEST_PLAN.ja.md`](file:///home/susie/GitHUB/wammed/Waddle/docs/TEST_PLAN.ja.md)
-   - 全80テストケース（Suite 1〜9）の追跡、合否判定基準、自動テストコマンド群の整合性維持。
+   - 全81テストケース（Suite 1〜9）の追跡、合否判定基準、自動テストコマンド群の整合性維持。
 6. **開発履歴・引き継ぎ**:
    - [`SESSION_HANDOVER.md`](file:///home/susie/GitHUB/wammed/Waddle/SESSION_HANDOVER.md)
    - ユーザー要望、時系列開発履歴、変更重要ファイル、ビルド検証結果の追記。
