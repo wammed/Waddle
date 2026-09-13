@@ -261,7 +261,7 @@
   - `rm`, `mkfs`, `fdisk`, `dd`, `git reset --hard`, `iptables -F` 等を単語境界（`\b`）で誤検知なく事前ブロック。
 - **Webview CSP & スコープ付きアセットプロトコル**:
   - 外部通信を Ollama と GitHub のみに限定。
-- *(詳細なセキュリティ仕様は [SECURITY.ja.md](../SECURITY.ja.md) を参照)*
+- *(詳細なセキュリティ仕様は [SECURITY.ja.md](SECURITY.ja.md) を参照)*
 
 ---
 

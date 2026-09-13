@@ -102,7 +102,7 @@ graph TD
 
 **テスト**: [L1350-1362](file:///home/susie/GitHUB/wammed/Waddle/src-tauri/src/pty.rs#L1350-L1362) で `t=s` が `ENOTSUP` を返すことを検証
 
-**SECURITY.md**: [L198-206](file:///home/susie/GitHUB/wammed/Waddle/SECURITY.md#L198-L206) に脅威モデルと設計判断が詳細に文書化済み
+**SECURITY.md**: [L198-206](file:///home/susie/GitHUB/wammed/Waddle/docs/SECURITY.md#L198-L206) に脅威モデルと設計判断が詳細に文書化済み
 
 > [!NOTE]
 > これは素晴らしいセキュリティ設計判断。「mpvの高FPS動画再生」を犠牲にして、SHM経由の全攻撃ベクトルを遮断するというトレードオフが明確に文書化されている。

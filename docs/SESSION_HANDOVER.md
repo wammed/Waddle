@@ -507,9 +507,8 @@
 | `src/i18n/translations.ts` | 日英多言語辞書（動的ページネーション、Kitty 画像プロトコル設定文言、テストフォーム文言） |
 | `docs/FEATURES.md` & `.ja.md` | 機能仕様書（フロー制御、壁紙D&D、大規模ディレクトリ動的読込、Prism.jsハイライト、エラー検知チップ） |
 | `docs/ARCHITECTURE.md` & `.ja.md` | アーキテクチャ図・PTYバックプレッシャー設計、ファイルシステム＆組み込みエディタ設計（Section 6）の追加 |
-| `docs/TEST_PLAN.md` & `.ja.md` | 包括的テスト計画書（全87テストケース・10スイート、全件PASS・エビデンス実測値・サインオフ完了） |
-| `SECURITY.md` & `.ja.md` | セキュリティ仕様書（PTYバッファ枯渇DoS防護、大規模ディレクトリDOM枯渇DoS防護） |
-| `README.md` & `.ja.md` | ルート README（ゼロラグPTYコア、組み込みエディタ、リッチファイルツリー、壁紙D&Dの最新同期） |
+| `docs/SECURITY.md` & `.ja.md` | セキュリティ仕様書（PTYバッファ枯渇DoS防護、大規模ディレクトリDOM枯渇DoS防護） |
+| `docs/README.md` & `.ja.md` | ルート README（ゼロラグPTYコア、組み込みエディタ、リッチファイルツリー、壁紙D&Dの最新同期） |
 
 ---
 
@@ -631,7 +630,7 @@ npm run tauri dev
 ユーザー指示に基づき、今後**機能追加（Feature）**、**バグ修正（Bug Fix）**、**セキュリティ強化（Security Fix）**を実施した際は、以下の 8 ドキュメント構成に従って**英語版・日本語版を必ずセットで同期更新**します：
 
 1. **ルート概要ドキュメント（スリム・Scannable構成を維持）**:
-   - [`README.md`](file:///home/susie/GitHUB/wammed/Waddle/README.md) & [`README.ja.md`](file:///home/susie/GitHUB/wammed/Waddle/README.ja.md)
+   - [`docs/README.md`](file:///home/susie/GitHUB/wammed/Waddle/docs/README.md) & [`docs/README.ja.md`](file:///home/susie/GitHUB/wammed/Waddle/docs/README.ja.md)
    - 新機能や主要変更の 1〜2 行要約バレット（Highlights）の追加・更新。
    - 変更に関連する詳細ドキュメントへのリンク付与。
    - 日常使用ショートカット一覧の同期。
@@ -643,12 +642,12 @@ npm run tauri dev
    - [`docs/ARCHITECTURE.md`](file:///home/susie/GitHUB/wammed/Waddle/docs/ARCHITECTURE.md) & [`docs/ARCHITECTURE.ja.md`](file:///home/susie/GitHUB/wammed/Waddle/docs/ARCHITECTURE.ja.md)
    - Mermaid 構成図の更新、PTY・IPC・各サブシステムの設計変更追記、技術スタック一覧の更新。
 4. **セキュリティ仕様・ガードレール**:
-   - [`SECURITY.md`](file:///home/susie/GitHUB/wammed/Waddle/SECURITY.md) & [`SECURITY.ja.md`](file:///home/susie/GitHUB/wammed/Waddle/SECURITY.ja.md)
+   - [`docs/SECURITY.md`](file:///home/susie/GitHUB/wammed/Waddle/docs/SECURITY.md) & [`docs/SECURITY.ja.md`](file:///home/susie/GitHUB/wammed/Waddle/docs/SECURITY.ja.md)
    - パストラバーサル防止、保護対象パス、危険コマンド検知パターン、Webview CSP、ネットワーク境界ポリシーの更新。
 5. **包括的検証テスト計画書**:
    - [`docs/TEST_PLAN.md`](file:///home/susie/GitHUB/wammed/Waddle/docs/TEST_PLAN.md) & [`docs/TEST_PLAN.ja.md`](file:///home/susie/GitHUB/wammed/Waddle/docs/TEST_PLAN.ja.md)
    - 全81テストケース（Suite 1〜9）の追跡、合否判定基準、自動テストコマンド群の整合性維持。
 6. **開発履歴・引き継ぎ**:
-   - [`SESSION_HANDOVER.md`](file:///home/susie/GitHUB/wammed/Waddle/SESSION_HANDOVER.md)
+   - [`docs/SESSION_HANDOVER.md`](file:///home/susie/GitHUB/wammed/Waddle/docs/SESSION_HANDOVER.md)
    - ユーザー要望、時系列開発履歴、変更重要ファイル、ビルド検証結果の追記。
 

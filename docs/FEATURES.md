@@ -270,7 +270,7 @@ Welcome to the comprehensive feature guide for **Waddle**, the AI-integrated, pr
   - Accurate regex token checks intercept destructive commands (`rm`, `mkfs`, `fdisk`, `dd`, `git reset --hard`, `iptables -F`, etc.) before execution.
 - **Webview CSP & Scoped Asset Protocol**:
   - Strict Content Security Policy confines networking to local Ollama and GitHub.
-- *(For comprehensive security specifications, see [SECURITY.md](../SECURITY.md))*
+- *(For comprehensive security specifications, see [SECURITY.md](SECURITY.md))*
 
 ---
 
