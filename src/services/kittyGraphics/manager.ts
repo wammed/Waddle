@@ -95,8 +95,8 @@ export class KittyGraphicsManager {
     this.screenElement = screen || container;
 
     // Clean up any stale kitty graphics canvases to prevent duplicate ghost layers
-    const existing = (screen || container).querySelectorAll('.xterm-kitty-graphics-layer');
-    existing.forEach((el) => el.remove());
+    const existing = container.querySelectorAll('.xterm-kitty-graphics-layer');
+    existing.forEach((el: Element) => el.remove());
 
     const canvas = document.createElement('canvas');
     canvas.className = 'xterm-kitty-graphics-layer';
@@ -554,16 +554,19 @@ export class KittyGraphicsManager {
     return cleanText;
   }
 
-  private calculateCursorOffset(text: string): { deltaCol: number; deltaLine: number } {
-    if (!text) return { deltaCol: 0, deltaLine: 0 };
+  private calculateCursorOffset(text: string): { deltaCol: number; deltaLine: number; hasCr: boolean } {
+    if (!text) return { deltaCol: 0, deltaLine: 0, hasCr: false };
     let deltaLine = 0;
     let lastLineLen = 0;
+    let hasCr = false;
     for (let i = 0; i < text.length; i++) {
       if (text[i] === '\n') {
         deltaLine++;
         lastLineLen = 0;
+        hasCr = false;
       } else if (text[i] === '\r') {
         lastLineLen = 0;
+        hasCr = true;
       } else if (text[i] === '\x1b' && text[i + 1] === '[') {
         // Parse full CSI sequence: \x1b[ [params] [final_byte 0x40-0x7E]
         let j = i + 2;
@@ -592,7 +595,7 @@ export class KittyGraphicsManager {
         lastLineLen++;
       }
     }
-    return { deltaCol: lastLineLen, deltaLine };
+    return { deltaCol: lastLineLen, deltaLine, hasCr };
   }
 
   /**
@@ -726,11 +729,11 @@ export class KittyGraphicsManager {
     this.flushTerminalBuffer();
 
     // Calculate anchor position taking into account any text preceding the image in the current chunk
-    const { deltaCol, deltaLine } = this.calculateCursorOffset(textBefore);
+    const { deltaCol, deltaLine, hasCr } = this.calculateCursorOffset(textBefore);
     let startCol = this.term.buffer.active.cursorX;
     let startBufferLine = this.term.buffer.active.baseY + this.term.buffer.active.cursorY;
 
-    if (deltaLine > 0) {
+    if (deltaLine > 0 || hasCr) {
       startCol = deltaCol % termCols;
       startBufferLine += deltaLine;
     } else if (deltaCol > 0) {
@@ -1247,6 +1250,9 @@ export class KittyGraphicsManager {
           for (const k of this.cache.keys()) {
             this.stopAnimation(k);
           }
+          for (const p of this.placements.values()) {
+            try { p.marker?.dispose(); } catch {}
+          }
           this.placements.clear();
           this.virtualPlacements.clear();
           this.cache.clear();
@@ -1256,11 +1262,14 @@ export class KittyGraphicsManager {
           this.virtualPlacements.delete(id);
           for (const [key, p] of this.placements.entries()) {
             if (p.imageId === id) {
+              try { p.marker?.dispose(); } catch {}
               this.placements.delete(key);
             }
           }
         } else if (cmd.keys.p !== undefined) {
           const pId = String(cmd.keys.p);
+          const p = this.placements.get(pId);
+          try { p?.marker?.dispose(); } catch {}
           this.placements.delete(pId);
         }
         this.render();
@@ -1395,13 +1404,39 @@ export class KittyGraphicsManager {
       ? anchorCol
       : (existingPlacement ? existingPlacement.col : cursorX);
 
+    // Dispose old marker if replacing an existing placement
+    if (existingPlacement?.marker) {
+      try {
+        existingPlacement.marker.dispose();
+      } catch {
+        // ignore
+      }
+    }
+
+    // Register marker in xterm buffer to track exact line across buffer reflow and scrolling
+    let marker: any = undefined;
+    try {
+      this.flushTerminalBuffer();
+      const currentAbsoluteLine = this.term.buffer.active.baseY + this.term.buffer.active.cursorY;
+      const offset = bufferLine - currentAbsoluteLine;
+      marker = this.term.registerMarker(offset);
+    } catch {
+      // fallback to bufferLine
+    }
+
+    const termCols = this.term.cols || 80;
+    const isCentered = Math.abs(col - Math.round((termCols - cols) / 2)) <= 2;
+
     const placement: KittyPlacement = {
       id: placementId,
       imageId,
       bufferLine,
+      marker,
       col,
       cols,
       rows,
+      originalTermCols: termCols,
+      isCentered,
       xOffset: keys.X || 0,
       yOffset: keys.Y || 0,
       z: keys.z || 0,
@@ -1473,17 +1508,34 @@ export class KittyGraphicsManager {
     this.ctx.clip();
 
     for (const [key, p] of this.placements.entries()) {
+      const line = (p.marker && !p.marker.isDisposed && p.marker.line !== -1)
+        ? p.marker.line
+        : p.bufferLine;
+
       // Memory pruning: discard placement only when the entire image span has scrolled past max scrollback
-      if (p.bufferLine + p.rows <= oldestAllowedLine) {
+      if (line + p.rows <= oldestAllowedLine || (p.marker && p.marker.isDisposed)) {
+        try {
+          p.marker?.dispose();
+        } catch {}
         this.placements.delete(key);
         continue;
       }
 
       // Calculate screen row relative to current viewport
-      const screenRow = p.bufferLine - viewportY;
+      const screenRow = line - viewportY;
 
-      const imgColStart = p.col;
-      const imgColEnd = p.col + p.cols;
+      // Dynamic horizontal column positioning:
+      // If image was centered when placed, preserve center alignment in resized pane;
+      // otherwise clamp to ensure it stays within visible columns.
+      let effectiveCol = p.col;
+      if (p.isCentered && p.originalTermCols && termCols !== p.originalTermCols) {
+        effectiveCol = Math.max(0, Math.round((termCols - p.cols) / 2));
+      } else if (effectiveCol + p.cols > termCols) {
+        effectiveCol = Math.max(0, termCols - p.cols);
+      }
+
+      const imgColStart = effectiveCol;
+      const imgColEnd = effectiveCol + p.cols;
       const imgRowStart = screenRow;
       const imgRowEnd = screenRow + p.rows;
 
@@ -1502,6 +1554,9 @@ export class KittyGraphicsManager {
 
       const img = this.cache.get(p.imageId);
       if (!img) {
+        try {
+          p.marker?.dispose();
+        } catch {}
         this.placements.delete(key);
         continue;
       }
@@ -1511,7 +1566,7 @@ export class KittyGraphicsManager {
       // 2. Continuous Target Geometry in Screen Pixel Space
       // render_x = padding_left + col * cell_width (+ xOffset)
       // render_y = padding_top + (row - scroll_offset) * cell_height (+ yOffset)
-      const rawX = padding.left + p.col * cellWidth + p.xOffset;
+      const rawX = padding.left + effectiveCol * cellWidth + p.xOffset;
       const rawY = padding.top + screenRow * cellHeight + p.yOffset;
       const rawW = p.cols * cellWidth;
       const rawH = p.rows * cellHeight;
@@ -1759,6 +1814,9 @@ export class KittyGraphicsManager {
     }
     this.disposables = [];
     this.cache.clear();
+    for (const p of this.placements.values()) {
+      try { p.marker?.dispose(); } catch {}
+    }
     this.placements.clear();
     this.virtualPlacements.clear();
     this.lastDecodedPlaceholder = null;

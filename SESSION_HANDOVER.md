@@ -525,9 +525,11 @@ npm run tauri dev
   - `TC-THM-03`: OSデスクトップからのドラッグ＆ドロップ壁紙適用正常動作確認。
   - `TC-THM-04`: 不透明度・ぼかしスライダーの 60 FPS リアルタイムプレビュー正常動作確認。
   - `TC-PERF-04`: 静的グロードット化によりアイドル時 CPU 0.0%〜1.0% 実証。
-  - `TC-ENH-04`: 直近コマンド以降の出力スキャン & 1-Click AI 修正チップ正常動作確認。
-  - `TC-KITTY-04`: `kitten icat --detect-support` 終了コード 0、モード `files` 検出、大文字 `OK` / DA1 即時応答正常動作確認。
-
+26. **TC-KITTY-17 ペイン分割・リサイズ時のGIFアニメ座標ズレ・過去出力への重なり解消**:
+    - **xterm.js `IMarker` 連動によるバッファリフロー追従**: 画像配置時（`placeImage`）に `this.term.registerMarker(offset)` を生成し、`KittyPlacement` に `marker` をバインド。ペイン分割やリサイズによる行の折り返し（Line Reflow）やスクロールが発生しても、`marker.line` がバッファ内の真の配置行をリアルタイムに自動追従。固定 `bufferLine` による過去のプロンプトや `ls` / `cat` コマンド実行結果への誤描画・重なりを完全根絶。
+    - **水平方向の動的センタリング追従 (`isCentered` & `originalTermCols`)**: 画像配置時に水平中央揃えされていた場合（`kitten icat` のデフォルト挙動）、ペイン分割・リサイズ等でターミナル列数（`cols`）が変化した際にも、新しい列幅の中央列をリアルタイム算出して配置。右端のはみ出し・不要なクリッピングを防止。
+    - **ゴーストレイヤー重複防止の厳格化**: `mountCanvas` 時に `container.querySelectorAll('.xterm-kitty-graphics-layer')` を用いて、コンテナ配下のすべての旧 Canvas レイヤーを確実に一括破棄。レイアウト変更や再マウント時の二重描画を物理排除。
+    - **キャリッジリターン (`\r`) によるカーソル列リセット追従**: `calculateCursorOffset` に `hasCr` フラグを新設し、先行テキスト末尾行で `\r` が実行された場合は `startCol` を 0 起点として正確にオフセット計算。
 
 ---
 

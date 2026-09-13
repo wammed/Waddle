@@ -890,7 +890,7 @@ export const TEST_CASES: TestCase[] = [
     expected: 'Delta frames auto-detect as 32-bit RGBA, preserving alpha channel and blending smoothly without black-and-white static dots.',
     expectedJa: '差分フレームが 32-bit RGBA として正確に自動判定され、白黒砂嵐ノイズなしで透明領域を前フレームに美しく合成する。',
     type: 'Scripted / Manual',
-    command: 'npx tsx scratch/test_decode_gif_frames.mjs',
+    command: 'cd ~/GitHUB/wammed/Waddle && npx tsx scratch/test_decode_gif_frames.mjs',
   },
   {
     id: 'TC-KITTY-17',
@@ -917,7 +917,7 @@ export const TEST_CASES: TestCase[] = [
     expected: 'Cursor offsets accurately reflect horizontal movements; image placement anchors at target column without line wrapping.',
     expectedJa: '水平カーソル移動が正確にオフセット計算され、改行回り込みを起こさず目的の列に画像が配置される。',
     type: 'Scripted / Manual',
-    command: 'npx tsx scratch/test_kitten_icat_gif.mjs',
+    command: 'cd ~/GitHUB/wammed/Waddle && npx tsx scratch/test_kitten_icat_gif.mjs',
   },
 
   // Suite 8: Security & Defense-in-Depth (15)

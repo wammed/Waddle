@@ -1,7 +1,10 @@
 import { KittyApcParser } from '../src/services/kittyGraphics/parser.ts';
 import { execFileSync } from 'child_process';
+import path from 'path';
 
-const output = execFileSync('python3', ['scratch/run_kitten_icat.py'], { maxBuffer: 10 * 1024 * 1024 });
+const scriptDir = import.meta.dirname;
+const pythonScript = path.join(scriptDir, 'run_kitten_icat.py');
+const output = execFileSync('python3', [pythonScript], { maxBuffer: 10 * 1024 * 1024 });
 
 const parser = new KittyApcParser();
 const { cleanText, commands } = parser.parse(output.toString('utf-8'));

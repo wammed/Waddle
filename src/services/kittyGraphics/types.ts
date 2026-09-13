@@ -66,10 +66,13 @@ export interface KittyImageRecord {
 export interface KittyPlacement {
   id: string;
   imageId: number;
-  bufferLine: number; // Absolute line in scrollback buffer (baseY + cursorY)
+  bufferLine: number; // Absolute line in scrollback buffer (fallback)
+  marker?: any; // xterm.js IMarker for tracking exact line across buffer reflow and scroll
   col: number; // Column index (0-indexed)
   cols: number; // Number of columns occupied
   rows: number; // Number of rows occupied
+  originalTermCols?: number; // Terminal cols when placed, for dynamic centering
+  isCentered?: boolean; // Whether the image was centered horizontally
   xOffset: number; // Pixel X offset
   yOffset: number; // Pixel Y offset
   z: number; // Layering Z-index
