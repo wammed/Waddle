@@ -357,17 +357,18 @@ Welcome to the comprehensive feature guide for **Waddle**, the AI-integrated, pr
 - **Cursor Advance & Buffer Space Allocation (`C` Key)**:
   - Full compliance with the Kitty Graphics cursor movement policy:
     - `C=0` (or omitted, default): Cursor advances to the right edge of the image on its final row (`start_col + cols` at row `start_row + rows - 1`). If the image reaches or exceeds terminal width, it wraps to column 0 on the line below. Text following the image (e.g. `<- TEXT HERE`) renders at the right of the image on the last row without overlapping image pixels, and shell prompts drop cleanly below the image area.
-    - `C=1`: Cursor does not move; its position is preserved at `(start_col, start_row)`, with scroll compensation applied.
-- **Placeholder Cell Allocation & Automatic Bottom Scrolling**:
-  - Automatically allocates the `cols x rows` grid in xterm's buffer at the exact stream position of `\x1b_G...` using space characters and linefeeds (`\r\n`).
+    - `C=1`: Cursor does not move; its position is preserved at `(start_col, start_row)`. When running TUI applications (such as `yazi`) or in the Alternate Screen buffer, zero buffer space and zero linefeeds (`\r\n`) are injected, completely preventing accidental scrolling and row-shift overlapping.
+- **Placeholder Cell Allocation & Automatic Bottom Scrolling (`C=0` Standard Screen)**:
+  - In standard CLI workflows (`fastfetch`, `kitten icat`), automatically allocates the `cols x rows` grid in xterm's buffer at the exact stream position of `\x1b_G...` using space characters and linefeeds (`\r\n`).
   - When an image is placed near the bottom of the screen (`start_row + rows > termRows`), linefeeds trigger native terminal scrolling, shifting preceding lines into scrollback and ensuring the full image height is visible without clipping.
 - **Partial Clipping & Scissoring (AABB Intersection & UV Mapping)**:
   - Supports smooth partial rendering when multi-row images cross the top or bottom viewport boundaries:
     - **AABB Intersection**: Checks overlap between the image bounds `[col..col+c, row..row+r]` and the visible terminal viewport `[0..termCols, 0..termRows]`. If even a single row or column is visible, the image remains actively rendered rather than popping out of existence.
     - **Viewport Scissoring (Approach A)**: Applies hardware-accelerated clipping bounds matching viewport dimensions `[0..width, 0..height]`.
-- **Anchor Cell Synchronization & Animation Frame Retention (`a=f`)**:
+- **Anchor Cell Synchronization, CUP Cursor Parsing & Uppercase Deletion (`d=A`)**:
   - Maintains zero-latency synchronous PTY streaming (`term.write`), guaranteeing instantaneous 0ms rendering for shell startup, `fish_greetings`, and terminal prompts.
-  - Precisely captures true anchor coordinates `(start_col, start_row)` even when preceded by text or ANSI cursor movements in the same chunk via `calculateCursorOffset(textBefore)` (supporting full CSI codes: `CUF \x1b[..C`, `CUB \x1b[..D`, `CHA \x1b[..G`).
+  - Precisely captures true anchor coordinates `(start_col, start_row)` even when preceded by text or ANSI cursor movements in the same chunk via `calculateCursorOffset(textBefore)` (supporting full CSI codes: `CUF \x1b[..C`, `CUB \x1b[..D`, `CHA \x1b[..G`, and absolute `CUP \x1b[<row>;<col>H` / `HVP \x1b[<row>;<col>f` positioning utilized by Yazi).
+  - Deletion action `a=d` fully supports `d=a` and `d=A` (uppercase: wipe all images and placements from memory and screen), ensuring instantaneous zero-leak cleanup during Yazi preview switching and exiting.
   - Renderer coordinates adhere strictly to `render_x = padding_left + col * cell_width` and `render_y = padding_top + (row - scroll_offset) * cell_height`, preventing default (0, 0) collisions over previous output.
   - Animation frame transmissions (`a=f`) update frame textures in cache while strictly inheriting and preserving the placement anchor coordinates established during initial placement.
 - **Delta Frame 32-bit RGBA Auto-Detection & Alpha Compositing**:
@@ -389,7 +390,7 @@ Welcome to the comprehensive feature guide for **Waddle**, the AI-integrated, pr
   - Automatically calculates normalized UV bounds (`u_min = x / texture_width`, `v_min = y / texture_height`, `u_max = (x + w) / texture_width`, `v_max = (y + h) / texture_height`), seamlessly combining source sub-rectangles with viewport boundary scissoring.
 - **Unicode Graphic Placeholder (`U+10EEEE`) & Virtual Placements (`U=1`)**:
   - Intercepts the private-use Unicode graphic placeholder codepoint `U+10EEEE` directly in character rendering, completely suppressing "tofu" (□) missing-glyph boxes.
-  - **Exclusive Render Pass & Multi-Layer Suppression**: Hooks `TextRenderLayer.prototype._drawForeground` to render the placeholder image texture quad directly during the cell pass while returning early (`continue`) to bypass glyph lookup, atlas rasterization, and font draw calls. Additional defense-in-depth hooks on `BaseRenderLayer` (`_drawChars`, `_fillCharTrueColor`), `CursorRenderLayer` (rendering an outline cursor instead of an opaque fill or tofu glyph), and DOM row factories ensure zero glyph leakage under all conditions.
+  - **Rendering Responsibility Separation, Multi-Layer Glyph Suppression & 100% Regular Text Preservation**: Hooks `TextRenderLayer.prototype._drawForeground`, `BaseRenderLayer` (`_drawChars`), and `CursorRenderLayer` to skip character rasterization, glyph lookup, and font drawing for placeholder cells. Actual image rendering is unified exclusively onto the dedicated Kitty graphics canvas (`renderVisiblePlaceholders()`) using predetermined grid geometry (`cols` / `rows`). This completely eliminates dynamic scaling errors during cell-by-cell passes (which caused row-by-row distortion and shift-stacking) as well as duplicate drawing between font and graphics layers. Furthermore, guards against stale `workCell.combinedData` residue in xterm's memory pool via strict `cell.isCombined()` verification, guaranteeing normal terminal text (file lists, borders, status bars) is never misidentified as placeholders or hidden from view.
   - Automatically parses combining diacritic marks attached to `U+10EEEE` from the 297 standard combining marks defined by the Kitty Graphics Protocol to determine the grid row and column index of the slice.
   - Supports diacritic omission with left-to-right inheritance and 3rd-diacritic high byte extension for 32-bit image IDs.
   - Extracts image IDs from cell foreground colors (24-bit TrueColor RGB or 256-color palette index) with automatic fallback to the most recently transmitted image.
@@ -402,8 +403,10 @@ Welcome to the comprehensive feature guide for **Waddle**, the AI-integrated, pr
   - **Multi-Probe Handshake (`a=q`) & Uppercase `OK` Compliance**:
     - Fully adheres to Kitty's official Go implementation (`DetectSupport`) requiring `g.ResponseMessage() == "OK"` (uppercase `OK`).
     - Immediately replies with `\x1b_Gi=<id>;OK\x1b\` to direct memory (`i=1`) and sandboxed temp file (`i=2`) queries.
-  - **Zero-Latency DA1 (`\x1b[c`) Emulation**:
-    - Instantly acknowledges Primary Device Attributes queries (`\x1b[c`) sent at the conclusion of Kitty capability probes with `\x1b[?62;4;22c`, allowing `kitten icat --detect-support` to exit in 0ms with status 0.
+  - **Yazi CSI Probes & DA1 Zero-Latency Emulation**:
+    - Instantly acknowledges and drains `\x1b[?996n` (placeholder support query) with `\x1b[?996;1n`, `\x1b[16t` (cell size query) with `\x1b[6;18;9t`, and `\x1b[c` / `\x1b[0c` (DA1 device attributes) with `\x1b[?62;4;22c`, enabling 0ms graphics capability detection in Yazi and fastfetch.
+  - **Full Yazi TUI Preview Compatibility (`C=1`, CUP Coordinates, `d=A`)**:
+    - Complete protection against extraneous newline (`\r\n`) injection under `C=1` or Alternate Screen buffers, pixel-perfect image placement within the preview pane, and instant cleanup via `d=A` on preview navigation or file change.
 - **Security Architecture: Intentional Omission of Shared Memory (`t=s`, `/dev/shm`) & Video Playback Trade-Off**:
   - **Threat Model & Design Rationale**:
     - POSIX Shared Memory (`/dev/shm`) on Linux is accessible to all processes running under the same UID. Supporting arbitrary shared memory handles creates dangerous attack vectors, including cross-process memory inspection, symlink traversal, and memory-exhaustion denial of service (OOM crashes).

@@ -225,11 +225,15 @@ Waddle is built on a hybrid architecture combining a high-performance **Rust bac
 +---------------------------------------------------------------------------------+
 ```
 
-- **Zero-Lag Stream Separation & 0ms Rust PTY Capability Handshake (`kitten icat` Full Integration)**:
+- **Zero-Lag Stream Separation & 0ms Rust PTY Capability Handshake (`kitten icat` / `yazi` Full Integration)**:
   - APC escape sequences (`\x1b_G...`) carrying megabytes of Base64 image data are intercepted before reaching `@xterm/xterm`.
   - Stripped text is passed to `term.write()`, preventing parser bottlenecking and terminal lag.
   - **Zero-Latency PTY Query Response & Official `kitten` Compliance**: The Rust PTY background reader (`process_kitty_output`) intercepts capability inquiries (`a=q`) and immediately replies with uppercase `\x1b_Gi=<id>;OK\x1b\` to child stdin with 0ms latency. Strictly satisfies Kitty's Go implementation (`DetectSupport`) check for `g.ResponseMessage() == "OK"`, eliminating probe timeouts in `kitten icat`, `fastfetch`, and CLI tools.
-  - **Zero-Latency DA1 (`\x1b[c`) Emulation**: Instantly returns `\x1b[?62;4;22c` to Primary Device Attributes queries following probe sequences, completing handshakes in 0ms.
+  - **Zero-Latency Yazi CSI Probes Emulation**:
+    - Instantly replies to `\x1b[?996n` (Kitty Unicode placeholder support query) with `\x1b[?996;1n` (supported).
+    - Instantly replies to `\x1b[16t` (cell size query) with `\x1b[6;18;9t` (height 18px, width 9px).
+    - Instantly replies to `\x1b[c` / `\x1b[0c` (DA1 Primary Device Attributes queries) with `\x1b[?62;4;22c`.
+    - Intercepts and drains these CSI probes independently of APC (`\x1b_G`) sequences, completing TUI initialization in 0ms.
   - **Dynamic Pixel Dimension Synchronization (`TIOCGWINSZ`)**: Propagates actual rendered cell dimensions (`cellWidth`, `cellHeight`) from xterm.js Canvas into the kernel PTY window size structure (`pixel_width`, `pixel_height` as `cols * cellWidth`, `rows * cellHeight`) on every resize, enabling accurate aspect ratio calculations for `kitten icat --place`.
   - **Intentional Omission of Shared Memory (`t=s`, `/dev/shm`)**: Refuses shared memory capability queries (`t=s`) to eliminate memory inspection and OOM denial-of-service attack vectors, smoothly falling back to direct Base64 (`t=d`) and sandboxed temp files (`t=t`). High-FPS video streaming is consciously omitted to uphold an uncompromised sandbox security model.
 - **Web Standard zlib / Deflate Decompression (`o=z`)**:
@@ -246,14 +250,19 @@ Waddle is built on a hybrid architecture combining a high-performance **Rust bac
   - Old textures are evicted when cache exceeds 256 MB.
   - Crucially, `ImageBitmap.close()` is called on eviction or deletion (`a=d`) to immediately free WebKitGTK and GPU memory.
 - **Pipeline Layering Order & Canvas Stacking Architecture**:
-  - Inside `.xterm-screen`, the graphics layer is mounted with `zIndex: 1` directly above `TextRenderLayer` (`zIndex: 0`) and beneath `SelectionRenderLayer` (`zIndex: 1` in DOM order) and `CursorRenderLayer` (`zIndex: 3`).
+  - The graphics layer is mounted at the bottom of `.xterm-screen` (`screen.firstChild`, `zIndex: 0`). This prevents the Linux WebKitGTK compositor from occluding underlying text surfaces, ensuring `TextRenderLayer` cleanly paints character glyphs in the foreground over transparent background cells.
   - Upon re-mounting or layout restructuring, previous `.xterm-kitty-graphics-layer` elements are purged from the DOM, guaranteeing a single active rendering canvas and eliminating ghost duplicate layers.
-  - **Exclusive Unicode Placeholder Pass (`U+10EEEE`)**: Resolves the true `CanvasRenderer` through xterm v5 `MutableDisposable` (`_renderer.value`), hooking `TextRenderLayer.prototype._drawForeground` to render placeholder texture quads directly at exact cell coordinates while skipping standard font glyph lookup and rasterization, completely suppressing missing-glyph "tofu" boxes with multi-layer defense in `BaseRenderLayer` and `CursorRenderLayer`.
+  - **Strict Rendering Separation for Unicode Placeholders & 100% Text Preservation (`U+10EEEE`)**:
+    - Completely eliminates direct `drawImage` calls from inside `TextRenderLayer` font glyph loops. The text layer hooks dedicate strictly to skipping character passes for `U+10EEEE` to prevent missing-glyph "tofu" (□) boxes.
+    - Image rendering is unified exclusively onto the dedicated Kitty graphics canvas (`renderVisiblePlaceholders()`) using predetermined grid geometry (`cols` / `rows`), completely eliminating cell-pass dynamic scaling errors and duplicate drawing.
+    - **Eradication of False-Positive Placeholder Checks from xterm.js `workCell` Memory Pooling**: To optimize performance, xterm.js reuses a single `workCell` object across full-grid iterations. When a placeholder with combining diacritics is encountered, `workCell.combinedData` retains the placeholder string and is NOT cleared for subsequent simple ASCII cells. By enforcing an explicit `cell.isCombined()` check before inspecting combined character sequences or strings, normal text cells (directory trees, file names, borders, status bars) are guaranteed never to be misclassified as placeholders, completely restoring 100% of terminal text rendering alongside image previews.
 - **Animated GIF & Delta Frame Compositing Architecture (`a=f`, `a=a`)**:
   - **32-bit RGBA Strict Format Determination**: Base images (`a=T`) may be 24-bit RGB (`f=24`), but animation delta frames (`a=f`) require an alpha channel for transparent delta overlay (Kitty specification default is `f=32`). Payloads are validated via byte length vs pixel count arithmetic ($S = s \times v \times 4$), reliably decoding RGBA frames without stride skew, black-and-white static noise, or synthetic opacity corruption.
   - **Sub-Rectangle Delta Composition**: Composes rectangular animation patches (`x, y, s, v`) onto base or previous frames (`c=<frame_index>`) via offscreen canvas alpha blending (`ctx.drawImage`), generating sequential full-frame ImageBitmaps with zero-leak lifecycle management.
-  - **Dedicated Graphics Loop (60 FPS)**: `advanceFrame` directly updates textures on the Kitty graphics canvas, bypassing redundant `term.refresh()` calls to avoid CPU-intensive text layer redraws.
-  - **ANSI CSI Cursor Sync**: `calculateCursorOffset` accurately parses full CSI escape codes (`CUF \x1b[..C`, `CUB \x1b[..D`, `CHA \x1b[..G`) emitted by CLI tools prior to image transfer, preventing text wrapping artifacts and ensuring precise cell anchoring.
+  - **ANSI CSI Cursor Sync & CUP Coordinate Parsing**: `calculateCursorOffset` accurately parses full CSI escape codes (`CUF \x1b[..C`, `CUB \x1b[..D`, `CHA \x1b[..G`) as well as absolute `CUP \x1b[<row>;<col>H` / `HVP \x1b[<row>;<col>f` sequences emitted by TUI tools prior to image transfer, ensuring precise cell anchoring.
+  - **TUI (Yazi) Placement & Non-Advancing Cursor (`C=1`) Buffer Protection**:
+    - When `C=1` is specified or when running in the Alternate Screen buffer, zero buffer space and zero linefeeds (`\r\n`) are allocated. Eliminates unwanted screen scrolling in fixed full-screen grids.
+    - **Uppercase Deletion (`d=A`) Support**: Handles `a=d, d=A` to completely wipe all placements, memory caches, and animation timers instantly, preventing ghost overlay retention during preview transitions and exit.
 
 ---
 

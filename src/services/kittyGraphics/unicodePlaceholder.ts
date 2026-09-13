@@ -80,7 +80,9 @@ export const IS_GRAPHIC_PLACEHOLDER = Symbol('IS_GRAPHIC_PLACEHOLDER');
  */
 export function isPlaceholderCell(cell: any): boolean {
   if (!cell) return false;
-  if (cell[IS_GRAPHIC_PLACEHOLDER] === true || cell.isGraphicPlaceholder === true) return true;
+  if (cell[IS_GRAPHIC_PLACEHOLDER] === true || cell.isGraphicPlaceholder === true) {
+    return true;
+  }
 
   const code =
     typeof cell.getCode === 'function'
@@ -95,6 +97,17 @@ export function isPlaceholderCell(cell: any): boolean {
     return true;
   }
 
+  // In xterm.js, combined characters (like U+10EEEE + diacritics) have a non-zero isCombined() flag.
+  // Note: NEVER read cell.combinedData directly without checking isCombined(), because xterm reuses
+  // a single workCell object and does NOT clear cell.combinedData for subsequent simple ASCII cells!
+  const isCombined = typeof cell.isCombined === 'function' ? cell.isCombined() : false;
+  if (isCombined) {
+    const chars = typeof cell.getChars === 'function' ? cell.getChars() : '';
+    if (chars && (chars.codePointAt(0) === PLACEHOLDER_CODEPOINT || chars.includes('\u{10EEEE}'))) {
+      return true;
+    }
+  }
+
   const chars =
     typeof cell.getChars === 'function'
       ? cell.getChars()
@@ -107,10 +120,6 @@ export function isPlaceholderCell(cell: any): boolean {
       : '';
 
   if (chars && (chars.codePointAt(0) === PLACEHOLDER_CODEPOINT || chars.includes('\u{10EEEE}'))) {
-    return true;
-  }
-
-  if (typeof cell.combinedData === 'string' && (cell.combinedData.codePointAt(0) === PLACEHOLDER_CODEPOINT || cell.combinedData.includes('\u{10EEEE}'))) {
     return true;
   }
 

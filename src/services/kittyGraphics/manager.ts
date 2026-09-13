@@ -23,7 +23,6 @@ export class KittyGraphicsManager {
   private placements: Map<string, KittyPlacement> = new Map();
   private virtualPlacements: Map<number, KittyVirtualPlacement> = new Map();
   private lastTransmittedImageId: number = 0;
-  private lastDecodedPlaceholder: DecodedPlaceholder | null = null;
   private canvas: HTMLCanvasElement | null = null;
   private ctx: CanvasRenderingContext2D | null = null;
   private nextImageId: number = 1;
@@ -95,7 +94,9 @@ export class KittyGraphicsManager {
     this.screenElement = screen || container;
 
     // Clean up any stale kitty graphics canvases to prevent duplicate ghost layers
-    const existing = container.querySelectorAll('.xterm-kitty-graphics-layer');
+    const existing = typeof container.querySelectorAll === 'function'
+      ? container.querySelectorAll('.xterm-kitty-graphics-layer')
+      : [];
     existing.forEach((el: Element) => el.remove());
 
     const canvas = document.createElement('canvas');
@@ -106,11 +107,9 @@ export class KittyGraphicsManager {
     canvas.style.pointerEvents = 'none';
     canvas.style.zIndex = '0';
 
-    // Insert before TextRenderLayer in .xterm-screen so cell background -> image -> text glyphs
-    if (screen && screen.firstChild) {
+    // Insert behind TextRenderLayer so font glyphs are never masked by WebKitGTK compositor
+    if (screen) {
       screen.insertBefore(canvas, screen.firstChild);
-    } else if (screen) {
-      screen.appendChild(canvas);
     } else {
       container.appendChild(canvas);
     }
@@ -215,45 +214,24 @@ export class KittyGraphicsManager {
         // Requirement 1: In this loop, if the cell's codepoint is 0x10EEEE or has the placeholder flag,
         // completely skip (continue) glyph search, rasterization, and font drawing!
         const fontGlyphPass = function (this: any, startRow: number, endRow: number) {
-          try {
-            if (startRow === 0) {
-              self.scanPlaceholderGridDimensions();
-            }
-          } catch {}
+          let hasPlaceholders = false;
           this._forEachCell(startRow, endRow, (cell: any, x: number, y: number) => {
-            try {
-              // Check if cell is Kitty Unicode placeholder
-              if (
-                (typeof cell?.getCode === 'function' && cell.getCode() === PLACEHOLDER_CODEPOINT) ||
-                isPlaceholderCell(cell)
-              ) {
-                // Requirement 2: Exclusive rendering
-                // Render placeholder texture onto canvas, completely bypassing font glyph drawing
-                const w = this._deviceCellWidth > 0 ? this._deviceCellWidth : self.getCellWidth() * (window.devicePixelRatio || 1);
-                const h = this._deviceCellHeight > 0 ? this._deviceCellHeight : self.getCellHeight() * (window.devicePixelRatio || 1);
-                self.drawPlaceholderCell(
-                  this._ctx,
-                  cell,
-                  x,
-                  y,
-                  w,
-                  h
-                );
-                // continue in loop -> completely bypass glyph lookup, atlas rasterization, and font draw
-                return;
-              }
-
-              if (x === 0) {
-                self.lastDecodedPlaceholder = null;
-              }
-
-              this._drawChars(cell, x, y);
-            } catch {
-              try {
-                this._drawChars(cell, x, y);
-              } catch {}
+            // Check if cell is Kitty Unicode placeholder
+            if (
+              (typeof cell?.getCode === 'function' && cell.getCode() === PLACEHOLDER_CODEPOINT) ||
+              isPlaceholderCell(cell)
+            ) {
+              // Completely bypass glyph lookup, atlas rasterization, and font drawing (no tofu)
+              hasPlaceholders = true;
+              return;
             }
+
+            this._drawChars(cell, x, y);
           });
+
+          if (hasPlaceholders) {
+            self.scheduleRender();
+          }
         };
 
         if (textProto && !textProto.__kittyForegroundHooked && typeof textProto._drawForeground === 'function') {
@@ -275,7 +253,6 @@ export class KittyGraphicsManager {
               (typeof cell?.getCode === 'function' && cell.getCode() === PLACEHOLDER_CODEPOINT) ||
               isPlaceholderCell(cell)
             ) {
-              // Completely bypass glyph lookup, atlas rasterization, and font drawing
               return;
             }
             return origBaseDrawChars.call(this, cell, x, y);
@@ -336,21 +313,8 @@ export class KittyGraphicsManager {
                 (typeof cell?.getCode === 'function' && cell.getCode() === PLACEHOLDER_CODEPOINT) ||
                 isPlaceholderCell(cell)
               ) {
-                // Exclusive rendering: draw placeholder texture and completely skip origDrawChars (tofu glyph)
-                const w = textLayer._deviceCellWidth > 0 ? textLayer._deviceCellWidth : self.getCellWidth() * (window.devicePixelRatio || 1);
-                const h = textLayer._deviceCellHeight > 0 ? textLayer._deviceCellHeight : self.getCellHeight() * (window.devicePixelRatio || 1);
-                this.drawPlaceholderCell(
-                  textLayer._ctx,
-                  cell,
-                  x,
-                  y,
-                  w,
-                  h
-                );
+                // Completely bypass glyph lookup, atlas rasterization, and font drawing
                 return;
-              }
-              if (x === 0) {
-                this.lastDecodedPlaceholder = null;
               }
               return origDrawChars(cell, x, y);
             } catch {
@@ -432,113 +396,15 @@ export class KittyGraphicsManager {
   }
 
   public drawPlaceholderCell(
-    ctx: CanvasRenderingContext2D,
-    cell: any,
-    col: number,
-    row: number,
-    cellWidth: number,
-    cellHeight: number
+    _ctx: CanvasRenderingContext2D,
+    _cell: any,
+    _col: number,
+    _row: number,
+    _cellWidth: number,
+    _cellHeight: number
   ): void {
-    if (col === 0) {
-      this.lastDecodedPlaceholder = null;
-    }
-
-    const decoded = decodePlaceholderCell(
-      cell,
-      this.lastDecodedPlaceholder,
-      this.lastTransmittedImageId
-    );
-    if (!decoded) {
-      this.lastDecodedPlaceholder = null;
-      return;
-    }
-    this.lastDecodedPlaceholder = decoded;
-
-    // Requirement 1: Resolve and bind texture from graphics cache
-    const img = resolveImageFromCache(
-      this.cache,
-      decoded.imageId,
-      cell,
-      this.lastTransmittedImageId
-    );
-    if (!img || !img.bitmap) return;
-
-    const vp = this.virtualPlacements.get(img.id) || this.virtualPlacements.get(decoded.imageId);
-    if (vp) {
-      if (!vp.explicitCols && decoded.col + 1 > (vp.detectedCols || 0)) {
-        vp.detectedCols = decoded.col + 1;
-        vp.cols = vp.detectedCols;
-      }
-      if (!vp.explicitRows && decoded.row + 1 > (vp.detectedRows || 0)) {
-        vp.detectedRows = decoded.row + 1;
-        vp.rows = vp.detectedRows;
-      }
-    }
-
-    const isSingleCell = !decoded.hasDiacritics && (!vp || (vp.cols <= 1 && vp.rows <= 1));
-
-    const totalCols = vp?.cols ?? Math.max(decoded.col + 1, 1);
-    const totalRows = vp?.rows ?? Math.max(decoded.row + 1, 1);
-
-    const srcX = vp?.srcX ?? 0;
-    const srcY = vp?.srcY ?? 0;
-    const srcWidth = vp?.srcWidth;
-    const srcHeight = vp?.srcHeight;
-
-    // Requirement 2: Submit texture quad to rendering pipeline with proper UV mapping
-    // Single cell: (0.0, 0.0) .. (1.0, 1.0); Divided: proportional tile UV
-    const uv = computePlaceholderUV(
-      decoded.row,
-      decoded.col,
-      totalRows,
-      totalCols,
-      img.bitmap.width,
-      img.bitmap.height,
-      srcX,
-      srcY,
-      srcWidth,
-      srcHeight,
-      isSingleCell
-    );
-
-    if (uv.sw <= 0 || uv.sh <= 0) return;
-
-    const effectiveCellWidth = cellWidth > 0 ? cellWidth : this.getCellWidth() * (window.devicePixelRatio || 1);
-    const effectiveCellHeight = cellHeight > 0 ? cellHeight : this.getCellHeight() * (window.devicePixelRatio || 1);
-
-    // Pixel rectangle with integer boundary snapping to eliminate seams between adjacent cells
-    const startX = Math.round(col * effectiveCellWidth);
-    const endX = Math.round((col + 1) * effectiveCellWidth);
-    const dw = Math.max(1, endX - startX);
-
-    const startY = Math.round(row * effectiveCellHeight);
-    const endY = Math.round((row + 1) * effectiveCellHeight);
-    const dh = Math.max(1, endY - startY);
-
-    try {
-      ctx.save();
-      // Requirement 3: Alpha blending enabled (source-over, full opacity, avoid clearing/black crushing)
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.globalAlpha = 1.0;
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = 'high';
-
-      // Draw cell texture directly without clipping path to eliminate edge anti-aliasing gaps
-      ctx.drawImage(
-        img.bitmap,
-        uv.sx,
-        uv.sy,
-        uv.sw,
-        uv.sh,
-        startX,
-        startY,
-        dw,
-        dh
-      );
-      ctx.restore();
-    } catch {
-      // ignore draw error if bitmap closed
-    }
+    // Deprecated: Placeholder graphics are rendered on the dedicated Kitty graphics layer
+    // (renderVisiblePlaceholders) to avoid multi-pass scale drift and duplicate drawing on TextRenderLayer.
   }
 
   private queueCommand(cmd: KittyCommand): void {
@@ -574,19 +440,31 @@ export class KittyGraphicsManager {
     return cleanText;
   }
 
-  private calculateCursorOffset(text: string): { deltaCol: number; deltaLine: number; hasCr: boolean } {
+  private calculateCursorOffset(text: string): {
+    deltaCol: number;
+    deltaLine: number;
+    hasCr: boolean;
+    absoluteCol?: number;
+    absoluteRow?: number;
+  } {
     if (!text) return { deltaCol: 0, deltaLine: 0, hasCr: false };
     let deltaLine = 0;
     let lastLineLen = 0;
     let hasCr = false;
+    let absoluteCol: number | undefined;
+    let absoluteRow: number | undefined;
+
     for (let i = 0; i < text.length; i++) {
       if (text[i] === '\n') {
         deltaLine++;
         lastLineLen = 0;
         hasCr = false;
+        if (absoluteRow !== undefined) absoluteRow++;
+        absoluteCol = 0;
       } else if (text[i] === '\r') {
         lastLineLen = 0;
         hasCr = true;
+        absoluteCol = 0;
       } else if (text[i] === '\x1b' && text[i + 1] === '[') {
         // Parse full CSI sequence: \x1b[ [params] [final_byte 0x40-0x7E]
         let j = i + 2;
@@ -600,12 +478,33 @@ export class KittyGraphicsManager {
           if (finalChar === 'C') {
             // Cursor Forward (CUF)
             lastLineLen += paramVal;
+            if (absoluteCol !== undefined) absoluteCol += paramVal;
           } else if (finalChar === 'D') {
             // Cursor Back (CUB)
             lastLineLen = Math.max(0, lastLineLen - paramVal);
+            if (absoluteCol !== undefined) absoluteCol = Math.max(0, absoluteCol - paramVal);
           } else if (finalChar === 'G') {
             // Cursor Horizontal Absolute (CHA)
             lastLineLen = Math.max(0, paramVal - 1);
+            absoluteCol = Math.max(0, paramVal - 1);
+            hasCr = true;
+          } else if (finalChar === 'H' || finalChar === 'f') {
+            // Cursor Position (CUP / HVP): \x1b[<row>;<col>H (1-based)
+            const parts = paramStr.split(';');
+            const r = (parseInt(parts[0], 10) || 1) - 1;
+            const c = (parseInt(parts[1], 10) || 1) - 1;
+            absoluteRow = Math.max(0, r);
+            absoluteCol = Math.max(0, c);
+            lastLineLen = absoluteCol;
+            hasCr = true;
+          } else if (finalChar === 'A') {
+            // Cursor Up (CUU)
+            deltaLine = Math.max(0, deltaLine - paramVal);
+            if (absoluteRow !== undefined) absoluteRow = Math.max(0, absoluteRow - paramVal);
+          } else if (finalChar === 'B') {
+            // Cursor Down (CUD)
+            deltaLine += paramVal;
+            if (absoluteRow !== undefined) absoluteRow += paramVal;
           }
           i = j;
           continue;
@@ -613,9 +512,10 @@ export class KittyGraphicsManager {
         lastLineLen++;
       } else {
         lastLineLen++;
+        if (absoluteCol !== undefined) absoluteCol++;
       }
     }
-    return { deltaCol: lastLineLen, deltaLine, hasCr };
+    return { deltaCol: lastLineLen, deltaLine, hasCr, absoluteCol, absoluteRow };
   }
 
   /**
@@ -749,11 +649,14 @@ export class KittyGraphicsManager {
     this.flushTerminalBuffer();
 
     // Calculate anchor position taking into account any text preceding the image in the current chunk
-    const { deltaCol, deltaLine, hasCr } = this.calculateCursorOffset(textBefore);
+    const { deltaCol, deltaLine, hasCr, absoluteCol, absoluteRow } = this.calculateCursorOffset(textBefore);
     let startCol = this.term.buffer.active.cursorX;
     let startBufferLine = this.term.buffer.active.baseY + this.term.buffer.active.cursorY;
 
-    if (deltaLine > 0 || hasCr) {
+    if (absoluteRow !== undefined && absoluteCol !== undefined) {
+      startCol = absoluteCol % termCols;
+      startBufferLine = this.term.buffer.active.baseY + absoluteRow;
+    } else if (deltaLine > 0 || hasCr) {
       startCol = deltaCol % termCols;
       startBufferLine += deltaLine;
     } else if (deltaCol > 0) {
@@ -768,16 +671,22 @@ export class KittyGraphicsManager {
 
     const C = cmd.keys.C ?? 0; // 0=move, 1=do not move
 
-    let seq = '';
-
-    // If C=1, save cursor position (DECSC / xterm adjusts saved cursor on scroll)
+    // 1. If C=1 (do not move cursor), do NOT allocate spaces or linefeeds in text buffer!
+    // Per Kitty protocol specification, C=1 places the image without advancing cursor or allocating buffer cells.
     if (C === 1) {
-      seq += '\x1b[s';
+      return '';
     }
 
-    // Allocate placeholder cells and linefeeds across rows
+    // 2. If alternate screen buffer (TUI applications like Yazi, Neovim, etc.),
+    // do NOT inject linefeeds/spaces that disrupt the fixed full-screen grid and cause runaway scrolling!
+    if (this.term.buffer.active.type === 'alternate') {
+      return '';
+    }
+
+    // Allocate placeholder cells and linefeeds across rows for standard CLI commands (fastfetch, icat)
     // Row 0: cols spaces
     // Rows 1 .. rows-1: \r\n + (if startCol > 0, move cursor to startCol) + cols spaces
+    let seq = '';
     const spaces = ' '.repeat(cols);
     for (let r = 0; r < rows; r++) {
       if (r > 0) {
@@ -789,14 +698,9 @@ export class KittyGraphicsManager {
       seq += spaces;
     }
 
-    if (C === 1) {
-      // Restore cursor position to start cell (scroll-corrected by xterm)
-      seq += '\x1b[u';
-    } else {
-      // If the final row reaches or exceeds terminal right margin, wrap to next line
-      if (startCol + cols >= termCols) {
-        seq += '\r\n';
-      }
+    // If the final row reaches or exceeds terminal right margin, wrap to next line
+    if (startCol + cols >= termCols) {
+      seq += '\r\n';
     }
 
     return seq;
@@ -1276,9 +1180,12 @@ export class KittyGraphicsManager {
 
       case 'd': {
         // Delete images / placements
-        const target = cmd.keys.d || 'a';
+        const target = (cmd.keys.d || 'a').toLowerCase();
         const id = cmd.keys.i !== undefined ? cmd.keys.i : cmd.keys.I;
+        const placementId = cmd.keys.p;
+
         if (target === 'a') {
+          // Delete all images and placements from memory and screen (d=a, d=A)
           for (const k of this.cache.keys()) {
             this.stopAnimation(k);
           }
@@ -1288,21 +1195,27 @@ export class KittyGraphicsManager {
           this.placements.clear();
           this.virtualPlacements.clear();
           this.cache.clear();
-        } else if (id !== undefined) {
-          this.stopAnimation(id);
-          this.cache.delete(id);
-          this.virtualPlacements.delete(id);
-          for (const [key, p] of this.placements.entries()) {
-            if (p.imageId === id) {
-              try { p.marker?.dispose(); } catch {}
-              this.placements.delete(key);
+        } else if (target === 'i' || (target !== 'p' && id !== undefined)) {
+          // Delete by image ID (d=i, d=I)
+          if (id !== undefined) {
+            this.stopAnimation(id);
+            this.cache.delete(id);
+            this.virtualPlacements.delete(id);
+            for (const [key, p] of this.placements.entries()) {
+              if (p.imageId === id) {
+                try { p.marker?.dispose(); } catch {}
+                this.placements.delete(key);
+              }
             }
           }
-        } else if (cmd.keys.p !== undefined) {
-          const pId = String(cmd.keys.p);
-          const p = this.placements.get(pId);
-          try { p?.marker?.dispose(); } catch {}
-          this.placements.delete(pId);
+        } else if (target === 'p' || placementId !== undefined) {
+          // Delete by placement ID (d=p, d=P)
+          if (placementId !== undefined) {
+            const pId = String(placementId);
+            const p = this.placements.get(pId);
+            try { p?.marker?.dispose(); } catch {}
+            this.placements.delete(pId);
+          }
         }
         this.render();
         this.term.refresh(0, this.term.rows - 1);
@@ -1425,7 +1338,21 @@ export class KittyGraphicsManager {
       ? { cols: spanCols, rows: spanRows }
       : this.computeSpans(keys, pixelWidth, pixelHeight);
 
-    const placementId = keys.p ? String(keys.p) : `img-${imageId}-${Date.now()}`;
+    // Determine placement ID: if keys.p is provided, use it;
+    // otherwise if an existing placement with the same imageId exists, reuse it to avoid accumulating ghost overlays
+    let placementId: string;
+    if (keys.p !== undefined) {
+      placementId = String(keys.p);
+    } else {
+      let existingKey: string | undefined;
+      for (const [k, p] of this.placements.entries()) {
+        if (p.imageId === imageId) {
+          existingKey = k;
+          break;
+        }
+      }
+      placementId = existingKey || `img-${imageId}-${Date.now()}`;
+    }
     const existingPlacement = this.placements.get(placementId);
 
     // Anchor coordinates: strictly prioritize captured anchor -> existing placement anchor -> current cursor
@@ -1498,7 +1425,8 @@ export class KittyGraphicsManager {
   public scheduleRender(): void {
     if (this.renderScheduled || this.isDisposed) return;
     this.renderScheduled = true;
-    requestAnimationFrame(() => {
+    const scheduleFn = typeof requestAnimationFrame === 'function' ? requestAnimationFrame : (cb: () => void) => setTimeout(cb, 16);
+    scheduleFn(() => {
       this.renderScheduled = false;
       if (!this.isDisposed) {
         this.render();
@@ -1711,7 +1639,14 @@ export class KittyGraphicsManager {
         }
         prevDecoded = decoded;
 
-        const vp = this.virtualPlacements.get(decoded.imageId);
+        const img = resolveImageFromCache(
+          this.cache,
+          decoded.imageId,
+          cell,
+          this.lastTransmittedImageId
+        );
+        const vpKey = img ? img.id : decoded.imageId;
+        const vp = this.virtualPlacements.get(vpKey) || this.virtualPlacements.get(decoded.imageId);
         if (vp) {
           if (!vp.explicitCols) {
             vp.detectedCols = Math.max(vp.detectedCols || 0, decoded.col + 1);
@@ -1903,7 +1838,6 @@ export class KittyGraphicsManager {
     }
     this.placements.clear();
     this.virtualPlacements.clear();
-    this.lastDecodedPlaceholder = null;
 
     if (this.canvas && this.canvas.parentElement) {
       this.canvas.parentElement.removeChild(this.canvas);

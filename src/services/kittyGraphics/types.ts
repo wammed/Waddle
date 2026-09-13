@@ -16,7 +16,7 @@ export interface KittyControlKeys {
   Y?: number; // Cell Y offset in pixels
   C?: 0 | 1; // Cursor movement policy (0=move, 1=do not move, default: 0)
   z?: number; // Z-index OR animation frame delay/gap in ms
-  d?: 'a' | 'i' | 'c' | 'p'; // Delete action target
+  d?: 'a' | 'A' | 'i' | 'I' | 'c' | 'C' | 'p' | 'P'; // Delete action target
   x?: number; // Sub-rectangle X offset in source image (pixels)
   y?: number; // Sub-rectangle Y offset in source image (pixels)
   w?: number; // Sub-rectangle width in source image (pixels)

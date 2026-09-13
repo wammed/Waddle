@@ -325,11 +325,7 @@ hookManager.installCanvasRendererHook();
 // Run _drawForeground (the Font/Glyph Render Pass)
 fakeTextLayer._drawForeground(0, 0);
 
-// Verify: col 0 (U+10EEEE) was handled by drawPlaceholderCell
-assert.strictEqual(drawnPlaceholderCalls.length, 1, 'Should call drawPlaceholderCell for U+10EEEE');
-assert.strictEqual(drawnPlaceholderCalls[0].col, 0);
-
-// Verify: col 0 was completely SKIPPED in _drawChars (Font/Glyph Pass)
+// Verify: col 0 (U+10EEEE) was completely SKIPPED in _drawChars (Font/Glyph Pass)
 assert.strictEqual(drawnCharsCalls.length, 2, 'Only 2 normal characters should be passed to _drawChars');
 assert.strictEqual(drawnCharsCalls[0].char, 'H', 'First drawn char should be H');
 assert.strictEqual(drawnCharsCalls[1].char, 'i', 'Second drawn char should be i');

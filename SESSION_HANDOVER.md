@@ -556,6 +556,54 @@ npm run tauri dev
       - 従来の `ctx.clip()` によるアンチエイリアス境界の黒いグリッド隙間・線の発生を廃止。`Math.round` による整数セル境界スナップ（`startX, endX, startY, endY`）を適用し、隣接セル同士が 1 ピクセルも隙間なく密着するシームレス描画を達成。
     - **PTY への `KITTY_WINDOW_ID=1` 自動設定**: `src-tauri/src/pty.rs` のシェル起動環境変数に `KITTY_WINDOW_ID=1` を常時注入し、Yazi や各種 Kitty グラフィックス対応ツールが追加設定なしで即座にインライン画像プレビューを認識・実行できるよう最適化。
     - **`scheduleRender` によるアニメーション描画デバウンス**: `requestAnimationFrame` を用いた描画キュー集約により、大量のコマンドストリーム受信時でも UI のマイクロスタッターや描画過負荷を防止。
+28. **TC-KITTY-19 Yazi プレビュー画像表示崩れ（一行ずらし重なり・全域スクロール）の完全解消**:
+    - **`C=1`（カーソル非前進）時の改行・空白挿入の完全抑止（ゼロアロケーション）**:
+      - Yazi 等の TUI ツールが指定する `C=1`（カーソルを移動するな）および代替スクリーンバッファ（`alternate`）稼働時において、`generatePlaceholderSequence` が行数分の `\r\n` や空白文字をターミナルバッファに挿入する処理を完全抑止（空文字列 `''` を返却）。
+      - 画面下端での不要なターミナル強制スクロールをゼロ化し、Yazi の TUI 全体と画像が 1 行ずつ上に押し出されて重なり表示崩壊を引き起こすバグを根絶。
+    - **CUP 絶対座標解析 (`\x1b[<row>;<col>H` / `\x1b[<row>;<col>f`)**:
+      - `calculateCursorOffset` を拡張し、`CUF`, `CUB`, `CHA` に加え、Yazi がプレビュー枠へカーソルをジャンプさせる絶対位置指定エスケープシーケンス `CUP` を完全パース。
+      - 画像コマンド直前の絶対行・絶対列 `(startCol, startBufferLine)` を正確にバインドし、プレビュー枠内への精密な画像アンカー配置を実現。
+    - **大文字削除 (`d=A`) の完全対応**:
+      - `case 'd'` において、小文字 `d=a` に加え、Yazi がプレビュー切り替え・終了時に送出する大文字 `d=A`（メモリおよび画面からの全画像・配置の一括消去）を解釈・実行。
+      - ゴースト配置の残存をゼロ化し、プレビュー更新時の重複描画を根絶。
+    - **同一画像 ID の配置再利用 (`placementId`)**:
+      - 同一 `imageId` に対する画像再配置時に古い配置キーを再利用・更新し、重複したゴースト配置の蓄積を物理排除。
+    - **単体テスト & ビルド検証**:
+      - `scratch/test_yazi_c1_repro.mjs` による検証全件パス（`C=1` で `\r\n` が 0 件、CUP 座標抽出 100%、`d=A` 即時消去、同一画像 ID 再利用）、既存テスト全件パス、`npm run build` エラー 0 件、Rust テスト 40 件全パス。
+29. **TC-KITTY-19 Yazi プレビュー画像表示崩れ（一行ずらし重なり・全域スクロール）の根本原因解明と完全解決**:
+    - **根本原因の完全解明**:
+      - **原因1: TextRenderLayer 内部での直接描画と動的スケール破損**: `TextRenderLayer`（xterm 文字・フォント描画レイヤー）のフック（`fontGlyphPass`, `_drawChars`）内で `drawPlaceholderCell` を直接呼び出し、セル走査ループの中で動的更新される `vp.rows = decoded.row + 1` に基づいて Canvas に `drawImage` していた。1行目を描画する際は `vp.rows = 1`（画像全体が1行に圧縮描画）、2行目は `vp.rows = 2`（上半分・下半分）、3行目は `vp.rows = 3`…と、行が進むごとに画像のスケールが狂いながら1行ずつずれて描画が重なり合っていた（ユーザーが指摘した「ウィンドウ内全域に一行ずらしで重なって表示される」の真の直接原因）。
+      - **原因2: 二重描画とレイヤーパディングズレ**: `TextRenderLayer` フックでの直接描画に加え、Kitty 専用 Canvas（`renderVisiblePlaceholders()`）でも同時に描画されており、二重描画およびパディング有無による座標ズレが発生していた。
+      - **原因3: PTY での Yazi 起動時プローブ未応答 & CSI 早期リターン**: `src-tauri/src/pty.rs` の `process_kitty_output` が、Kitty APC シーケンス（`\x1b_G`）を含まないチャンクにおいて早期リターンしていたため、Yazi が送出する `\x1b[?996n`（Kitty Unicode プレースホルダー対応確認）、`\x1b[16t`（セルサイズ問い合わせ）、`\x1b[0c`（DA1）がインターセプトされずに無視されていた。
+    - **実施した根本解決策**:
+      - **バックエンド (`src-tauri/src/pty.rs`)**:
+        - `process_kitty_output` において、APC（`\x1b_G`）の有無に関わらず `has_csi_query` を判定。
+        - `\x1b[?996n` に対し `\x1b[?996;1n`（対応）を即時返信・ドレイン。
+        - `\x1b[16t` に対し `\x1b[6;18;9t`（高さ18px, 幅9px）を即時返信・ドレイン。
+        - `\x1b[0c` / `\x1b[c` に対し `\x1b[?62;4;22c` を即時返信・ドレイン。
+        - ユニットテスト `test_kitty_query_yazi_probes` を追加し、CSI プローブの即時応答とストリームからの完全ドレインを保証。
+      - **フロントエンド (`src/services/kittyGraphics/manager.ts`)**:
+        - **レンダリング責務の分離**: `installCanvasRendererHook` 内の `fontGlyphPass` および `textLayer._drawChars` から `drawPlaceholderCell` 呼び出しを撤廃。プレースホルダー文字（`U+10EEEE`）は単に文字描画（豆腐 □）のみをスキップ（`return;`）する役に専任化。
+        - **Kitty 専用 Canvas への描画一本化**: `drawPlaceholderCell` を no-op 化し、画像本体の描画を事前にグリッド寸法（`cols` / `rows`）を確定した上で Kitty 専用 Canvas（`renderVisiblePlaceholders()`）に一本化。セル走査中の動的スケール破損と二重描画を根絶。
+        - **DOM レイヤースタッキング**: `mountCanvas` において Kitty 専用 Canvas の `zIndex` を `0`（`screen.firstChild`）に設定し、WebKitGTK のサーフェス遮蔽を防止して `TextRenderLayer` の通常文字が前面に美しく描画される透過スタックを実現。
+        - **プレースホルダー寸法確定の強化**: `scanPlaceholderGridDimensions` に画像 ID フォールバック解決を組み込み、正確なグリッド寸法を確定。
+      - **緊急バグ修正：Yazi で画像表示後にターミナルの通常テキストが消失する不具合の根本解消**:
+        - **症状**: Yazi で画像は綺麗に表示されるが、ファイル名一覧、枠線、ステータス等の通常テキストが一切描画されず空白になる。
+        - **原因究明 (`scratch/simulate_canvas_draw.mjs`)**:
+          - xterm.js は画面セル走査時に単一の `workCell` オブジェクトを使い回すメモリ最適化を行っている。
+          - プレースホルダー（結合ダイアクリティック付き）が出現すると `workCell.combinedData` にその文字列が代入されるが、以降の通常文字（ASCII等）を走査する際、xterm.js は `combinedData` をクリアしない。
+          - `unicodePlaceholder.ts` の `isPlaceholderCell` が `cell.combinedData` を無条件で検証していたため、一度プレースホルダーが出現した後は**以降の全セル（通常文字含む）が `isPlaceholderCell === true` と誤判定され、`fontGlyphPass` 内ですべて `return;` されて文字描画が 100% スキップ（`_drawChars` 呼び出し回数: 0）されていた**。
+        - **恒久対策 (`src/services/kittyGraphics/unicodePlaceholder.ts`)**:
+          - `isPlaceholderCell` において、`cell.isCombined()` が真（非ゼロ）の場合のみ結合文字列を検証するように修正し、汚染された残骸が残る `cell.combinedData` の無条件参照を完全撤廃。
+          - 通常文字は `cell.isCombined() === 0` かつ `code !== 0x10EEEE` となり、100% `isPlaceholderCell === false` と判定されるように厳密化。
+    - **検証エビデンス**:
+      - `scratch/simulate_canvas_draw.mjs` による実機 Yazi データシミュレーション：
+        - 修正前の `_drawChars` 呼び出し回数: **0 回**（文字が一切描画されず消失）
+        - 修正後の `_drawChars` 呼び出し回数: **2,324 回**（30 行すべての文字グリフ描画が 100% 復活）
+        - プレビュー枠外（`dx < 740`）の画像描画: 0 件、プレビュー枠内（右ペイン）へのピクセルパーフェクト描画を維持。
+      - `npm run build`（TypeScript/Vite）エラー 0 件。
+      - `cargo test --manifest-path src-tauri/Cargo.toml`（Rust 41 件）全テスト PASS。
+      - `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets` 警告・エラー 0 件。
 
 ---
 

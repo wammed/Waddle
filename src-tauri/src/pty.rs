@@ -77,7 +77,13 @@ pub fn process_kitty_output<W: Write + ?Sized>(
         pending_prefix.clear();
     }
 
-    if !decoded.contains("\x1b_G") {
+    let has_apc = decoded.contains("\x1b_G");
+    let has_csi_query = decoded.contains("\x1b[c")
+        || decoded.contains("\x1b[0c")
+        || decoded.contains("\x1b[16t")
+        || decoded.contains("\x1b[?996n");
+
+    if !has_apc && !has_csi_query {
         if decoded.ends_with("\x1b_") {
             *pending_prefix = decoded.split_off(decoded.len() - 2);
         } else if decoded.ends_with("\x1b") {
@@ -86,128 +92,130 @@ pub fn process_kitty_output<W: Write + ?Sized>(
         return;
     }
 
-    let mut search_idx = 0;
-    let mut to_remove_ranges: Vec<std::ops::Range<usize>> = Vec::new();
+    if has_apc {
+        let mut search_idx = 0;
+        let mut to_remove_ranges: Vec<std::ops::Range<usize>> = Vec::new();
 
-    while let Some(rel_start) = decoded[search_idx..].find("\x1b_G") {
-        let start = search_idx + rel_start;
-        let header_start = start + 3; // Length of "\x1b_G"
-        let rest = &decoded[header_start..];
+        while let Some(rel_start) = decoded[search_idx..].find("\x1b_G") {
+            let start = search_idx + rel_start;
+            let header_start = start + 3; // Length of "\x1b_G"
+            let rest = &decoded[header_start..];
 
-        // Find delimiter ending the header: ';' or ST '\x1b\' or BEL '\x07'
-        let semi_pos = rest.find(';');
-        let mut term_pos = None;
-        let mut term_len = 0;
+            // Find delimiter ending the header: ';' or ST '\x1b\' or BEL '\x07'
+            let semi_pos = rest.find(';');
+            let mut term_pos = None;
+            let mut term_len = 0;
 
-        if let Some(pos) = rest.find("\x1b\\") {
-            term_pos = Some(pos);
-            term_len = 2;
-        }
-        if let Some(pos) = rest.find('\x07') {
-            if term_pos.is_none_or(|t| pos < t) {
+            if let Some(pos) = rest.find("\x1b\\") {
                 term_pos = Some(pos);
-                term_len = 1;
+                term_len = 2;
             }
-        }
-
-        let header_end = match (semi_pos, term_pos) {
-            (Some(s), Some(t)) => Some(s.min(t)),
-            (Some(s), None) => Some(s),
-            (None, Some(t)) => Some(t),
-            (None, None) => None,
-        };
-
-        if let Some(h_end) = header_end {
-            let header = &rest[..h_end];
-            println!("[Kitty Graphics] Received header: {}", header);
-
-            // Check if this is a query probe (a=q)
-            let mut is_query = false;
-            let mut query_id: Option<u32> = None;
-            let mut medium: Option<char> = None;
-
-            for part in header.split(',') {
-                let part = part.trim();
-                let mut kv = part.split('=');
-                if let (Some(k), Some(v)) = (kv.next(), kv.next()) {
-                    let k = k.trim();
-                    let v = v.trim();
-                    if k.eq_ignore_ascii_case("a") && v.eq_ignore_ascii_case("q") {
-                        is_query = true;
-                    } else if k.eq_ignore_ascii_case("i") || k.eq_ignore_ascii_case("I") {
-                        query_id = v.parse::<u32>().ok();
-                    } else if k.eq_ignore_ascii_case("t") || k.eq_ignore_ascii_case("T") {
-                        medium = v.chars().next();
-                    }
+            if let Some(pos) = rest.find('\x07') {
+                if term_pos.is_none_or(|t| pos < t) {
+                    term_pos = Some(pos);
+                    term_len = 1;
                 }
             }
 
-            if is_query {
-                let id = query_id.unwrap_or(1);
-                let is_shm = matches!(medium, Some('s') | Some('S'));
-                if !is_shm {
-                    // Send uppercase "OK" as required by kitten's DetectSupport (g.ResponseMessage() == "OK")
-                    let response = format!("\x1b_Gi={};OK\x1b\\", id);
-                    if let Err(e) = writer.write_all(response.as_bytes()) {
-                        eprintln!("[Kitty Graphics] Error writing query response: {}", e);
-                    } else if let Err(e) = writer.flush() {
-                        eprintln!("[Kitty Graphics] Error flushing query response: {}", e);
-                    } else {
-                        println!("[Kitty Graphics] Responded to query: \\x1b_Gi={};OK\\x1b\\", id);
-                    }
-                } else {
-                    let response = format!("\x1b_Gi={};ENOTSUP\x1b\\", id);
-                    if let Err(e) = writer.write_all(response.as_bytes()) {
-                        eprintln!("[Kitty Graphics] Error writing query refusal: {}", e);
-                    } else if let Err(e) = writer.flush() {
-                        eprintln!("[Kitty Graphics] Error flushing query refusal: {}", e);
-                    } else {
-                        println!("[Kitty Graphics] Refused probe for shared memory (t=s) with ENOTSUP: i={}", id);
+            let header_end = match (semi_pos, term_pos) {
+                (Some(s), Some(t)) => Some(s.min(t)),
+                (Some(s), None) => Some(s),
+                (None, Some(t)) => Some(t),
+                (None, None) => None,
+            };
+
+            if let Some(h_end) = header_end {
+                let header = &rest[..h_end];
+                println!("[Kitty Graphics] Received header: {}", header);
+
+                // Check if this is a query probe (a=q)
+                let mut is_query = false;
+                let mut query_id: Option<u32> = None;
+                let mut medium: Option<char> = None;
+
+                for part in header.split(',') {
+                    let part = part.trim();
+                    let mut kv = part.split('=');
+                    if let (Some(k), Some(v)) = (kv.next(), kv.next()) {
+                        let k = k.trim();
+                        let v = v.trim();
+                        if k.eq_ignore_ascii_case("a") && v.eq_ignore_ascii_case("q") {
+                            is_query = true;
+                        } else if k.eq_ignore_ascii_case("i") || k.eq_ignore_ascii_case("I") {
+                            query_id = v.parse::<u32>().ok();
+                        } else if k.eq_ignore_ascii_case("t") || k.eq_ignore_ascii_case("T") {
+                            medium = v.chars().next();
+                        }
                     }
                 }
 
-                // Remove the query sequence from decoded
-                if let Some(t_pos) = term_pos {
-                    let seq_end = header_start + t_pos + term_len;
-                    to_remove_ranges.push(start..seq_end);
-                    search_idx = seq_end;
-                    continue;
-                } else if let Some(s_pos) = semi_pos {
-                    let after_semi = &rest[s_pos + 1..];
-                    if after_semi.starts_with("\x1b\\") {
-                        let seq_end = header_start + s_pos + 1 + 2;
+                if is_query {
+                    let id = query_id.unwrap_or(1);
+                    let is_shm = matches!(medium, Some('s') | Some('S'));
+                    if !is_shm {
+                        // Send uppercase "OK" as required by kitten's DetectSupport (g.ResponseMessage() == "OK")
+                        let response = format!("\x1b_Gi={};OK\x1b\\", id);
+                        if let Err(e) = writer.write_all(response.as_bytes()) {
+                            eprintln!("[Kitty Graphics] Error writing query response: {}", e);
+                        } else if let Err(e) = writer.flush() {
+                            eprintln!("[Kitty Graphics] Error flushing query response: {}", e);
+                        } else {
+                            println!("[Kitty Graphics] Responded to query: \\x1b_Gi={};OK\\x1b\\", id);
+                        }
+                    } else {
+                        let response = format!("\x1b_Gi={};ENOTSUP\x1b\\", id);
+                        if let Err(e) = writer.write_all(response.as_bytes()) {
+                            eprintln!("[Kitty Graphics] Error writing query refusal: {}", e);
+                        } else if let Err(e) = writer.flush() {
+                            eprintln!("[Kitty Graphics] Error flushing query refusal: {}", e);
+                        } else {
+                            println!("[Kitty Graphics] Refused probe for shared memory (t=s) with ENOTSUP: i={}", id);
+                        }
+                    }
+
+                    // Remove the query sequence from decoded
+                    if let Some(t_pos) = term_pos {
+                        let seq_end = header_start + t_pos + term_len;
                         to_remove_ranges.push(start..seq_end);
                         search_idx = seq_end;
                         continue;
-                    } else if after_semi.starts_with('\x07') {
-                        let seq_end = header_start + s_pos + 1 + 1;
-                        to_remove_ranges.push(start..seq_end);
-                        search_idx = seq_end;
-                        continue;
+                    } else if let Some(s_pos) = semi_pos {
+                        let after_semi = &rest[s_pos + 1..];
+                        if after_semi.starts_with("\x1b\\") {
+                            let seq_end = header_start + s_pos + 1 + 2;
+                            to_remove_ranges.push(start..seq_end);
+                            search_idx = seq_end;
+                            continue;
+                        } else if after_semi.starts_with('\x07') {
+                            let seq_end = header_start + s_pos + 1 + 1;
+                            to_remove_ranges.push(start..seq_end);
+                            search_idx = seq_end;
+                            continue;
+                        }
                     }
                 }
-            }
 
-            // For non-queries, advance search_idx past this header
-            search_idx = header_start + h_end + 1;
-        } else {
-            // Header is incomplete at end of buffer (< 256 bytes)
-            if rest.len() < 256 {
-                break;
+                // For non-queries, advance search_idx past this header
+                search_idx = header_start + h_end + 1;
             } else {
-                search_idx = header_start;
+                // Header is incomplete at end of buffer (< 256 bytes)
+                if rest.len() < 256 {
+                    break;
+                } else {
+                    search_idx = header_start;
+                }
+            }
+        }
+
+        // Drain removed ranges in reverse order so indices remain valid
+        for range in to_remove_ranges.into_iter().rev() {
+            if range.end <= decoded.len() {
+                decoded.drain(range);
             }
         }
     }
 
-    // Drain removed ranges in reverse order so indices remain valid
-    for range in to_remove_ranges.into_iter().rev() {
-        if range.end <= decoded.len() {
-            decoded.drain(range);
-        }
-    }
-
-    // Check if DA1 query "\x1b[c" is present in decoded (frequently sent at the end of Kitty capability probes)
+    // Check if DA1 query "\x1b[c" or "\x1b[0c" is present in decoded (frequently sent at the end of Kitty capability probes)
     while let Some(da1_pos) = decoded.find("\x1b[c") {
         let response = b"\x1b[?62;4;22c";
         if let Err(e) = writer.write_all(response) {
@@ -218,6 +226,45 @@ pub fn process_kitty_output<W: Write + ?Sized>(
             println!("[Kitty Graphics] Responded to DA1 query: \\x1b[?62;4;22c");
         }
         decoded.drain(da1_pos..da1_pos + 3);
+    }
+    while let Some(da1_0_pos) = decoded.find("\x1b[0c") {
+        let response = b"\x1b[?62;4;22c";
+        if let Err(e) = writer.write_all(response) {
+            eprintln!("[Kitty Graphics] Error writing DA1 (0c) response: {}", e);
+        } else if let Err(e) = writer.flush() {
+            eprintln!("[Kitty Graphics] Error flushing DA1 (0c) response: {}", e);
+        } else {
+            println!("[Kitty Graphics] Responded to DA1 (0c) query: \\x1b[?62;4;22c");
+        }
+        decoded.drain(da1_0_pos..da1_0_pos + 4);
+    }
+
+    // Check if cell size query "\x1b[16t" is present (used by Yazi/terminal graphics tools to determine cell dimensions)
+    while let Some(cell_size_pos) = decoded.find("\x1b[16t") {
+        // Response format: \x1b[6;<cell_height>;<cell_width>t (e.g. 18 height x 9 width)
+        let response = b"\x1b[6;18;9t";
+        if let Err(e) = writer.write_all(response) {
+            eprintln!("[Kitty Graphics] Error writing cell size response: {}", e);
+        } else if let Err(e) = writer.flush() {
+            eprintln!("[Kitty Graphics] Error flushing cell size response: {}", e);
+        } else {
+            println!("[Kitty Graphics] Responded to cell size (16t) query: \\x1b[6;18;9t");
+        }
+        decoded.drain(cell_size_pos..cell_size_pos + 5);
+    }
+
+    // Check if Kitty Unicode placeholder support query "\x1b[?996n" is present
+    while let Some(u_probe_pos) = decoded.find("\x1b[?996n") {
+        // Response format: \x1b[?996;1n (1 = supported)
+        let response = b"\x1b[?996;1n";
+        if let Err(e) = writer.write_all(response) {
+            eprintln!("[Kitty Graphics] Error writing unicode placeholder probe response: {}", e);
+        } else if let Err(e) = writer.flush() {
+            eprintln!("[Kitty Graphics] Error flushing unicode placeholder probe response: {}", e);
+        } else {
+            println!("[Kitty Graphics] Responded to unicode placeholder (?996n) query: \\x1b[?996;1n");
+        }
+        decoded.drain(u_probe_pos..u_probe_pos + 7);
     }
 
     // If an unclosed \x1b_G header remains at the end of decoded (< 256 bytes), hold it
@@ -1344,6 +1391,39 @@ mod tests {
         assert_eq!(chunk2, "");
         assert_eq!(pending, "");
         assert_eq!(writer, b"\x1b_Gi=1;OK\x1b\\");
+    }
+
+    #[test]
+    fn test_kitty_query_yazi_probes() {
+        let mut writer = Vec::new();
+        let mut pending = String::new();
+
+        // 1. Placeholder probe: \x1b[?996n
+        let mut data = "\x1b[?996n".to_string();
+        process_kitty_output(&mut data, &mut writer, &mut pending);
+        assert_eq!(data, "");
+        assert_eq!(writer, b"\x1b[?996;1n");
+
+        // 2. Cell size probe: \x1b[16t
+        writer.clear();
+        let mut data2 = "\x1b[16t".to_string();
+        process_kitty_output(&mut data2, &mut writer, &mut pending);
+        assert_eq!(data2, "");
+        assert_eq!(writer, b"\x1b[6;18;9t");
+
+        // 3. DA1 probe: \x1b[0c
+        writer.clear();
+        let mut data3 = "\x1b[0c".to_string();
+        process_kitty_output(&mut data3, &mut writer, &mut pending);
+        assert_eq!(data3, "");
+        assert_eq!(writer, b"\x1b[?62;4;22c");
+
+        // 4. Combined with normal data
+        writer.clear();
+        let mut data4 = "hello\x1b[?996nworld".to_string();
+        process_kitty_output(&mut data4, &mut writer, &mut pending);
+        assert_eq!(data4, "helloworld");
+        assert_eq!(writer, b"\x1b[?996;1n");
     }
 }
 

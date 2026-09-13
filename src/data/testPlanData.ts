@@ -919,6 +919,20 @@ export const TEST_CASES: TestCase[] = [
     type: 'Scripted / Manual',
     command: 'cd ~/GitHUB/wammed/Waddle && npx tsx scratch/test_kitten_icat_gif.mjs',
   },
+  {
+    id: 'TC-KITTY-19',
+    suiteId: 7,
+    suiteName: 'Kitty Graphics Protocol',
+    suiteNameJa: 'Kitty Graphics Protocol (完全サブシステム)',
+    title: 'Yazi TUI Preview Integration (Instant PTY Probe Reply, Separated Placeholder Rendering & Zero Row-Shift Overlap)',
+    titleJa: 'Yazi TUI プレビュー完全対応 (PTY プローブ即時応答、プレースホルダー描画一本化 & 一行ずらし重なり根絶)',
+    procedure: 'Launch Yazi, display image preview, and verify PTY handling of \\x1b[?996n / \\x1b[16t / \\x1b[0c probes and U+10EEEE placeholder rendering.',
+    procedureJa: 'Yazi を起動し画像プレビューを表示。PTY 経由での \\x1b[?996n / \\x1b[16t / \\x1b[0c 問い合わせおよび U+10EEEE プレースホルダーの描画動作を検証。',
+    expected: 'PTY responds in 0ms to initialize Yazi Kitty mode; font layer delegates image drawing exclusively to dedicated Kitty canvas, completely eliminating cell-pass dynamic scaling errors, row-shift overlaps, and duplicate rendering; image displays pixel-perfectly inside the preview pane.',
+    expectedJa: 'PTY が即時応答して Yazi が Kitty モードで初期化され、TextRenderLayer 側で画像描画を行わず Kitty 専用 Canvas へ描画を一本化することで、行走査中のスケール破損や一行ずらしの重なり崩れ・二重描画が 100% 解消され、プレビュー枠内（右ペイン）にピクセルパーフェクトにインライン表示される。',
+    type: 'Automated / Manual',
+    command: 'cd ~/GitHUB/wammed/Waddle && npx tsx scratch/test_clean_render.mjs',
+  },
 
   // Suite 8: Security & Defense-in-Depth (15)
   {
