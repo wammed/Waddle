@@ -84,7 +84,7 @@ fn is_dangerous_path(path: &Path) -> bool {
         || normalized == "/lib64"
         || normalized.starts_with("/lib64/")
         || normalized == "/dev"
-        || normalized.starts_with("/dev/")
+        || (normalized.starts_with("/dev/") && !normalized.starts_with("/dev/shm/") && normalized != "/dev/shm")
         || normalized == "/proc"
         || normalized.starts_with("/proc/")
         || normalized == "/sys"
@@ -119,6 +119,12 @@ fn is_in_temp_dir(path: &Path) -> bool {
     }
     if let Ok(var_tmp) = fs::canonicalize("/var/tmp") {
         temp_roots.push(var_tmp);
+    }
+    if let Ok(dev_shm) = fs::canonicalize("/dev/shm") {
+        temp_roots.push(dev_shm);
+    }
+    if let Ok(run_shm) = fs::canonicalize("/run/shm") {
+        temp_roots.push(run_shm);
     }
     temp_roots.iter().any(|root| path.starts_with(root))
 }
@@ -531,5 +537,25 @@ mod tests {
 
         // File must be deleted even on EFBIG!
         assert!(!file_path.exists(), "Temp file MUST be deleted even if EFBIG occurs!");
+    }
+
+    #[test]
+    fn test_temp_file_in_dev_shm_allowed() {
+        let dev_shm = PathBuf::from("/dev/shm");
+        if dev_shm.exists() && dev_shm.is_dir() {
+            let file_path = dev_shm.join(format!("waddle_test_shm_{}.png", std::process::id()));
+            create_dummy_png(&file_path, 64, 64);
+            assert!(file_path.exists());
+
+            let res = read_kitty_file(
+                file_path.to_str().unwrap(),
+                None,
+                1024 * 1024,
+                4096,
+                true, // is_temp
+            );
+            assert!(res.is_ok(), "Temporary files in /dev/shm must be allowed: {:?}", res);
+            assert!(!file_path.exists(), "Temporary files in /dev/shm must be unlinked after read!");
+        }
     }
 }

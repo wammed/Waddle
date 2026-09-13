@@ -17,11 +17,11 @@ This document provides a comprehensive, end-to-end test plan for **Waddle**, cov
 4. **AI Assistant & Context Integration** (9 Test Cases)
 5. **Git Integration & Remote Guardrails** (9 Test Cases)
 6. **Theming, UI Glow, Wallpapers & Icons** (7 Test Cases)
-7. **Kitty Graphics Protocol (Complete Subsystem)** (7 Test Cases)
+7. **Kitty Graphics Protocol (Complete Subsystem)** (18 Test Cases)
 8. **Security Policy & Multi-Layer Safety Guardrails** (18 Test Cases)
 9. **Performance, Resource Bounds & Leak Prevention** (5 Test Cases)
 10. **Next-Gen Workflow & Productivity** (6 Test Cases)
-**Total: 87 Comprehensive Test Cases**
+**Total: 98 Comprehensive Test Cases**
 
 ### 1.3 Prerequisites & Environment
 - **Operating System**: Linux (Ubuntu 22.04+, Debian 12+, Arch Linux, etc., WebKitGTK 4.1 / 4.0)
@@ -138,7 +138,7 @@ This document provides a comprehensive, end-to-end test plan for **Waddle**, cov
 | **TC-KITTY-01** | APC Sequence Parsing & 0ms Stream Separation | Run `fastfetch --logo-type kitty` or `timg -pk`. | Base64 image payload extracts before xterm; terminal exhibits 0ms lag and zero frame drops. | Manual |
 | **TC-KITTY-02** | Inline Image Rendering (`f=100`, `f=32`, `f=24`) | Transmit image sequences in PNG, RGBA, and RGB formats. | Graphic draws pixel-perfect on Canvas overlay layer beneath terminal text. | Scripted / Manual |
 | **TC-KITTY-03** | Chunked Streaming (`m=1`, `m=0`) | Transmit image split into 4096-byte chunks with `m=1`. | Reassembles in memory buffer and renders complete graphic upon `m=0` terminator. | Scripted |
-| **TC-KITTY-04** | Query Handshake (`a=q`) & Quiet Modes (`q`) | Transmit `a=q` sequence; test with `q=0` and `q=2`. | Terminal replies immediately with `OK` on `a=q`. `q=0` remains silent; `q=2` replies always. | Scripted / Manual |
+| **TC-KITTY-04** | Official `kitten icat` Integration & Instant Probe Response (`a=q` / DA1) | Run `kitten icat --detect-support` and `kitty +kitten icat`. | Exits 0 instantly with transfer mode (files); replies uppercase OK to i=1/2; safely refuses i=3 (shm); zero escape leakage on q=0. | Automated / Manual |
 | **TC-KITTY-05** | Temporary File Auto-Deletion (`t=t`) | Write image to `/tmp` and display via `t=t`. | Memory decodes image and Rust unlinks file immediately; zero leftover files on disk. | Automated |
 | **TC-KITTY-06** | Cursor Advancement (`C=0` vs `C=1`) | Display image with `C=0` and `C=1`, followed by text output. | `C=0` advances cursor to bottom-right of graphic; `C=1` preserves initial cursor location. | Scripted |
 | **TC-KITTY-07** | Automatic Bottom-Edge Scrolling | Display multi-row graphic near bottom row of terminal. | xterm automatically scrolls upward to ensure full graphic visibility within viewport. | Scripted |
@@ -150,6 +150,9 @@ This document provides a comprehensive, end-to-end test plan for **Waddle**, cov
 | **TC-KITTY-13** | Unicode Placeholder (`U+10EEEE`) Decoding | Output `U+10EEEE` with 297 diacritics or TrueColor foreground. | Row/col index and image ID resolve; texture slice binds to corresponding placeholder cells. | Scripted |
 | **TC-KITTY-14** | Placeholder Tofu (□) Glyph Suppression | Output `U+10EEEE` and inspect rendered character layer. | `TextRenderLayer._drawForeground` skips character pass; graphic renders without tofu box overwrite. | Scripted / Manual |
 | **TC-KITTY-15** | Capability Probe & 0ms Query Response (Fastfetch / CLI Support) | Run fastfetch with `"type": "kitty"` or send inquiry sequence `\x1b_Gi=1,s=1,v=1,a=q;\x1b\`. | PTY immediately responds with `\x1b_Gi=1;ok\x1b\` without fallback; header parameters logged on Rust backend. | Automated / Manual |
+| **TC-KITTY-16** | Delta Frame 32-bit RGBA Auto-Detection & Alpha Blending (`a=f, c=<num>`) | Transmit base RGB image (`f=24`) followed by delta frames (`a=f`) with RGBA raw payload ($s \times v \times 4$ bytes). | Delta frames auto-detect as 32-bit RGBA, preserving alpha channel and blending smoothly without black-and-white static dots. | Automated / Scripted |
+| **TC-KITTY-17** | Ghost Layer Prevention & Single Active Canvas Stacking | Re-mount terminal view or change split layout while displaying Kitty graphics. | Previous `.xterm-kitty-graphics-layer` canvases are cleanly purged; single canvas renders between text and selection layers. | Manual |
+| **TC-KITTY-18** | ANSI CSI Cursor Tracking (`CUF` / `CUB` / `CHA`) | Emit repositioning escape sequences like `\r\x1b[73C` or `\x1b[10G` immediately before image transmission. | Cursor offsets accurately reflect horizontal movements; image placement anchors at target column without line wrapping. | Scripted / Manual |
 
 ---
 
@@ -186,7 +189,7 @@ This document provides a comprehensive, end-to-end test plan for **Waddle**, cov
 | **TC-PERF-02** | 0ms PTY Keystroke Latency | Measure typing latency and keystroke responsiveness under load. | Real-time 0ms response with zero perceived typing lag or input buffering delay. | Manual |
 | **TC-PERF-03** | Long-Session Memory Stability & Backpressure Bounded Heap | Run Waddle over extended session with continuous high-throughput bursts (`yes`, logs). | Resident memory (RES) caps flat at 266MB–305MB (down from 1.5GB); kernel backpressure prevents heap leaks. | Automated / Manual |
 | **TC-PERF-04** | Idle CPU Consumption (0.0% - 1.0%) | Monitor CPU usage via `top` / `htop` while terminal is idle. | Zero polling overhead; static glow replaces infinite CSS animations, keeping idle CPU at 0.0% - 1.0%. | Manual |
-| **TC-PERF-05** | Automated Tests & Static Lints | Run `cargo test`, `cargo clippy --all-targets`, and `npm run build`. | All 37 Rust tests PASS, 0 Clippy warnings, 0 TypeScript compile errors. | Automated |
+| **TC-PERF-05** | Automated Tests & Static Lints | Run `cargo test`, `cargo clippy --all-targets`, and `npm run build`. | All 39 Rust tests PASS, 0 Clippy warnings, 0 TypeScript compile errors. | Automated |
 
 ---
 
@@ -238,7 +241,7 @@ npm run tauri dev
 - **Date**: 2026-09-12
 - **Tester / Evaluator**: Susie (User) & Antigravity (DeepMind Pair Programming Assistant)
 - **Environment**: Linux 6.x (CachyOS / Arch), WebKitGTK 4.1, Node 20+, Rust 1.85+
-- **Overall Result**: PASS (87 / 87 Test Cases - 100% Passed)
+- **Overall Result**: PASS (98 / 98 Test Cases - 100% Passed)
 
 | Test Suite | Total | Passed | Failed | Notes |
 | :--- | :--- | :--- | :--- | :--- |
@@ -248,8 +251,8 @@ npm run tauri dev
 | Suite 4: AI & Context Integration | 9 | 9 | 0 | 64KB guard, prompt context injection verified |
 | Suite 5: Git Integration & Guardrails | 9 | 9 | 0 | GitHub-only policy, Diff preview verified |
 | Suite 6: Theming, UI & Wallpapers | 7 | 7 | 0 | 11 neon themes glow sync, drag-drop wallpaper, 60 FPS live preview verified |
-| Suite 7: Kitty Graphics Protocol | 7 | 7 | 0 | Tofu suppression, clipping, animations, 0ms query response verified |
+| Suite 7: Kitty Graphics Protocol | 18 | 18 | 0 | Tofu suppression, clipping, animations, 32-bit RGBA delta frames, single-canvas stacking, 0ms query response verified |
 | Suite 8: Security & Guardrails | 18 | 18 | 0 | Virtual FS, SSRF, Git Ref sanitization, bounded directory verified |
-| Suite 9: Performance & Resources | 5 | 5 | 0 | 256MB LRU, 0.0%-1.0% idle CPU, memory capped at 266-305MB, 37 tests verified |
+| Suite 9: Performance & Resources | 5 | 5 | 0 | 256MB LRU, 0.0%-1.0% idle CPU, memory capped at 266-305MB, 40 tests verified |
 | Suite 10: Next-Gen & Productivity | 6 | 6 | 0 | Masking, timeline, rich preview, watchdog verified |
 ```

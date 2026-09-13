@@ -75,8 +75,13 @@ async fn resize_pty(
     session_id: String,
     rows: u16,
     cols: u16,
+    pixel_width: Option<u16>,
+    pixel_height: Option<u16>,
 ) -> Result<(), String> {
-    state.pty_manager.resize(&session_id, rows, cols).await
+    state
+        .pty_manager
+        .resize(&session_id, rows, cols, pixel_width, pixel_height)
+        .await
 }
 
 #[tauri::command]
@@ -842,6 +847,14 @@ fn kitty_read_file(
 }
 
 #[tauri::command]
+fn log_kitty_debug(msg: String) {
+    use std::io::Write;
+    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/waddle_kitty_debug.log") {
+        let _ = writeln!(f, "{}", msg);
+    }
+}
+
+#[tauri::command]
 fn get_project_rules(
     state: State<'_, AppState>,
     cwd: String,
@@ -912,6 +925,7 @@ pub fn run() {
             validate_wallpaper_path,
             get_system_info,
             kitty_read_file,
+            log_kitty_debug,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Waddle terminal application");

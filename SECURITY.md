@@ -195,7 +195,15 @@ The Kitty Graphics Protocol subsystem is hardened with multiple layers of sandbo
 - **Cell Dimension Clamping**: Allocated placeholder grid spans (`cols`, `rows`) are bounded against terminal geometries (`cols <= termCols`, `rows <= termRows * 2`). Images requesting excessive dimensions cannot cause out-of-bounds cursor jumps, integer overflow, or runaway line allocation.
 - **Scrollback Buffer Stability**: Grid placeholder cells (`\r\n` and spaces) are driven through standard terminal VT linefeeds without artificial buffer displacement, maintaining stable scrollback indices (`baseY + cursorY`) and preventing screen corruption or desynchronization between canvas overlay rendering and terminal text.
 - **Saved Cursor Isolation (`C=1`)**: When `C=1` is specified, the terminal cursor is protected via standard VT save/restore sequences (`\x1b[s` / `\x1b[u`), preventing runaway cursor positioning and arbitrary screen state corruption across command outputs.
-- **Bounded Viewport Clipping & Zero Out-of-Bounds GPU Calls**: Partial clipping computes clamped destination coordinates (`destX, destY, destW, destH` in `[0..width, 0..height]`) and normalized source UV coordinates (`srcX, srcY, srcW, srcH` in `[0..bitmap.width, 0..bitmap.height]`), backed by 2D canvas hardware scissoring. Never dispatches negative dimensions or out-of-bounds memory buffers to WebKitGTK/Cairo graphics drivers, preventing crashes, driver memory corruption, and rendering anomalies.
+### 6. Intentional Disabling of POSIX Shared Memory (`t=s`, `/dev/shm`) & Threat Defense
+- **Threat Model for Shared Memory**:
+  - POSIX Shared Memory (`/dev/shm`) on Linux is accessible to all processes running under the same UID.
+  - Allowing untrusted terminal processes to pass arbitrary shared memory object names to Waddle creates critical attack vectors: cross-process memory inspection, symlink traversal, and confused deputy file access.
+  - Furthermore, malicious scripts could allocate massive, un-reclaimed memory blocks via `shm_open`, exhausting system RAM and triggering OS-level Out-Of-Memory (OOM) denial-of-service crashes.
+- **Architectural Security Trade-Off (Video Playback Limitation)**:
+  - Guided by Waddle's privacy-first, zero-leakage security model, **POSIX Shared Memory transmission (`t=s`) is intentionally unsupported and disallowed**, and probe queries for `t=s` are safely refused.
+  - Consequently, raw uncompressed high-FPS video streaming (such as `mpv --vo=kitty --vo-kitty-use-shm=yes`) is deliberately omitted in favor of ironclad sandbox security (resulting in smooth audio playback only, or jittery high-bandwidth Base64 streaming). Waddle is an engineering workstation, not a video player.
+  - In contrast, static images, animated GIFs, `kitten icat`, `kitten diff`, and file manager previews render with 100% graphical fidelity via secure direct Base64 (`t=d`) and sandboxed temporary files (`t=t`, immediately unlinked from disk upon reading, with strict file size and dimension limits).
 
 ---
 

@@ -208,11 +208,13 @@ Waddle は、高速・堅牢な **Rust バックエンド** と、最新の **Re
 +---------------------------------------------------------------------------------+
 ```
 
-- **遅延ゼロのストリーム事前分離 & 0ms Rust PTY 機能ハンドシェイク**:
+- **遅延ゼロのストリーム事前分離 & 0ms Rust PTY 機能ハンドシェイク (`kitten icat` 完全連携)**:
   - 数MBに及ぶ Base64 画像データを含む APC エスケープシーケンス (`\x1b_G...`) を xterm 到達前にインターセプト。
   - 抽出後の通常テキストのみを `term.write()` へ送ることで、xterm パーサーの負荷とターミナルの描画遅延を防止。
-  - **超低遅延 PTY クエリ即時応答**: Rust PTY バックグラウンド読み込みループ（`process_kitty_output`）が機能問い合わせ（`\x1b_Gi=1,s=1,v=1,a=q;\x1b\` や `a=q` 含有シーケンス）を直接検知し、即座に `\x1b_Gi=<id>;ok\x1b\` を子プロセス stdin に 0ms で返送。`fastfetch`, `chafa`, `timg` などの CLI ツールでのタイムアウトによるアスキーアートフォールバックを防止。
-  - `create_pty` および `resize` において適切なセルピクセル寸法（`cols * 9`, `rows * 18`）を PTY に設定し、`TIOCGWINSZ` によるフォント寸法取得（`getCharacterPixelDimensions`）を正常化。
+  - **超低遅延 PTY クエリ即時応答 & 公式 `kitten` 準拠**: Rust PTY バックグラウンド読み込みループ（`process_kitty_output`）が機能問い合わせ（`a=q`）を直接検知し、即座に大文字 `\x1b_Gi=<id>;OK\x1b\` を子プロセス stdin に 0ms で返送。Kitty 公式 Go 実装（`DetectSupport`）の `g.ResponseMessage() == "OK"` に厳格準拠し、`kitten icat` や `fastfetch` でのタイムアウトを完全解消。
+  - **DA1 (`\x1b[c`) ゼロ遅延エミュレーション**: プローブ終端で送信されるプライマリデバイス属性問い合わせに `\x1b[?62;4;22c` を即時返信し、ハンドシェイクを 0ms で完了。
+  - **動的ピクセル解像度同期 (`TIOCGWINSZ`)**: xterm.js の実際のフォント・セル描画寸法（`cellWidth`, `cellHeight`）に基づき、カーネルの PTY ウィンドウ構造体へ `pixel_width` および `pixel_height`（`cols * cellWidth`, `rows * cellHeight`）をリアルタイム通知。`kitten icat` のグリッド計算や `--place` 配置を正常化。
+  - **共有メモリ (`t=s`, `/dev/shm`) の意図的無効化**: サンドボックス境界侵犯・メモリ汚染 DoS を防ぐため、共有メモリのプローブ（`t=s`）は意図的に未応答とし、安全な Base64 (`t=d`) およびセキュア一時ファイル (`t=t`) へフォールバック。高FPS動画の生メモリ再生はセキュリティ確保のため割り切った設計を採用。
 - **Web 標準 zlib / Deflate 圧縮解凍 (`o=z`)**:
   - `KittyDecoder` 内で Web 標準の `DecompressionStream('deflate')`（および `'deflate-raw'`）を活用したネイティブ解凍を実装。
   - `fastfetch`（`"type": "kitty"`）等が送信する zlib 圧縮画像ストリーム（`o=z`）を自動検知して高速解凍。
@@ -225,10 +227,15 @@ Waddle は、高速・堅牢な **Rust バックエンド** と、最新の **Re
 - **LRU テクスチャキャッシュ & GPU VRAM 管理**:
   - キャッシュ総枠を 256 MB (RGBA 4bytes/px 換算) で管理し、超過時は古い画像から退避。
   - WebKitGTK および GPU メモリリークを防止するため、破棄時および削除時 (`a=d`) に必ず明示的に `ImageBitmap.close()` を呼び出し。
-- **レイヤー合成順序 & Canvas レンダラーインターセプト**:
-  - `.xterm-screen` 内の最背面（TextRenderLayer の手前）にキャンバスをマウント。
-  - 合成順序: **ターミナル背景/壁紙 → Kitty 画像レイヤー → セルテキスト/グリフレイヤー → カーソルレイヤー**。
+- **レイヤー合成順序 & Canvas 積層アーキテクチャ**:
+  - `.xterm-screen` 内において、`TextRenderLayer`（`zIndex: 0`）の直上、かつ `SelectionRenderLayer`（DOM 順で `zIndex: 1`）および `CursorRenderLayer`（`zIndex: 3`）の手前に `zIndex: 1` でグラフィックスキャンバスをマウント。
+  - 再マウントやレイアウト変更時には既存の `.xterm-kitty-graphics-layer` を DOM から確実にパージし、常に単一のアクティブな描画キャンバスを維持してゴースト重複描画を根絶。
   - **Unicode プレースホルダー排他描画パス (`U+10EEEE`)**: xterm v5 の `MutableDisposable` 構造（`_renderer.value`）から真の `CanvasRenderer` を解決し、`TextRenderLayer.prototype._drawForeground` をインターセプト。セル走査ループ内でプレースホルダーテクスチャを直接描画し、フォントグリフ検索・アトラスラスタライズをスキップすることで豆腐文字の発生を完全に抑止。`BaseRenderLayer` や `CursorRenderLayer` との多層防御連携を実現。
+- **アニメーション GIF & 差分フレーム合成アーキテクチャ (`a=f`, `a=a`)**:
+  - **32-bit RGBA 厳格フォーマット自動判定**: 基底画像（`a=T`）が 24-bit RGB（`f=24`）であっても、Kitty 仕様上差分フレーム（`a=f`）はアルファ透過合成を行うためデフォルトで 32-bit RGBA（`f=32`）となります。ペイロードバイト長とピクセル数の積（$S = s \times v \times 4$）から数学的に判定し、ストライドのスキューや白黒砂嵐ノイズのない正確な RGBA デコードを保証。
+  - **サブ矩形差分合成**: 差分フレームの矩形パッチ（`x, y, s, v`）を指定された基底/直前フレーム（`c=<frame_index>`）へ OffscreenCanvas 上でアルファ合成（`ctx.drawImage`）し、メモリリークのない ImageBitmap ライフサイクル管理下で連続フレームを生成。
+  - **グラフィックス専用更新ループ (60 FPS)**: `advanceFrame` において文字レイヤーの全行再描画（`term.refresh()`）を伴わず、Kitty レイヤーのみを直接再描画することで CPU 負荷を最小化。
+  - **ANSI CSI カーソル移動追従**: 画像出力直前の `CUF`（`\x1b[..C`）、`CUB`（`\x1b[..D`）、`CHA`（`\x1b[..G`）等の CSI コードを正確に解釈し、改行回り込みを起こさず目的のセル列に画像をアンカー。
 
 ---
 

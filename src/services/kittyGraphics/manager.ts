@@ -94,24 +94,36 @@ export class KittyGraphicsManager {
     const screen = container.querySelector('.xterm-screen') as HTMLElement | null;
     this.screenElement = screen || container;
 
+    // Clean up any stale kitty graphics canvases to prevent duplicate ghost layers
+    const existing = (screen || container).querySelectorAll('.xterm-kitty-graphics-layer');
+    existing.forEach((el) => el.remove());
+
     const canvas = document.createElement('canvas');
     canvas.className = 'xterm-kitty-graphics-layer';
     canvas.style.position = 'absolute';
     canvas.style.top = '0';
     canvas.style.left = '0';
     canvas.style.pointerEvents = 'none';
-    canvas.style.zIndex = '0';
+    canvas.style.zIndex = '1';
 
-    // Insert before TextRenderLayer in .xterm-screen so cell background -> image -> text glyphs
-    if (screen && screen.firstChild) {
-      screen.insertBefore(canvas, screen.firstChild);
+    // Insert after TextRenderLayer (zIndex 0) and before SelectionRenderLayer (zIndex 1)
+    if (screen) {
+      const layers = screen.querySelectorAll('canvas');
+      if (layers.length >= 2) {
+        screen.insertBefore(canvas, layers[1]);
+      } else {
+        screen.appendChild(canvas);
+      }
     } else {
-      (screen || container).appendChild(canvas);
+      container.appendChild(canvas);
     }
 
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
     this.syncCanvasSize();
+    TauriApi.logKittyDebug(
+      `[mountCanvas] Mounted canvas zIndex=${canvas.style.zIndex}, screen=${!!screen}, dims=${this.canvas.width}x${this.canvas.height}`
+    );
   }
 
   public syncCanvasSize() {
@@ -552,15 +564,31 @@ export class KittyGraphicsManager {
         lastLineLen = 0;
       } else if (text[i] === '\r') {
         lastLineLen = 0;
-      } else {
-        // Skip ANSI escape codes if present (e.g. colors \x1b[...m)
-        if (text[i] === '\x1b' && text[i + 1] === '[') {
-          const mIdx = text.indexOf('m', i);
-          if (mIdx !== -1 && mIdx - i < 16) {
-            i = mIdx;
-            continue;
-          }
+      } else if (text[i] === '\x1b' && text[i + 1] === '[') {
+        // Parse full CSI sequence: \x1b[ [params] [final_byte 0x40-0x7E]
+        let j = i + 2;
+        while (j < text.length && text.charCodeAt(j) >= 0x20 && text.charCodeAt(j) <= 0x3f) {
+          j++;
         }
+        if (j < text.length && text.charCodeAt(j) >= 0x40 && text.charCodeAt(j) <= 0x7e) {
+          const finalChar = text[j];
+          const paramStr = text.slice(i + 2, j);
+          const paramVal = parseInt(paramStr, 10) || 1;
+          if (finalChar === 'C') {
+            // Cursor Forward (CUF)
+            lastLineLen += paramVal;
+          } else if (finalChar === 'D') {
+            // Cursor Back (CUB)
+            lastLineLen = Math.max(0, lastLineLen - paramVal);
+          } else if (finalChar === 'G') {
+            // Cursor Horizontal Absolute (CHA)
+            lastLineLen = Math.max(0, paramVal - 1);
+          }
+          i = j;
+          continue;
+        }
+        lastLineLen++;
+      } else {
         lastLineLen++;
       }
     }
@@ -681,8 +709,9 @@ export class KittyGraphicsManager {
 
     // Determine dimensions if possible
     let pixelDims: { width: number; height: number } | null = null;
-    if (action === 'p' && cmd.keys.i !== undefined) {
-      const cached = this.cache.get(cmd.keys.i);
+    const checkPlacementId = cmd.keys.i !== undefined ? cmd.keys.i : cmd.keys.I;
+    if (action === 'p' && checkPlacementId !== undefined) {
+      const cached = this.cache.get(checkPlacementId);
       if (cached) {
         pixelDims = { width: cached.width, height: cached.height };
       }
@@ -761,7 +790,9 @@ export class KittyGraphicsManager {
         const id = cmd.keys.i !== undefined ? cmd.keys.i : (cmd.keys.I !== undefined ? cmd.keys.I : 0);
         if (cmd.keys.s === 1 && cmd.keys.v === 1) {
           // Protocol capability probe: ESC _ G i=1,s=1,v=1,a=q ; ESC \
-          this.sendPtyResponse(id || 1, 'ok', cmd.keys.q, true);
+          // Handled synchronously in Rust by pty.rs directly on the PTY byte stream.
+          // Do NOT send duplicate responses from the frontend to avoid shell prompt pollution!
+          return;
         } else if (id > 0) {
           const pendingLoad = this.loadingImages.get(id);
           if (pendingLoad) {
@@ -770,15 +801,15 @@ export class KittyGraphicsManager {
           const exists = this.cache.has(id) || this.virtualPlacements.has(id);
           this.sendPtyResponse(id, exists ? 'OK' : 'ENOENT', cmd.keys.q, true);
         } else {
-          // General protocol capability query probe (e.g. from fastfetch)
-          this.sendPtyResponse(0, 'ok', cmd.keys.q, true);
+          // General protocol capability query probe (handled synchronously in Rust by pty.rs)
+          return;
         }
         break;
       }
 
       case 't': {
         // Transmit and store in cache
-        const id = cmd.keys.i !== undefined ? cmd.keys.i : this.nextImageId++;
+        const id = (cmd.keys.i !== undefined ? cmd.keys.i : cmd.keys.I) ?? this.nextImageId++;
         this.lastTransmittedImageId = id;
         let resolveLoad!: () => void;
         const loadPromise = new Promise<void>((resolve) => {
@@ -798,8 +829,10 @@ export class KittyGraphicsManager {
             delayMs: this.getFrameDelayMs(cmd.keys),
           };
 
+          const detectedFormat = cmd.keys.f ?? (decoded.byteSize === decoded.width * decoded.height * 3 ? 24 : 32);
           this.cache.set(id, {
             id,
+            format: detectedFormat,
             bitmap: decoded.bitmap,
             width: decoded.width,
             height: decoded.height,
@@ -816,6 +849,7 @@ export class KittyGraphicsManager {
           this.term.refresh(0, this.term.rows - 1);
           this.sendPtyResponse(id, 'OK', cmd.keys.q);
         } catch (err: any) {
+          console.error('[KittyGraphics] Failed to decode image (t):', err);
           this.sendPtyResponse(id, err.message || 'EBADMSG', cmd.keys.q);
         } finally {
           resolveLoad();
@@ -826,7 +860,7 @@ export class KittyGraphicsManager {
 
       case 'T': {
         // Transmit and display immediately
-        const id = cmd.keys.i !== undefined ? cmd.keys.i : this.nextImageId++;
+        const id = (cmd.keys.i !== undefined ? cmd.keys.i : cmd.keys.I) ?? this.nextImageId++;
         this.lastTransmittedImageId = id;
         let resolveLoad!: () => void;
         const loadPromise = new Promise<void>((resolve) => {
@@ -846,8 +880,10 @@ export class KittyGraphicsManager {
             delayMs: this.getFrameDelayMs(cmd.keys),
           };
 
+          const detectedFormat = cmd.keys.f ?? (decoded.byteSize === decoded.width * decoded.height * 3 ? 24 : 32);
           this.cache.set(id, {
             id,
+            format: detectedFormat,
             bitmap: decoded.bitmap,
             width: decoded.width,
             height: decoded.height,
@@ -893,6 +929,7 @@ export class KittyGraphicsManager {
           this.term.refresh(0, this.term.rows - 1);
           this.sendPtyResponse(id, 'OK', cmd.keys.q);
         } catch (err: any) {
+          console.error('[KittyGraphics] Failed to decode image (T):', err);
           this.sendPtyResponse(id, err.message || 'EBADMSG', cmd.keys.q);
         } finally {
           resolveLoad();
@@ -903,7 +940,7 @@ export class KittyGraphicsManager {
 
       case 'p': {
         // Place previously transmitted image by ID
-        const id = cmd.keys.i;
+        const id = cmd.keys.i !== undefined ? cmd.keys.i : cmd.keys.I;
         if (id === undefined) {
           this.sendPtyResponse(0, 'ENOENT: Missing image ID', cmd.keys.q);
           return;
@@ -955,9 +992,21 @@ export class KittyGraphicsManager {
 
       case 'f': {
         // Animation frame transmission
-        const id = cmd.keys.i;
+        const id = cmd.keys.i !== undefined ? cmd.keys.i : cmd.keys.I;
         if (id === undefined) {
           this.sendPtyResponse(0, 'ENOENT: Missing image ID for frame', cmd.keys.q);
+          return;
+        }
+
+        // Await any pending load for this image ID (e.g. root frame still decoding)
+        const pendingLoad = this.loadingImages.get(id);
+        if (pendingLoad) {
+          await pendingLoad;
+        }
+
+        const cached = this.cache.get(id);
+        if (!cached) {
+          this.sendPtyResponse(id, 'ENOENT: Image not found in cache for animation frame', cmd.keys.q);
           return;
         }
 
@@ -968,20 +1017,75 @@ export class KittyGraphicsManager {
         this.loadingImages.set(id, loadPromise);
 
         try {
-          const decoded = await this.decoder.decode(cmd.keys, cmd.payload);
+          // In Kitty animation protocol, f defaults to 32 (RGBA).
+          // If keys.S matches pixelCount * 4, it is 32-bit RGBA.
+          const keysWithFormat = { ...cmd.keys };
+          if (keysWithFormat.f === undefined) {
+            if (cmd.keys.s && cmd.keys.v) {
+              const pixelCount = cmd.keys.s * cmd.keys.v;
+              if (cmd.keys.S === pixelCount * 4) {
+                keysWithFormat.f = 32;
+              } else if (cmd.keys.S === pixelCount * 3) {
+                keysWithFormat.f = 24;
+              } else if (cached.format) {
+                keysWithFormat.f = cached.format as 24 | 32 | 100;
+              } else {
+                keysWithFormat.f = 32;
+              }
+            } else if (cached.format) {
+              keysWithFormat.f = cached.format as 24 | 32 | 100;
+            } else {
+              keysWithFormat.f = 32;
+            }
+          }
+
+          const decoded = await this.decoder.decode(keysWithFormat, cmd.payload);
           const delayMs = this.getFrameDelayMs(cmd.keys);
           const isHeight = (cmd.keys.f === 24 || cmd.keys.f === 32) && cmd.keys.s !== undefined;
           const loopCount = (!isHeight && cmd.keys.v !== undefined) ? cmd.keys.v : 0;
 
+          // Handle sub-rectangle and canvas frame composition
+          let frameBitmap = decoded.bitmap;
+          let frameWidth = decoded.width;
+          let frameHeight = decoded.height;
+
+          const isSubRect = cmd.keys.x !== undefined || cmd.keys.y !== undefined || cmd.keys.c !== undefined || cmd.keys.X !== undefined || (cached && (decoded.width !== cached.width || decoded.height !== cached.height));
+          if (cached && isSubRect) {
+            const fullWidth = cached.width;
+            const fullHeight = cached.height;
+            const canvas = new OffscreenCanvas(fullWidth, fullHeight);
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              const baseFrameNum = cmd.keys.c !== undefined ? cmd.keys.c : (cmd.keys.r !== undefined && cmd.keys.r > 0 ? cmd.keys.r : 0);
+              if (baseFrameNum >= 1 && cached.frames && cached.frames[baseFrameNum - 1]) {
+                ctx.drawImage(cached.frames[baseFrameNum - 1].bitmap, 0, 0, fullWidth, fullHeight);
+              } else if (cached.bitmap) {
+                ctx.drawImage(cached.bitmap, 0, 0, fullWidth, fullHeight);
+              }
+
+              const patchX = cmd.keys.x || 0;
+              const patchY = cmd.keys.y || 0;
+              if (cmd.keys.X === 1) {
+                ctx.clearRect(patchX, patchY, decoded.width, decoded.height);
+              }
+              ctx.drawImage(decoded.bitmap, patchX, patchY);
+              frameBitmap = canvas.transferToImageBitmap();
+              frameWidth = fullWidth;
+              frameHeight = fullHeight;
+              if (decoded.bitmap !== frameBitmap) {
+                decoded.bitmap.close?.();
+              }
+            }
+          }
+
           const newFrame: KittyAnimationFrame = {
-            bitmap: decoded.bitmap,
-            width: decoded.width,
-            height: decoded.height,
-            byteSize: decoded.byteSize,
+            bitmap: frameBitmap,
+            width: frameWidth,
+            height: frameHeight,
+            byteSize: frameWidth * frameHeight * 4,
             delayMs,
           };
 
-          const cached = this.cache.get(id);
           if (cached) {
             if (!cached.frames) {
               cached.frames = [{
@@ -1009,7 +1113,7 @@ export class KittyGraphicsManager {
 
             if (targetFrameIndex < cached.frames.length) {
               const old = cached.frames[targetFrameIndex];
-              if (old.bitmap !== decoded.bitmap) {
+              if (old.bitmap !== frameBitmap) {
                 old.bitmap.close?.();
               }
               cached.frames[targetFrameIndex] = newFrame;
@@ -1028,10 +1132,10 @@ export class KittyGraphicsManager {
           } else {
             this.cache.set(id, {
               id,
-              bitmap: decoded.bitmap,
-              width: decoded.width,
-              height: decoded.height,
-              byteSize: decoded.byteSize,
+              bitmap: frameBitmap,
+              width: frameWidth,
+              height: frameHeight,
+              byteSize: frameWidth * frameHeight * 4,
               lastUsed: Date.now(),
               frames: [newFrame],
               animation: {
@@ -1046,6 +1150,7 @@ export class KittyGraphicsManager {
 
           this.sendPtyResponse(id, 'OK', cmd.keys.q);
         } catch (err: any) {
+          console.error('[KittyGraphics] Failed to decode frame (f):', err);
           this.sendPtyResponse(id, err.message || 'EBADMSG', cmd.keys.q);
         } finally {
           resolveLoad();
@@ -1056,10 +1161,16 @@ export class KittyGraphicsManager {
 
       case 'a': {
         // Animation control
-        const id = cmd.keys.i;
+        const id = cmd.keys.i !== undefined ? cmd.keys.i : cmd.keys.I;
         if (id === undefined) {
           this.sendPtyResponse(0, 'ENOENT: Missing image ID for animation control', cmd.keys.q);
           return;
+        }
+
+        // Await any pending load for this image ID
+        const pendingLoad = this.loadingImages.get(id);
+        if (pendingLoad) {
+          await pendingLoad;
         }
 
         const cached = this.cache.get(id);
@@ -1077,8 +1188,9 @@ export class KittyGraphicsManager {
           };
         }
 
-        // Loop count v: default 0 (infinite loop), or explicit loop count
-        if (cmd.keys.v !== undefined) {
+        // Loop count v:
+        // Protocol: v=0 is ignored (default infinite), v=1 is infinite loop, v > 1 is loop (v - 1) times.
+        if (cmd.keys.v !== undefined && cmd.keys.v > 0) {
           cached.animation.loopCount = cmd.keys.v;
           cached.animation.loopsCompleted = 0;
         }
@@ -1100,7 +1212,9 @@ export class KittyGraphicsManager {
           const delay = Math.max(10, cmd.keys.z);
           const targetIdx = (jumpFrame !== undefined && jumpFrame >= 1 && jumpFrame <= cached.frames.length)
             ? jumpFrame - 1
-            : cached.animation.currentFrameIndex;
+            : (cmd.keys.r !== undefined && cmd.keys.r >= 1 && cmd.keys.r <= cached.frames.length)
+              ? cmd.keys.r - 1
+              : cached.animation.currentFrameIndex;
           if (cached.frames[targetIdx]) {
             cached.frames[targetIdx].delayMs = delay;
           }
@@ -1110,6 +1224,11 @@ export class KittyGraphicsManager {
         const s = cmd.keys.s;
         if (s === 1) {
           this.stopAnimation(id);
+        } else if (s === 2) {
+          // Loading mode: play animation while frames are loading
+          if (!cached.animation.isPlaying && cached.frames && cached.frames.length >= 2) {
+            this.startAnimation(id);
+          }
         } else if (s === 3 || s === undefined) {
           if (cached.frames && cached.frames.length >= 2) {
             this.startAnimation(id);
@@ -1123,15 +1242,15 @@ export class KittyGraphicsManager {
       case 'd': {
         // Delete images / placements
         const target = cmd.keys.d || 'a';
+        const id = cmd.keys.i !== undefined ? cmd.keys.i : cmd.keys.I;
         if (target === 'a') {
-          for (const id of this.cache.keys()) {
-            this.stopAnimation(id);
+          for (const k of this.cache.keys()) {
+            this.stopAnimation(k);
           }
           this.placements.clear();
           this.virtualPlacements.clear();
           this.cache.clear();
-        } else if (cmd.keys.i !== undefined) {
-          const id = cmd.keys.i;
+        } else if (id !== undefined) {
           this.stopAnimation(id);
           this.cache.delete(id);
           this.virtualPlacements.delete(id);
@@ -1146,7 +1265,7 @@ export class KittyGraphicsManager {
         }
         this.render();
         this.term.refresh(0, this.term.rows - 1);
-        this.sendPtyResponse(cmd.keys.i ?? 0, 'OK', cmd.keys.q);
+        this.sendPtyResponse(id ?? 0, 'OK', cmd.keys.q);
         break;
       }
     }
@@ -1220,7 +1339,9 @@ export class KittyGraphicsManager {
       // Completed one full loop
       anim.loopsCompleted++;
 
-      if (anim.loopCount > 0 && anim.loopsCompleted >= anim.loopCount) {
+      // Protocol: v=0 (default) and v=1 mean play infinite loops.
+      // v > 1 means play (v - 1) loops.
+      if (anim.loopCount > 1 && anim.loopsCompleted >= (anim.loopCount - 1)) {
         // Finished designated loop count: stop and freeze on final frame
         this.stopAnimation(imageId);
         return;
@@ -1239,9 +1360,8 @@ export class KittyGraphicsManager {
     cached.width = activeFrame.width;
     cached.height = activeFrame.height;
 
-    // Render updated frame
+    // Render updated frame on graphics canvas
     this.render();
-    this.term.refresh(0, this.term.rows - 1);
 
     // Reschedule timer for subsequent frame (guaranteed to continue loop)
     this.scheduleNextFrame(imageId);
@@ -1294,8 +1414,12 @@ export class KittyGraphicsManager {
     this.placements.set(placementId, placement);
     this.isCanvasClear = false;
 
-    const cached = this.cache.get(imageId);
-    if (cached?.frames && cached.frames.length >= 2 && !cached.animation?.isPlaying) {
+    const cachedRec = this.cache.get(imageId);
+    TauriApi.logKittyDebug(
+      `[placeImage] img=${imageId} placement=${placementId} bufferLine=${bufferLine} col=${col} spans=${cols}x${rows} animFrames=${cachedRec?.frames?.length}`
+    );
+
+    if (cachedRec?.frames && cachedRec.frames.length >= 2 && !cachedRec.animation?.isPlaying) {
       this.startAnimation(imageId);
     } else {
       this.render();
@@ -1333,6 +1457,9 @@ export class KittyGraphicsManager {
     const cellWidth = this.getCellWidth();
     const cellHeight = this.getCellHeight();
     const viewportY = this.term.buffer.active.viewportY;
+    TauriApi.logKittyDebug(
+      `[render] placements=${this.placements.size}, viewportY=${viewportY}, screenDims=${width}x${height}, cellDims=${cellWidth}x${cellHeight}`
+    );
     const maxScrollback = this.term.options.scrollback || 10000;
     const oldestAllowedLine = Math.max(0, this.term.buffer.active.baseY - maxScrollback);
     const termCols = this.term.cols || 80;
@@ -1451,7 +1578,11 @@ export class KittyGraphicsManager {
           destW,
           destH
         );
-      } catch (err) {
+        TauriApi.logKittyDebug(
+          `[drawImage] img=${p.imageId} frame=${img.animation?.currentFrameIndex ?? 0}/${img.frames?.length ?? 1} dest=(${destX},${destY},${destW}x${destH})`
+        );
+      } catch (err: any) {
+        TauriApi.logKittyDebug(`[drawImage ERROR] img=${p.imageId}: ${err?.message || err}`);
         console.warn('Failed to draw partially clipped image placement:', err);
       }
     }
@@ -1592,11 +1723,11 @@ export class KittyGraphicsManager {
   }
 
   private sendPtyResponse(id: number, message: string, quiet?: number, force: boolean = false) {
-    const q = quiet ?? 0;
     if (!force) {
-      if (q === 0) return; // Default: silent, suppress all responses
-      if (q === 1 && message === 'OK') return; // q=1: errors only, suppress OK
-      // q=2: respond to everything (both OK and errors)
+      if (quiet === 2) return; // q=2: suppress all responses (silent)
+      if (quiet === 1 && message === 'OK') return; // q=1: errors only, suppress OK
+      if (quiet === undefined && message === 'OK') return; // quiet unspecified: suppress OK to prevent prompt pollution
+      // q=0: send both OK and errors
     }
 
     const resp = id > 0 ? `\x1b_Gi=${id};${message}\x1b\\` : `\x1b_G;${message}\x1b\\`;

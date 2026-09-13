@@ -36,34 +36,52 @@ export class KittyDecoder {
   public async decode(keys: KittyControlKeys, payload: string): Promise<DecodedImage> {
     const medium = keys.t || 'd';
 
-    // 1. Local file path reference (t=f) or temporary file (t=t)
-    if (medium === 'f' || medium === 't') {
-      return await this.decodeFile(payload, medium === 't');
+    // 1. Shared memory (t=s) is disabled for security and sandboxing
+    if (medium === 's') {
+      throw new Error('ENOTSUP: Shared memory transfer (t=s) is not supported');
     }
 
-    // 2. Direct Base64 transfer (t=d)
-    const format = keys.f || 32;
+    // 2. Local file path reference (t=f) or temporary file (t=t)
+    if (medium === 'f' || medium === 't') {
+      return await this.decodeFile(payload, medium === 't', keys);
+    }
 
+    // 3. Direct Base64 transfer (t=d)
     let bytes = this.base64ToBytes(payload);
     if (keys.o === 'z') {
       bytes = await this.decompressZlib(bytes);
     }
 
-    if (format === 100) {
+    let finalFormat = keys.f;
+    if (keys.s && keys.v) {
+      const pixelCount = keys.s * keys.v;
+      if (bytes.length === pixelCount * 4 || keys.S === pixelCount * 4) {
+        finalFormat = 32;
+      } else if (bytes.length === pixelCount * 3 || keys.S === pixelCount * 3) {
+        finalFormat = 24;
+      }
+    }
+    finalFormat = finalFormat || keys.f || 32;
+
+    if (finalFormat === 100) {
       // PNG
       return await this.decodePng(bytes);
-    } else if (format === 32) {
+    } else if (finalFormat === 32) {
       // RGBA
       return await this.decodeRgba(bytes, keys.s, keys.v);
-    } else if (format === 24) {
+    } else if (finalFormat === 24) {
       // RGB
       return await this.decodeRgb(bytes, keys.s, keys.v);
     } else {
-      throw new Error(`Unsupported Kitty image format f=${format}`);
+      throw new Error(`Unsupported Kitty image format f=${finalFormat}`);
     }
   }
 
-  private async decodeFile(base64Path: string, isTemp: boolean = false): Promise<DecodedImage> {
+  private async decodeFile(
+    base64Path: string,
+    isTemp: boolean = false,
+    keys?: KittyControlKeys
+  ): Promise<DecodedImage> {
     // Decode file path string from Base64
     let filePath: string;
     try {
@@ -81,8 +99,33 @@ export class KittyDecoder {
       isTemp
     );
 
-    const binary = this.base64ToBytes(fileResult.data);
-    const blob = new Blob([binary], { type: fileResult.mime || 'image/png' });
+    let bytes = this.base64ToBytes(fileResult.data);
+    if (keys?.o === 'z') {
+      bytes = await this.decompressZlib(bytes);
+    }
+
+    let format = keys?.f;
+    if (keys?.s && keys?.v) {
+      const pixelCount = keys.s * keys.v;
+      if (bytes.length === pixelCount * 4 || keys.S === pixelCount * 4) {
+        format = 32;
+      } else if (bytes.length === pixelCount * 3 || keys.S === pixelCount * 3) {
+        format = 24;
+      }
+    }
+    if (!format) {
+      format = keys?.f || 32;
+    }
+
+    if (format === 24) {
+      return await this.decodeRgb(bytes, keys?.s, keys?.v);
+    } else if (format === 32) {
+      return await this.decodeRgba(bytes, keys?.s, keys?.v);
+    } else if (format === 100) {
+      return await this.decodePng(bytes);
+    }
+
+    const blob = new Blob([bytes], { type: fileResult.mime || 'image/png' });
     const bitmap = await createImageBitmap(blob);
 
     if (bitmap.width > this.maxDimension || bitmap.height > this.maxDimension) {
@@ -163,6 +206,26 @@ export class KittyDecoder {
 
     const clamped = new Uint8ClampedArray(bytes.buffer, bytes.byteOffset, expectedLength);
     const imageData = new ImageData(clamped, width, height);
+
+    if (typeof OffscreenCanvas !== 'undefined') {
+      try {
+        const offscreen = new OffscreenCanvas(width, height);
+        const ctx = offscreen.getContext('2d');
+        if (ctx) {
+          ctx.putImageData(imageData, 0, 0);
+          const bitmap = offscreen.transferToImageBitmap();
+          return {
+            bitmap,
+            width,
+            height,
+            byteSize: expectedLength,
+          };
+        }
+      } catch {
+        // Fall back to createImageBitmap if OffscreenCanvas fails
+      }
+    }
+
     const bitmap = await createImageBitmap(imageData);
 
     return {
@@ -213,6 +276,26 @@ export class KittyDecoder {
     }
 
     const imageData = new ImageData(rgba, width, height);
+
+    if (typeof OffscreenCanvas !== 'undefined') {
+      try {
+        const offscreen = new OffscreenCanvas(width, height);
+        const ctx = offscreen.getContext('2d');
+        if (ctx) {
+          ctx.putImageData(imageData, 0, 0);
+          const bitmap = offscreen.transferToImageBitmap();
+          return {
+            bitmap,
+            width,
+            height,
+            byteSize: totalPixels * 4,
+          };
+        }
+      } catch {
+        // Fall back to createImageBitmap if OffscreenCanvas fails
+      }
+    }
+
     const bitmap = await createImageBitmap(imageData);
 
     return {

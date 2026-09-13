@@ -90,6 +90,22 @@ export const SingleTerminalView: React.FC<SingleTerminalViewProps> = ({
   const lastDimensionsRef = useRef<{ cols: number; rows: number }>({ cols: 0, rows: 0 });
   const fetchCwdAndGitRef = useRef<() => void>(() => {});
 
+  const getTerminalPixelDimensions = useCallback((term: Terminal, rows: number, cols: number) => {
+    const core = (term as any)?._core;
+    const cellWidth =
+      core?._renderService?.dimensions?.actualCellWidth ||
+      core?._renderService?.dimensions?.css?.cell?.width ||
+      9;
+    const cellHeight =
+      core?._renderService?.dimensions?.actualCellHeight ||
+      core?._renderService?.dimensions?.css?.cell?.height ||
+      18;
+    return {
+      pixelWidth: Math.round(cols * cellWidth),
+      pixelHeight: Math.round(rows * cellHeight),
+    };
+  }, []);
+
   const fitTerminal = useCallback(() => {
     if (!containerRef.current || !fitAddonRef.current || !termRef.current) return;
     const w = containerRef.current.clientWidth;
@@ -104,13 +120,14 @@ export const SingleTerminalView: React.FC<SingleTerminalViewProps> = ({
           lastDimensionsRef.current.cols !== cols
         ) {
           lastDimensionsRef.current = { rows, cols };
-          TauriApi.resizePty(pane.sessionId, rows, cols);
+          const { pixelWidth, pixelHeight } = getTerminalPixelDimensions(termRef.current, rows, cols);
+          TauriApi.resizePty(pane.sessionId, rows, cols, pixelWidth, pixelHeight);
         }
       }
     } catch (e) {
       // ignore
     }
-  }, [pane.sessionId]);
+  }, [pane.sessionId, getTerminalPixelDimensions]);
 
   const handleFindNext = useCallback(
     (query?: string) => {
@@ -249,7 +266,8 @@ export const SingleTerminalView: React.FC<SingleTerminalViewProps> = ({
         fitAddon.fit();
         const { rows, cols } = term;
         if (rows > 2 && cols > 2) {
-          TauriApi.resizePty(pane.sessionId, rows, cols);
+          const { pixelWidth, pixelHeight } = getTerminalPixelDimensions(term, rows, cols);
+          TauriApi.resizePty(pane.sessionId, rows, cols, pixelWidth, pixelHeight);
         }
       } catch (e) {
         // ignore
@@ -353,7 +371,8 @@ export const SingleTerminalView: React.FC<SingleTerminalViewProps> = ({
           fitAddon.fit();
           const { rows, cols } = term;
           if (rows > 2 && cols > 2) {
-            TauriApi.resizePty(pane.sessionId, rows, cols);
+            const { pixelWidth, pixelHeight } = getTerminalPixelDimensions(term, rows, cols);
+            TauriApi.resizePty(pane.sessionId, rows, cols, pixelWidth, pixelHeight);
           }
           if (isActivePaneRef.current && isTabActiveRef.current) {
             focusTerminal();

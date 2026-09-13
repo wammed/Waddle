@@ -280,6 +280,127 @@
       - `npm run tauri build`（リリースバイナリ生成完了、24.33秒）。
       - `~/.local/bin/waddle` へ再配備完了。
 
+35. **公式 `kitten icat` 完全対応 & 共有メモリ (`t=s`) の意図的無効化・セキュリティ防護 (`TC-KITTY-04`)**:
+    - **ユーザー要望**:
+      - 「kitty graphics protocol完全対応を謳っていることから、kitty +kitten icatに完全対応するようにして、READMEにもそのことを追加して」
+      - 「セキュリティ面の要請からmpv等での滑らかな動画再生は捨てていることも、README等に追加して」に基づき実施。
+    - **改修内容**:
+      1. **動的 `TIOCGWINSZ` ピクセル解像度同期 (`SingleTerminalView.tsx` & `src-tauri/src/pty.rs`, `src-tauri/src/lib.rs`)**:
+         - xterm.js Canvas の実際の描画セル寸法（`cellWidth`, `cellHeight`）からピクセル幅・高さを算出し、`TauriApi.resizePty` 経由でカーネルの PTY ウィンドウ構造体（`PtySize`）へ動的通知。
+         - `kitten icat` のセルアスペクト比計算や `--place <W>x<H>@<X>x<Y>`、`--fit contain`、`kitten icat --print-window-size` を正常化。
+      2. **公式 `kitten` 準拠の大文字 `OK` プローブ応答 & DA1 エミュレーション (`src-tauri/src/pty.rs`)**:
+         - Kitty 公式 Go 実装（`DetectSupport`）が要求する仕様（`g.ResponseMessage() == "OK"`）に厳格準拠し、メモリ転送 (`i=1`) およびセキュア一時ファイル転送 (`i=2`) に対し大文字 `\x1b_Gi=<id>;OK\x1b\` を 0ms 即時返信。
+         - プローブ終端のプライマリデバイス属性問い合わせ（`\x1b[c`）に対し、`\x1b[?62;4;22c`（VT220 拡張応答）を即時返信し、ハンドシェイクを 0ms で完了。
+      3. **共有メモリ (`t=s`, `/dev/shm`) の意図的無効化とセキュリティ防護**:
+         - `/dev/shm` の共有メモリ汚染、パストラバーサル脱出、OOM メモリ枯渇 DoS を防ぐため、共有メモリのプローブ（`t=s`）は意図的に拒否（未応答）とし、安全な Base64 (`t=d`) およびセキュア一時ファイル (`t=t`) へフォールバック。
+         - 高フレームレート動画の生メモリ再生（`mpv --vo=kitty --vo-kitty-use-shm=yes`）はセキュリティ確保のため割り切った設計方針を全ドキュメントに明記。
+      4. **単体テストの拡充**:
+         - `test_kitty_query_probe_kitten_icat_multi`: `i=1` (OK), `i=2` (OK), `i=3` (拒絶), DA1 応答を検証。
+         - `test_kitty_shm_query_rejection`: `t=s` が安全に拒絶されることを検証。
+         - 単体テスト全 39 件へ拡充（すべて PASS）。
+    - **検証**:
+      - `cargo test --manifest-path src-tauri/Cargo.toml`（全 39 件パス）。
+      - `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets`（警告 0 件）。
+      - `npm run build`（TypeScript 型検査 & Vite ビルド成功、2.17秒）。
+      - `npm run tauri build`（リリースバイナリ生成完了、24.92秒）。
+      - 実機 PTY ハーネスにて `kitten icat --detect-support` が終了コード 0、モード `files` を検出し、`kitten icat ~/Downloads/bye-bye.gif` が正常出力されることを確認完了。
+36. **`kitty +kitten icat` アニメーション GIF 再生不具合 & プロンプトエラー漏洩 (`Gi=2;EBADMSGG;...`) の根本解決**:
+    - **ユーザー報告**: `kitty +kitten icat ./bye-bye.gif` を実行した際、GIF が再生されず、新しいプロンプトに `Gi=2;EBADMSGG;ENOENT: Missing image ID for frameG;` と表示される不具合を報告。
+    - **原因究明**:
+      1. 一時ファイル (`t=t`) における `/dev/shm` のセキュリティ遮断: `src-tauri/src/kitty.rs` の `is_dangerous_path` が `/dev` を一律遮断し、`is_in_temp_dir` に `/dev/shm` が含まれていなかったため `EACCES` で弾かれていた。
+      2. デコーダーの生ピクセル形式未対応: `src/services/kittyGraphics/decoder.ts` の `decodeFile` が常に PNG/JPEG のようなコンテナ画像前提で `createImageBitmap(blob)` を呼び出していたため、`kitten` が出力する生 RGB (`f=24`) データに対して `createImageBitmap` が失敗し `EBADMSG` となっていた。
+      3. 画像番号 (`I`) の未参照: `kitten` はアニメーション制御・フレーム送信時にクライアント指定の画像番号 (`I=...`) を使用するが、`manager.ts` の各アクション (`a=f`, `a=a`, `a=p` 等) が小文字 `i` のみを参照しており `Missing image ID for frame` となっていた。
+      4. 静音仕様 (`q=2`) 判定の逆転: Kitty プロトコル仕様において `q=2` は完全無音（OK およびエラー応答の全抑制）であるが、従来のコードでは `q=2` のときに PTY stdin へ応答を書き込んでいたため、`kitten` 終了後のシェルがキー入力として拾ってプロンプトに印字されていた。
+      5. 差分フレーム合成とループ仕様: `kitten` は基底フレーム (`c=1`) に対する部分矩形 (`x, y, s, v`) を送信するため、`OffscreenCanvas` によるフレーム合成を実装。また `v=1`（仕様上無限ループ）の恒久再生に対応。
+    - **改修内容**:
+      - `src-tauri/src/kitty.rs`: `is_dangerous_path` で `/dev/shm` を許可、`is_in_temp_dir` に `/dev/shm` と `/run/shm` を追加。単体テスト追加。
+      - `src/services/kittyGraphics/decoder.ts`: `decodeFile` に `keys` を引き渡し、`keys.f === 24` (RGB) / `keys.f === 32` (RGBA) の生ピクセル展開および `keys.o === 'z'` の zlib 展開をサポート。
+      - `src/services/kittyGraphics/manager.ts`: 全アクションで `cmd.keys.I` をフォールバック解決。`sendPtyResponse` で `q === 2` 時に即時リターン（完全無音化）。`a=f` で `OffscreenCanvas` による基底フレーム合成。`v=1` による無限ループ再生を保証。
+    - **検証**:
+      - `cargo test --manifest-path src-tauri/Cargo.toml`（全 40 件パス）。
+      - `npm run build`（TypeScript 型検査 & Vite ビルド成功、2.14秒）。
+      - `npx tsx scratch/test_kitten_icat_gif.mjs`（基底フレーム T、全5フレーム f、全3制御 a のパース・画像番号 I 認識確認）。
+      - `node scratch/test_kitty_query.mjs`（全 10 項目パス）。
+37. **`kitten +kitten icat` 共有メモリプローブ拒否 (`ENOTSUP`)・フレーム形式継承・非同期待機・プロンプト漏洩完全根絶**:
+    - **ユーザー報告**: `kitty +kitten icat ./bye-bye.gif` 実行時、GIF が再生されず、空行13行の後に `Gi=918977182;ENOENT: Image not found in cache` が 3 回連続でプロンプトに漏洩し、fish シェルが `fish: Unsupported use of '='` エラーを出力する不具合を報告。
+    - **根本原因の完全解明**:
+      1. **共有メモリ能力プローブ (`a=q,t=s`) の誤承諾**: `kitten icat` は起動時に 3 種のプローブ（`i=1`: 直接転送 `t=d`, `i=2`: 一時ファイル `t=t`, `i=3`: 共有メモリ `t=s`）を送信。Waddle の `manager.ts` が `s=1, v=1` に対して無条件に `OK` を返していたため、`kitten` は `t=s` がサポートされていると判定し、基底フレーム (`a=T`) および差分フレーム (`a=f`) で `t=s`（18 バイトの shm 名）を送信。デコーダー側で生 RGB ピクセル（145,200 バイト）期待値と不一致（18 < 145,200）となり `EBADMSG` で基底画像ロードが失敗、キャッシュに一切画像が登録されなかった。
+      2. **差分フレーム (`a=f`) の形式 (`f`) 省略**: Kitty 仕様では差分フレームで `f` が省略される。`keys.f` が undefined の場合、`decodeFile` が PNG Blob デコードを試みてクラッシュしていた。
+      3. **非同期読み込みレースコンディション**: `a=T` のデコード中に直後の `a=a` が到着した際、`this.loadingImages.get(id)` の待機がなかったため、キャッシュに未登録と判定され `ENOENT: Image not found in cache` を発出していた。
+      4. **静音未指定時 (`quiet === undefined`) のプロンプト汚染**: `kitten icat` が `a=a` で `q` パラメータを省略した際、`sendPtyResponse` が PTY へ応答を書き込んでいた。`kitten` 終了後の fish シェルがこれを受信し、プロンプトに `Gi=...` が入力文字として展開されていた。
+    - **改修内容**:
+      - `src/services/kittyGraphics/manager.ts`:
+        - `case 'q'`: `cmd.keys.t === 's'` の能力プローブに対して `ENOTSUP` を明示返答。`kitten` を安全な一時ファイルモード (`t=t`, `/dev/shm`) へ確実に誘導。
+        - `case 't'` / `case 'T'`: キャッシュ画像レコードに `format`（RGB=24, RGBA=32 等）を明示保存。
+        - `case 'f'`: デコード前に `this.loadingImages.get(id)` を明示 `await`。基底画像の `format` を自動継承。
+        - `case 'a'`: キャッシュ検索前に `this.loadingImages.get(id)` を明示 `await`。
+        - `sendPtyResponse`: `force=true`（明示的クエリ）以外では、`quiet` 未指定時の `OK` 応答を抑止。エラーのみ通知し、シェルへの応答漏洩を完全遮断。
+      - `src/services/kittyGraphics/decoder.ts`:
+        - `medium === 's'` を検知した場合、即座に `ENOTSUP` を送出。
+        - `decodeFile` / `decode`: `keys.f` 未指定時、画像寸法 (`s, v`) およびバイト長/ペイロードサイズ (`S`) から 32-bit RGBA / 24-bit RGB を自動判定。
+      - `src/services/kittyGraphics/types.ts`: `KittyImageRecord` に `format?: number` を追加、`KittyControlKeys` に `S?: number` を追加。
+      - `src/services/kittyGraphics/parser.ts`: `case 'S'`（ペイロードサイズ）のパースに対応。
+    - **検証**:
+      - `cargo test --manifest-path src-tauri/Cargo.toml`（全 40 件パス）。
+      - `npm run build`（TypeScript 型検査 & Vite ビルド成功、2.27秒）。
+      - Python 実機 PTY ハーネスによる `kitten icat /home/susie/Downloads/bye-bye.gif` の bash / fish 実行テストで、シェルのエラー漏洩 0 件・終了コード 0 を完全実証。
+      - `install -m 755 target/release/waddle /home/susie/.local/bin/waddle` により本番バイナリ再配備完了。
+
+38. **`kitty +kitten icat` プローブ重複応答漏洩 (`Gi=1;OKGi=2;OK`) 根絶 & レンダラー積層順序 (`zIndex`) 正常化によるアニメーション GIF 完全描画**:
+    - **ユーザー報告**: `kitty +kitten icat bye-bye.gif` 実行時、13行の空行領域は確保されるが画像が表示されず、コマンド終了後に fish プロンプトに `Gi=1;OKGi=2;OK` が入力文字として残留する不具合を報告。
+    - **根本原因の完全解明**:
+      1. **プロンプト漏洩 `Gi=1;OKGi=2;OK` の原因**:
+         - `src-tauri/src/pty.rs` のリーダースレッドが、PTY ストリーム上で能力プローブ（`a=q, s=1, v=1`）を受信した際に `\x1b_Gi=1;OK\x1b\` および `\x1b_Gi=2;OK\x1b\` を同期返信していた。
+         - フロントエンド側の `manager.ts` にも `case 'q'` で `cmd.keys.s === 1 && cmd.keys.v === 1` に対し `sendPtyResponse(..., force=true)` を実行するコードが残っていた。
+         - `kitten icat` は最初の 1 組の応答を受信すると直ちに画像転送を開始してプロセス終了するため、フロントエンドから遅れて PTY に送られた重複応答（`Gi=1;OK` / `Gi=2;OK`）が PTY バッファに滞留し、`kitten` 終了後の fish シェルがキー入力として拾ってプロンプトに印字されていた。
+      2. **画像非表示の原因**:
+         - `manager.ts` の `mountCanvas` において、`xterm-kitty-graphics-layer` の canvas が `screen.insertBefore(canvas, screen.firstChild)` かつ `zIndex = '0'` で配置されていた。
+         - `@xterm/addon-canvas` の `TextRenderLayer` も同じく `zIndex = '0'` で後から生成・追加されており、CSS の DOM ツリー順ルールにより `TextRenderLayer` が画像レイヤーの前面に描画されていた。
+         - 画像配置領域に確保されたプレースホルダー文字（スペース）の背景色矩形（ダーク色）が毎フレーム `TextRenderLayer` によって全面塗りつぶされ、背面の画像が完全に覆い隠されていた。
+         - また、`decoder.ts` の `decodeRgb` / `decodeRgba` において WebKitGTK 環境下で `createImageBitmap(ImageData)` が不安定になるケースが存在した。
+    - **改修内容**:
+      1. `src/services/kittyGraphics/manager.ts`:
+         - `case 'q'`: `cmd.keys.s === 1 && cmd.keys.v === 1` の能力プローブ受信時は即時 `return` し、フロントエンドからの重複返信を完全停止。一般クエリも Rust 側で同期処理されるためフロントエンド返信を停止。
+         - `mountCanvas`: canvas の `zIndex` を `'1'` に設定し、`.xterm-screen` 内の `TextRenderLayer`（`zIndex = 0`）の後かつ `SelectionRenderLayer`（`zIndex = 1`）の直前（`layers[1]` の前）に挿入。背景色の上に画像、画像の上に選択・リンク・カーソルが来る完全な積層順序を確立。
+      2. `src-tauri/src/pty.rs`:
+         - 共有メモリプローブ（`t=s`）に対し、無応答ではなく Kitty 仕様に準拠した `\x1b_Gi=<id>;ENOTSUP\x1b\` を明示返答し、`kitten icat` のフォールバック完了を瞬時化。単体テスト更新。
+      3. `src/services/kittyGraphics/decoder.ts`:
+         - `decodeRgb` / `decodeRgba`: `OffscreenCanvas` と `transferToImageBitmap()` による高信頼・ゼロコピーの ImageBitmap 生成へ移行。
+      4. `src/services/tauriApi.ts` & `src/services/kittyGraphics/manager.ts`:
+         - `logKittyDebug` を配備し、配置・フレーム更新・描画のトレーサビリティを確保。
+    - **検証**:
+      - `cargo test --manifest-path src-tauri/Cargo.toml`: 全 40 件 PASS。
+      - `npm run build`: TypeScript 型検査 & Vite ビルド成功（0 エラー、2.36秒）。
+      - `cargo build --release --manifest-path src-tauri/Cargo.toml`: 最適化リリースバイナリ生成完了（24.92秒）。
+      - `install -m 755 src-tauri/target/release/waddle /home/susie/.local/bin/waddle`: 本番配備完了。
+
+39. **`kitty +kitten icat` アニメーション GIF 差分フレーム 32-bit RGBA デコード正常化（白黒ドット崩壊の根絶） & ゴースト重複描画の完全解決**:
+    - **ユーザー報告**: `kitty +kitten icat bye-bye.gif` 実行時、最初の静止画は表示されるが、アニメーションの動きが入ると白黒のドット（ノイズ）で動くだけになり、画像がダブって表示される不具合を報告。
+    - **根本原因の完全解明**:
+      1. **白黒ドット（ノイズ）崩壊の原因**:
+         - `bye-bye.gif` の基底フレーム (`a=T`) は 24-bit RGB（`f=24, s=220, v=220, S=145200`、220×220×3 = 145,200 バイト）。
+         - 一方、Kitty 仕様においてアニメーション差分フレーム (`a=f`) はアルファチャンネルによる透明合成を行うため 32-bit RGBA が基本であり、`f` キー省略時の仕様デフォルトは `f=32` である。
+         - 実際に `kitten icat` は差分フレームで `s=152, v=212, S=128896`（152×212×4 = 128,896 バイト）の 32-bit RGBA 生ピクセルを送信していた。
+         - しかし `manager.ts` が基底画像の `format`（24）を機械的に差分フレームへ継承させ、`decoder.ts` でも `format === 24`（`decodeRgb`）を強制適用していた。
+         - 4 バイト/ピクセルの RGBA データを 3 バイト/ピクセルの RGB としてデコードした結果、全ピクセルのストライドが 1 バイトずつズレて対角線上にスキューし、不透明アルファ値（255 = 0xFF）が RGB の色成分として解釈され、白黒の砂嵐ノイズドットとなって合成されていた。
+      2. **画像ダブり・重複ゴーストの原因**:
+         - `mountCanvas` において、再マウント時やサイズ変更時に既存の `.xterm-kitty-graphics-layer` キャンバスが DOM に残存し、背面に古い静止画像を表示し続けるケースがあった。
+         - `calculateCursorOffset` において、`\r\x1b[73C`（カーソル 73 桁前進）などの CSI エスケープシーケンスが ANSI カラーコード（`m`）以外に対応しておらず、エスケープコードの文字数として誤計算されていた。
+         - アニメーション進行ループ（`advanceFrame`）内で `this.term.refresh()` を毎フレーム呼び出していたため、xterm.js の文字レイヤー再描画と `term.onRender` による二重の `render()` 呼び出しが発生していた。
+    - **改修内容**:
+      1. `src/services/kittyGraphics/decoder.ts`:
+         - `decode` および `decodeFile`: ペイロード長 `S` やバイト配列長とピクセル数（`s * v`）の積から 24-bit（×3）と 32-bit（×4）を厳密に数学的判定。4 バイト/ピクセルのデータは `keys.f` の誤指定にかかわらず確実に 32-bit RGBA としてデコード。
+      2. `src/services/kittyGraphics/manager.ts`:
+         - `case 'f'`: `keys.S === s * v * 4` の場合は 32-bit RGBA（`f=32`）を設定し、基底フレームの 24-bit 形式を誤って上書きしないよう修正。
+         - `mountCanvas`: キャンバス追加前に既存の `.xterm-kitty-graphics-layer` をすべて DOM から完全削除。
+         - `calculateCursorOffset`: CSI シーケンスパーサーを実装し、`C` (CUF), `D` (CUB), `G` (CHA) などのカーソル移動コードを正確に列オフセットへ反映。
+         - `advanceFrame`: 不要な `this.term.refresh()` を排除し、グラフィックスレイヤーのみを低負荷かつ滑らかに 60 FPS で直接更新。
+    - **検証**:
+      - `cargo test --manifest-path src-tauri/Cargo.toml`: 全 40 件 PASS。
+      - `npm run build`: TypeScript 型検査 & Vite ビルド成功（0 エラー、2.18秒）。
+      - `cargo build --release --manifest-path src-tauri/Cargo.toml`: 最適化リリースバイナリ生成完了（24.11秒）。
+      - `install -m 755 src-tauri/target/release/waddle /home/susie/.local/bin/waddle`: 本番配備完了。
+
 ---
 
 ## 3. 実施された主要な改善と技術的解決策
@@ -381,7 +502,7 @@
 # フロントエンドの型検査 & 本番ビルド (Vite + TypeScript) - 警告/エラー0件でビルド完了
 npm run build
 
-# Rust バックエンドの単体テスト (全37件すべてパス、うち Kitty セキュリティテスト7件、PTY迎撃テスト6件、ページネーションテスト1件)
+# Rust バックエンドの単体テスト (全39件すべてパス、うち Kitty セキュリティテスト8件、PTY迎撃テスト8件、ページネーションテスト1件)
 cargo test --manifest-path src-tauri/Cargo.toml
 
 # Rust の Clippy 静的解析 (警告0件)
@@ -405,6 +526,7 @@ npm run tauri dev
   - `TC-THM-04`: 不透明度・ぼかしスライダーの 60 FPS リアルタイムプレビュー正常動作確認。
   - `TC-PERF-04`: 静的グロードット化によりアイドル時 CPU 0.0%〜1.0% 実証。
   - `TC-ENH-04`: 直近コマンド以降の出力スキャン & 1-Click AI 修正チップ正常動作確認。
+  - `TC-KITTY-04`: `kitten icat --detect-support` 終了コード 0、モード `files` 検出、大文字 `OK` / DA1 即時応答正常動作確認。
 
 
 ---

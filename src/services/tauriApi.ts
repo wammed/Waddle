@@ -75,9 +75,15 @@ export const TauriApi = {
     return await invoke('write_pty', { sessionId, data });
   },
 
-  async resizePty(sessionId: string, rows: number, cols: number): Promise<void> {
+  async resizePty(
+    sessionId: string,
+    rows: number,
+    cols: number,
+    pixelWidth?: number,
+    pixelHeight?: number
+  ): Promise<void> {
     if (!isTauri()) return;
-    return await invoke('resize_pty', { sessionId, rows, cols });
+    return await invoke('resize_pty', { sessionId, rows, cols, pixelWidth, pixelHeight });
   },
 
   async closePty(sessionId: string): Promise<void> {
@@ -491,6 +497,15 @@ export const TauriApi = {
         isTemp: isTemp ?? false,
       }
     );
+  },
+
+  async logKittyDebug(msg: string): Promise<void> {
+    if (!isTauri()) return;
+    try {
+      await invoke('log_kitty_debug', { msg });
+    } catch {
+      // ignore
+    }
   },
 };
 

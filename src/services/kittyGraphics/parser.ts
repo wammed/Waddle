@@ -195,6 +195,9 @@ export class KittyApcParser {
         case 'v':
           result.v = parseInt(val, 10);
           break;
+        case 'S':
+          result.S = parseInt(val, 10);
+          break;
         case 'm':
           result.m = parseInt(val, 10) === 1 ? 1 : 0;
           break;

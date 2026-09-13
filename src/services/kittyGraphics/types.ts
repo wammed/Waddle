@@ -4,6 +4,7 @@ export interface KittyControlKeys {
   t?: 'd' | 'f' | 't' | 's'; // Medium: 'd'=direct base64, 'f'=file, 't'=temp file, 's'=shared memory (default: 'd')
   s?: number; // Image width in pixels OR animation state (1=stop, 2=loading, 3=run)
   v?: number; // Image height in pixels OR animation loop count (default: 0 = infinite loop)
+  S?: number; // Payload size in bytes
   m?: 0 | 1; // More chunks: 0=last, 1=more follow (default: 0)
   i?: number; // Image ID
   I?: number; // Image number
@@ -52,6 +53,7 @@ export interface KittyCommand {
 
 export interface KittyImageRecord {
   id: number;
+  format?: number;
   bitmap: ImageBitmap;
   width: number;
   height: number;

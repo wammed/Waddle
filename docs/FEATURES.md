@@ -367,14 +367,22 @@ Welcome to the comprehensive feature guide for **Waddle**, the AI-integrated, pr
     - **Viewport Scissoring (Approach A)**: Applies hardware-accelerated clipping bounds matching viewport dimensions `[0..width, 0..height]`.
 - **Anchor Cell Synchronization & Animation Frame Retention (`a=f`)**:
   - Maintains zero-latency synchronous PTY streaming (`term.write`), guaranteeing instantaneous 0ms rendering for shell startup, `fish_greetings`, and terminal prompts.
-  - Precisely captures true anchor coordinates `(start_col, start_row)` even when preceded by text in the same chunk via `calculateCursorOffset(textBefore)`.
+  - Precisely captures true anchor coordinates `(start_col, start_row)` even when preceded by text or ANSI cursor movements in the same chunk via `calculateCursorOffset(textBefore)` (supporting full CSI codes: `CUF \x1b[..C`, `CUB \x1b[..D`, `CHA \x1b[..G`).
   - Renderer coordinates adhere strictly to `render_x = padding_left + col * cell_width` and `render_y = padding_top + (row - scroll_offset) * cell_height`, preventing default (0, 0) collisions over previous output.
   - Animation frame transmissions (`a=f`) update frame textures in cache while strictly inheriting and preserving the placement anchor coordinates established during initial placement.
+- **Delta Frame 32-bit RGBA Auto-Detection & Alpha Compositing**:
+  - Automatically identifies whether an incoming animation delta frame (`a=f`) is 32-bit RGBA or 24-bit RGB based on exact byte length and pixel count arithmetic ($S = s \times v \times 4$), adhering strictly to the Kitty specification default (`f=32`).
+  - Prevents byte stride skew, pixel misalignment, and opaque black-and-white static noise by never forcing base RGB formats onto RGBA delta frames.
+  - Composes rectangular delta patches (`x, y, s, v`) seamlessly over previous frames (`c=<frame_index>`) via offscreen canvas alpha blending (`ctx.drawImage`).
+- **Ghost Layer Prevention & Single Active Canvas Stacking**:
+  - Prunes stale `.xterm-kitty-graphics-layer` elements before re-attaching canvases, preventing ghost image doubling during split layout changes or tab switches.
+  - Graphics layer is mounted with `zIndex: 1` directly above `TextRenderLayer` (`zIndex: 0`) and beneath `SelectionRenderLayer` (`zIndex: 1` in DOM order) and `CursorRenderLayer` (`zIndex: 3`).
 - **Animation Loop Count (`v`) Specification Compliance & Resilient Timer Scheduling**:
   - **Loop Count Default**: Parameter `v` defaults to `0` (Infinite Loop) per Kitty Graphics Protocol specification.
   - **Infinite Playback (`v=0`)**: Automatically loops back to frame 1 (index 0) upon expiration of the final frame's delay (`z` ms), continually rescheduling the frame timer to sustain perpetual animation.
   - **Finite Count Playback (`v>0`)**: Accurately tracks completed cycles (`loopsCompleted`); when the requested loop count is reached, halts the timer and freezes on the final frame.
   - **Animation Control (`a=a`)**: Supports playback state (`s=1` stop, `s=3` run), seeking to designated frame (`r`), dynamic frame gap delay updates (`z`), and dynamic loop count reconfiguration (`v`).
+  - **Dedicated 60 FPS Graphics Loop**: `advanceFrame` directly re-renders the Kitty graphics canvas without triggering full text layer refreshes (`term.refresh()`), maintaining high animation smoothness with low CPU usage.
   - **Resource Management**: Automatically cleans up and unregisters active animation timers upon LRU cache eviction, image deletion (`a=d`), or terminal disposal to prevent memory or timer leaks.
 - **Sub-Rectangle Source Clipping (`x, y, w, h`)**:
   - Full support for source texture clipping parameters: `x` (source X offset in pixels), `y` (source Y offset in pixels), `w` (source rectangle width in pixels), and `h` (source rectangle height in pixels).
@@ -386,6 +394,23 @@ Welcome to the comprehensive feature guide for **Waddle**, the AI-integrated, pr
   - Supports diacritic omission with left-to-right inheritance and 3rd-diacritic high byte extension for 32-bit image IDs.
   - Extracts image IDs from cell foreground colors (24-bit TrueColor RGB or 256-color palette index) with automatic fallback to the most recently transmitted image.
   - Seamlessly handles virtual placements (`U=1`), suppressing buffer space reservation while holding placement dimensions and source sub-rectangles for Unicode placeholders.
+- **Official `kitten icat` & Kitty Ecosystem Integration (`kitten diff`, `yazi`, `image.nvim`)**:
+  - Full native compatibility with Kitty's official `kitten icat` image display command (and `kitty +kitten icat`).
+  - **Dynamic `TIOCGWINSZ` Pixel Dimensions Reporting**:
+    - Queries actual rendered font cell dimensions (`cellWidth`, `cellHeight`) from xterm.js Canvas and dynamically updates the Linux kernel PTY window size structure (`pixel_width`, `pixel_height` as `cols * cellWidth`, `rows * cellHeight`).
+    - Enables accurate aspect ratio calculations for `kitten icat`, supporting grid placement `--place <W>x<H>@<X>x<Y>`, `--fit contain`, and pixel reporting `kitten icat --print-window-size`.
+  - **Multi-Probe Handshake (`a=q`) & Uppercase `OK` Compliance**:
+    - Fully adheres to Kitty's official Go implementation (`DetectSupport`) requiring `g.ResponseMessage() == "OK"` (uppercase `OK`).
+    - Immediately replies with `\x1b_Gi=<id>;OK\x1b\` to direct memory (`i=1`) and sandboxed temp file (`i=2`) queries.
+  - **Zero-Latency DA1 (`\x1b[c`) Emulation**:
+    - Instantly acknowledges Primary Device Attributes queries (`\x1b[c`) sent at the conclusion of Kitty capability probes with `\x1b[?62;4;22c`, allowing `kitten icat --detect-support` to exit in 0ms with status 0.
+- **Security Architecture: Intentional Omission of Shared Memory (`t=s`, `/dev/shm`) & Video Playback Trade-Off**:
+  - **Threat Model & Design Rationale**:
+    - POSIX Shared Memory (`/dev/shm`) on Linux is accessible to all processes running under the same UID. Supporting arbitrary shared memory handles creates dangerous attack vectors, including cross-process memory inspection, symlink traversal, and memory-exhaustion denial of service (OOM crashes).
+  - **Security-First Architecture Trade-Off**:
+    - Guided by Waddle's privacy-first, zero-leakage security model, POSIX Shared Memory (`t=s`) is **intentionally unsupported and disallowed**.
+    - Consequently, raw uncompressed high-FPS video streaming (such as `mpv --vo=kitty --vo-kitty-use-shm=yes`) is deliberately omitted in favor of ironclad sandbox security (resulting in smooth audio playback only, or jittery high-bandwidth Base64 streaming). Waddle is an engineering workstation, not a video player.
+    - In contrast, static images, animated GIFs, `kitten diff`, and file manager previews render with 100% graphical fidelity via secure direct Base64 (`t=d`) and sandboxed temporary files (`t=t`, immediately unlinked from disk upon reading, with strict file size and dimension limits).
 - **Layering Order**:
   - Render pipeline: **Terminal Background / Wallpaper → Kitty Graphics Canvas Layer → Text/Glyphs Layer → Cursor Layer**.
   - Text glyphs and the terminal cursor render crisp and clear on top of displayed graphics.

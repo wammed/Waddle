@@ -124,6 +124,7 @@ pub fn process_kitty_output<W: Write + ?Sized>(
             // Check if this is a query probe (a=q)
             let mut is_query = false;
             let mut query_id: Option<u32> = None;
+            let mut medium: Option<char> = None;
 
             for part in header.split(',') {
                 let part = part.trim();
@@ -135,19 +136,34 @@ pub fn process_kitty_output<W: Write + ?Sized>(
                         is_query = true;
                     } else if k.eq_ignore_ascii_case("i") || k.eq_ignore_ascii_case("I") {
                         query_id = v.parse::<u32>().ok();
+                    } else if k.eq_ignore_ascii_case("t") || k.eq_ignore_ascii_case("T") {
+                        medium = v.chars().next();
                     }
                 }
             }
 
             if is_query {
                 let id = query_id.unwrap_or(1);
-                let response = format!("\x1b_Gi={};ok\x1b\\", id);
-                if let Err(e) = writer.write_all(response.as_bytes()) {
-                    eprintln!("[Kitty Graphics] Error writing query response: {}", e);
-                } else if let Err(e) = writer.flush() {
-                    eprintln!("[Kitty Graphics] Error flushing query response: {}", e);
+                let is_shm = matches!(medium, Some('s') | Some('S'));
+                if !is_shm {
+                    // Send uppercase "OK" as required by kitten's DetectSupport (g.ResponseMessage() == "OK")
+                    let response = format!("\x1b_Gi={};OK\x1b\\", id);
+                    if let Err(e) = writer.write_all(response.as_bytes()) {
+                        eprintln!("[Kitty Graphics] Error writing query response: {}", e);
+                    } else if let Err(e) = writer.flush() {
+                        eprintln!("[Kitty Graphics] Error flushing query response: {}", e);
+                    } else {
+                        println!("[Kitty Graphics] Responded to query: \\x1b_Gi={};OK\\x1b\\", id);
+                    }
                 } else {
-                    println!("[Kitty Graphics] Responded to query: \\x1b_Gi={};ok\\x1b\\", id);
+                    let response = format!("\x1b_Gi={};ENOTSUP\x1b\\", id);
+                    if let Err(e) = writer.write_all(response.as_bytes()) {
+                        eprintln!("[Kitty Graphics] Error writing query refusal: {}", e);
+                    } else if let Err(e) = writer.flush() {
+                        eprintln!("[Kitty Graphics] Error flushing query refusal: {}", e);
+                    } else {
+                        println!("[Kitty Graphics] Refused probe for shared memory (t=s) with ENOTSUP: i={}", id);
+                    }
                 }
 
                 // Remove the query sequence from decoded
@@ -189,6 +205,19 @@ pub fn process_kitty_output<W: Write + ?Sized>(
         if range.end <= decoded.len() {
             decoded.drain(range);
         }
+    }
+
+    // Check if DA1 query "\x1b[c" is present in decoded (frequently sent at the end of Kitty capability probes)
+    while let Some(da1_pos) = decoded.find("\x1b[c") {
+        let response = b"\x1b[?62;4;22c";
+        if let Err(e) = writer.write_all(response) {
+            eprintln!("[Kitty Graphics] Error writing DA1 response: {}", e);
+        } else if let Err(e) = writer.flush() {
+            eprintln!("[Kitty Graphics] Error flushing DA1 response: {}", e);
+        } else {
+            println!("[Kitty Graphics] Responded to DA1 query: \\x1b[?62;4;22c");
+        }
+        decoded.drain(da1_pos..da1_pos + 3);
     }
 
     // If an unclosed \x1b_G header remains at the end of decoded (< 256 bytes), hold it
@@ -491,18 +520,27 @@ impl PtyManager {
         }
     }
 
-    pub async fn resize(&self, session_id: &str, rows: u16, cols: u16) -> Result<(), String> {
+    pub async fn resize(
+        &self,
+        session_id: &str,
+        rows: u16,
+        cols: u16,
+        pixel_width: Option<u16>,
+        pixel_height: Option<u16>,
+    ) -> Result<(), String> {
         let sessions = self.sessions.lock().await;
         if let Some(session) = sessions.get(session_id) {
             let master = session.master.lock();
-            let pixel_width = cols.saturating_mul(9);
-            let pixel_height = rows.saturating_mul(18);
+            let pw = pixel_width.unwrap_or(0);
+            let ph = pixel_height.unwrap_or(0);
+            let final_pixel_width = if pw > 0 { pw } else { cols.saturating_mul(9) };
+            let final_pixel_height = if ph > 0 { ph } else { rows.saturating_mul(18) };
             master
                 .resize(PtySize {
                     rows,
                     cols,
-                    pixel_width,
-                    pixel_height,
+                    pixel_width: final_pixel_width,
+                    pixel_height: final_pixel_height,
                 })
                 .map_err(|e| format!("Failed to resize PTY: {}", e))?;
             Ok(())
@@ -1202,7 +1240,7 @@ mod tests {
 
         process_kitty_output(&mut decoded, &mut writer, &mut pending);
 
-        assert_eq!(writer, b"\x1b_Gi=1;ok\x1b\\");
+        assert_eq!(writer, b"\x1b_Gi=1;OK\x1b\\");
         assert_eq!(decoded, "");
         assert_eq!(pending, "");
     }
@@ -1215,7 +1253,7 @@ mod tests {
 
         process_kitty_output(&mut decoded, &mut writer, &mut pending);
 
-        assert_eq!(writer, b"\x1b_Gi=1;ok\x1b\\");
+        assert_eq!(writer, b"\x1b_Gi=1;OK\x1b\\");
         assert_eq!(decoded, "");
         assert_eq!(pending, "");
     }
@@ -1228,7 +1266,7 @@ mod tests {
 
         process_kitty_output(&mut decoded, &mut writer, &mut pending);
 
-        assert_eq!(writer, b"\x1b_Gi=42;ok\x1b\\");
+        assert_eq!(writer, b"\x1b_Gi=42;OK\x1b\\");
         assert_eq!(decoded, "");
         assert_eq!(pending, "");
     }
@@ -1241,8 +1279,37 @@ mod tests {
 
         process_kitty_output(&mut decoded, &mut writer, &mut pending);
 
-        assert_eq!(writer, b"\x1b_Gi=1;ok\x1b\\");
+        assert_eq!(writer, b"\x1b_Gi=1;OK\x1b\\");
         assert_eq!(decoded, "Hello World");
+        assert_eq!(pending, "");
+    }
+
+    #[test]
+    fn test_kitty_query_probe_kitten_icat_multi() {
+        // kitten icat sends 3 probes: direct (i=1), temp file (i=2), shared memory (i=3) followed by DA1 (\x1b[c)
+        let mut decoded = "\x1b_Ga=q,f=24,s=1,v=1,S=3,i=1;MTIz\x1b\\\x1b_Ga=q,f=24,t=t,s=1,v=1,S=46,i=2;L2Rldi9zaG0v...\x1b\\\x1b_Ga=q,f=24,t=s,s=1,v=1,S=18,i=3;aWNhdC0...\x1b\\\x1b[c".to_string();
+        let mut writer = Vec::new();
+        let mut pending = String::new();
+
+        process_kitty_output(&mut decoded, &mut writer, &mut pending);
+
+        // Expect OK for i=1, OK for i=2, refusal (ENOTSUP) for i=3 (shm), and DA1 response
+        assert_eq!(writer, b"\x1b_Gi=1;OK\x1b\\\x1b_Gi=2;OK\x1b\\\x1b_Gi=3;ENOTSUP\x1b\\\x1b[?62;4;22c");
+        assert_eq!(decoded, "");
+        assert_eq!(pending, "");
+    }
+
+    #[test]
+    fn test_kitty_shm_query_rejection() {
+        // Verify that standalone shared memory probe (t=s) is rejected with ENOTSUP for sandbox security
+        let mut decoded = "\x1b_Ga=q,t=s,s=1,v=1,i=99;test\x1b\\".to_string();
+        let mut writer = Vec::new();
+        let mut pending = String::new();
+
+        process_kitty_output(&mut decoded, &mut writer, &mut pending);
+
+        assert_eq!(writer, b"\x1b_Gi=99;ENOTSUP\x1b\\", "Shared memory query (t=s) must be rejected with ENOTSUP");
+        assert_eq!(decoded, "");
         assert_eq!(pending, "");
     }
 
@@ -1275,7 +1342,7 @@ mod tests {
         process_kitty_output(&mut chunk2, &mut writer, &mut pending);
         assert_eq!(chunk2, "");
         assert_eq!(pending, "");
-        assert_eq!(writer, b"\x1b_Gi=1;ok\x1b\\");
+        assert_eq!(writer, b"\x1b_Gi=1;OK\x1b\\");
     }
 }
 
