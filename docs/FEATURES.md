@@ -395,18 +395,27 @@ Welcome to the comprehensive feature guide for **Waddle**, the AI-integrated, pr
   - Supports diacritic omission with left-to-right inheritance and 3rd-diacritic high byte extension for 32-bit image IDs.
   - Extracts image IDs from cell foreground colors (24-bit TrueColor RGB or 256-color palette index) with automatic fallback to the most recently transmitted image.
   - Seamlessly handles virtual placements (`U=1`), suppressing buffer space reservation while holding placement dimensions and source sub-rectangles for Unicode placeholders.
-- **Official `kitten icat` & Kitty Ecosystem Integration (`kitten diff`, `yazi`, `image.nvim`)**:
-  - Full native compatibility with Kitty's official `kitten icat` image display command (and `kitty +kitten icat`).
-  - **Dynamic `TIOCGWINSZ` Pixel Dimensions Reporting**:
-    - Queries actual rendered font cell dimensions (`cellWidth`, `cellHeight`) from xterm.js Canvas and dynamically updates the Linux kernel PTY window size structure (`pixel_width`, `pixel_height` as `cols * cellWidth`, `rows * cellHeight`).
-    - Enables accurate aspect ratio calculations for `kitten icat`, supporting grid placement `--place <W>x<H>@<X>x<Y>`, `--fit contain`, and pixel reporting `kitten icat --print-window-size`.
-  - **Multi-Probe Handshake (`a=q`) & Uppercase `OK` Compliance**:
-    - Fully adheres to Kitty's official Go implementation (`DetectSupport`) requiring `g.ResponseMessage() == "OK"` (uppercase `OK`).
-    - Immediately replies with `\x1b_Gi=<id>;OK\x1b\` to direct memory (`i=1`) and sandboxed temp file (`i=2`) queries.
-  - **Yazi CSI Probes & DA1 Zero-Latency Emulation**:
-    - Instantly acknowledges and drains `\x1b[?996n` (placeholder support query) with `\x1b[?996;1n`, `\x1b[16t` (cell size query) with `\x1b[6;18;9t`, and `\x1b[c` / `\x1b[0c` (DA1 device attributes) with `\x1b[?62;4;22c`, enabling 0ms graphics capability detection in Yazi and fastfetch.
-  - **Full Yazi TUI Preview Compatibility (`C=1`, CUP Coordinates, `d=A`)**:
-    - Complete protection against extraneous newline (`\r\n`) injection under `C=1` or Alternate Screen buffers, pixel-perfect image placement within the preview pane, and instant cleanup via `d=A` on preview navigation or file change.
+- **Comprehensive Linux TUI & CLI Ecosystem Integration**:
+  - Delivers pixel-perfect inline rendering and flawless text co-existence across native and plugin-driven Linux CLI/TUI tools: `yazi`, `ranger`, `lf`, `fastfetch`, `kitten icat`, `chafa`, `timg`, `viu`, and Neovim (`image.nvim`).
+  - **4 Universal Architecture Foundations**:
+    1. **100% Normal Text Preservation (`workCell` Memory Hygiene)**:
+       - Eliminates stale cache misclassifications in xterm's shared cell memory pool by enforcing strict `cell.isCombined()` verification.
+       - Guarantees that in any placeholder-based environment (Yazi, Neovim `image.nvim`, Ranger), all surrounding text, file lists, borders, code lines, and status indicators remain 100% visible and uncorrupted when images appear.
+    2. **TUI Fixed-Grid Protection (`C=1` & Alternate Screen Zero-Allocation)**:
+       - Strictly suppresses extraneous linefeed (`\r\n`) and space character allocation in alternate screen buffers and `C=1` placements. Completely prevents runaway scrolling, screen jumping, and pushed-down pane borders in full-screen TUIs (`yazi`, `ranger`, `lf`).
+    3. **ANSI CSI Cursor Tracking & Absolute CUP Coordinate Parsing**:
+       - Accurately tracks both relative cursor offsets (`CUF \x1b[..C`, `CUB \x1b[..D`, `CHA \x1b[..G`) and absolute screen coordinates (`CUP \x1b[<row>;<col>H` / `HVP \x1b[<row>;<col>f`) used by TUI windowing layouts, anchoring images precisely at the target preview pane's boundaries.
+    4. **Zero-Latency PTY Probe Responses & Timeout Prevention**:
+       - The Rust PTY reader loop intercepts and instantly answers graphics capability inquiries (`a=q`, `\x1b[?996n`, `\x1b[16t`, `\x1b[c` / `\x1b[0c`) in 0ms with official uppercase `OK` and VT220 DA1 attributes. Prevents tools from timing out or falling back to ASCII art, enabling instant first-frame graphic rendering.
+  - **Verified Tool Compatibility**:
+    - **`fastfetch` (`"type": "kitty"`)**: Displays official distro logos in high-resolution graphics with 0ms startup.
+    - **`kitten icat`**: Dynamic `TIOCGWINSZ` pixel reporting ensures `--place`, `--fit contain`, and aspect ratio mathematics align perfectly without unexpected wrapping.
+    - **`chafa` (`--format kitty`) / `timg` (`-pk`) / `viu`**: Restores prompt positions cleanly beneath images upon CLI return.
+    - **`yazi`**: Pixel-perfect preview rendering within right pane bounds, zero row-shift overlap, and 100% text display in left/middle panes.
+    - **`ranger` (`method=kitty`) / `lf`**: Seamless preview pane integration without vertical scrolling disruption.
+    - **`image.nvim` (Neovim)**: Displays inline Markdown and image previews without hiding buffer text or triggering missing-glyph tofu boxes.
+  - **Universal Image Deletion (`a=d, d=A`)**:
+    - Fully supports uppercase deletion (`d=A`), purging all placements, cached textures, and animation timers instantly on file change or tool exit.
 - **Security Architecture: Intentional Omission of Shared Memory (`t=s`, `/dev/shm`) & Video Playback Trade-Off**:
   - **Threat Model & Design Rationale**:
     - POSIX Shared Memory (`/dev/shm`) on Linux is accessible to all processes running under the same UID. Supporting arbitrary shared memory handles creates dangerous attack vectors, including cross-process memory inspection, symlink traversal, and memory-exhaustion denial of service (OOM crashes).

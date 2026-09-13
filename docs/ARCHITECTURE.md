@@ -225,11 +225,11 @@ Waddle is built on a hybrid architecture combining a high-performance **Rust bac
 +---------------------------------------------------------------------------------+
 ```
 
-- **Zero-Lag Stream Separation & 0ms Rust PTY Capability Handshake (`kitten icat` / `yazi` Full Integration)**:
+- **Zero-Lag Stream Separation & 0ms Rust PTY Capability Handshake (Universal Linux TUI/CLI Ecosystem Integration)**:
   - APC escape sequences (`\x1b_G...`) carrying megabytes of Base64 image data are intercepted before reaching `@xterm/xterm`.
   - Stripped text is passed to `term.write()`, preventing parser bottlenecking and terminal lag.
   - **Zero-Latency PTY Query Response & Official `kitten` Compliance**: The Rust PTY background reader (`process_kitty_output`) intercepts capability inquiries (`a=q`) and immediately replies with uppercase `\x1b_Gi=<id>;OK\x1b\` to child stdin with 0ms latency. Strictly satisfies Kitty's Go implementation (`DetectSupport`) check for `g.ResponseMessage() == "OK"`, eliminating probe timeouts in `kitten icat`, `fastfetch`, and CLI tools.
-  - **Zero-Latency Yazi CSI Probes Emulation**:
+  - **Universal TUI (Yazi, Ranger, lf, etc.) CSI Probes Emulation**:
     - Instantly replies to `\x1b[?996n` (Kitty Unicode placeholder support query) with `\x1b[?996;1n` (supported).
     - Instantly replies to `\x1b[16t` (cell size query) with `\x1b[6;18;9t` (height 18px, width 9px).
     - Instantly replies to `\x1b[c` / `\x1b[0c` (DA1 Primary Device Attributes queries) with `\x1b[?62;4;22c`.
@@ -260,7 +260,7 @@ Waddle is built on a hybrid architecture combining a high-performance **Rust bac
   - **32-bit RGBA Strict Format Determination**: Base images (`a=T`) may be 24-bit RGB (`f=24`), but animation delta frames (`a=f`) require an alpha channel for transparent delta overlay (Kitty specification default is `f=32`). Payloads are validated via byte length vs pixel count arithmetic ($S = s \times v \times 4$), reliably decoding RGBA frames without stride skew, black-and-white static noise, or synthetic opacity corruption.
   - **Sub-Rectangle Delta Composition**: Composes rectangular animation patches (`x, y, s, v`) onto base or previous frames (`c=<frame_index>`) via offscreen canvas alpha blending (`ctx.drawImage`), generating sequential full-frame ImageBitmaps with zero-leak lifecycle management.
   - **ANSI CSI Cursor Sync & CUP Coordinate Parsing**: `calculateCursorOffset` accurately parses full CSI escape codes (`CUF \x1b[..C`, `CUB \x1b[..D`, `CHA \x1b[..G`) as well as absolute `CUP \x1b[<row>;<col>H` / `HVP \x1b[<row>;<col>f` sequences emitted by TUI tools prior to image transfer, ensuring precise cell anchoring.
-  - **TUI (Yazi) Placement & Non-Advancing Cursor (`C=1`) Buffer Protection**:
+  - **TUI (Yazi, Ranger, lf, image.nvim, etc.) Placement & Non-Advancing Cursor (`C=1`) Buffer Protection**:
     - When `C=1` is specified or when running in the Alternate Screen buffer, zero buffer space and zero linefeeds (`\r\n`) are allocated. Eliminates unwanted screen scrolling in fixed full-screen grids.
     - **Uppercase Deletion (`d=A`) Support**: Handles `a=d, d=A` to completely wipe all placements, memory caches, and animation timers instantly, preventing ghost overlay retention during preview transitions and exit.
 

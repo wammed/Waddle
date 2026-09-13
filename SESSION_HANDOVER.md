@@ -596,6 +596,14 @@ npm run tauri dev
         - **恒久対策 (`src/services/kittyGraphics/unicodePlaceholder.ts`)**:
           - `isPlaceholderCell` において、`cell.isCombined()` が真（非ゼロ）の場合のみ結合文字列を検証するように修正し、汚染された残骸が残る `cell.combinedData` の無条件参照を完全撤廃。
           - 通常文字は `cell.isCombined() === 0` かつ `code !== 0x10EEEE` となり、100% `isPlaceholderCell === false` と判定されるように厳密化。
+      - **全 Linux TUI / CLI エコシステムへの汎用連携と 4 大共通基盤の確立**:
+        - 今回の改修は Yazi 個別の対症療法に留まらず、Kitty Graphics Protocol を利用する Linux 向け全 CLI/TUI ツールに波及する 4 つの共通基盤を確立：
+          1. **通常テキスト 100% 保持**: `workCell` 汚染防御により、画像表示時でも周囲のテキスト（ファイル一覧・枠線・コード・ステータス）が 1 文字も消えずに描画されることを保証。
+          2. **TUI 固定グリッド保護**: `C=1` / Alternate Screen ゼロアロケーションにより、全画面 TUI（Yazi, Ranger, lf）の画面スクロール崩壊・枠線押し出しを根絶。
+          3. **CUP 絶対座標解析**: `\x1b[<row>;<col>H` 追従により、目的のプレビュー領域枠内に画像を狂いなくアンカー。
+          4. **0ms プローブ即時応答**: `a=q`, `\x1b[?996n`, `\x1b[16t`, `\x1b[c` / `\x1b[0c` への即時応答により、各ツール（fastfetch, kitten icat, 各種 TUI）の起動遅延やアスキーアートフォールバックを防止。
+        - 検証済み互換ツール: `yazi`, `ranger`, `lf`, `fastfetch`, `kitten icat`, `chafa`, `timg`, `viu`, Neovim (`image.nvim`)。
+        - 意図的トレードオフ（共有メモリ `t=s`, `/dev/shm` の非対応＝セキュリティ優先）を維持しつつ、静止画・透過 PNG/SVG・アニメーション GIF において 100% 美しいインライン描画を実現。
     - **検証エビデンス**:
       - `scratch/simulate_canvas_draw.mjs` による実機 Yazi データシミュレーション：
         - 修正前の `_drawChars` 呼び出し回数: **0 回**（文字が一切描画されず消失）

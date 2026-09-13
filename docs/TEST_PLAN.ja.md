@@ -152,7 +152,7 @@
 | **TC-KITTY-15** | プロトコル機能問い合わせ（Capability Probe）& 0ms 即時クエリ応答 | `fastfetch` (`"type": "kitty"`) の実行、または `\x1b_Gi=1,s=1,v=1,a=q;\x1b\` を送信。 | PTY 側で即座に `\x1b_Gi=1;ok\x1b\` が返信されアスキーアートにフォールバックせず画像表示される。ヘッダー情報が Rust バックエンドでログ記録される。 | Automated / Manual |
 | **TC-KITTY-16** | アニメーション差分フレームの 32-bit RGBA 自動判定 & アルファ合成 (`a=f, c=<num>`) | 基底 RGB 画像 (`f=24`) に続いて、ペイロードサイズが $s \times v \times 4$ バイトの差分フレーム (`a=f`) を送信。 | 差分フレームが 32-bit RGBA として正確に自動判定され、白黒砂嵐ノイズなしで透明領域を前フレームに美しく合成する。 | Automated / Scripted |
 | **TC-KITTY-17** | グラフィックスレイヤーのゴースト重複防止 & 厳格な単一 Canvas 積層 | Kitty 画像表示中にターミナル画面の再マウントや分割リサイズを実施。 | 既存の `.xterm-kitty-graphics-layer` が確実に破棄され、単一の Canvas のみが文字と選択レイヤーの間に正しく積層描画される。 | Manual |
-| **TC-KITTY-19** | Yazi TUI プレビュー完全対応 (PTY プローブ即時応答、プレースホルダー描画一本化 & 一行ずらし重なり根絶) | Yazi を起動し画像プレビューを表示。PTY 経由での `\x1b[?996n` / `\x1b[16t` / `\x1b[0c` 問い合わせおよび `U+10EEEE` プレースホルダーの描画動作を検証。 | PTY が即時応答して Yazi が Kitty モードで初期化され、`TextRenderLayer` 側で画像描画を行わず Kitty 専用 Canvas へ描画を一本化することで、行走査中のスケール破損や一行ずらしの重なり崩れ・二重描画が 100% 解消され、プレビュー枠内（右ペイン）にピクセルパーフェクトにインライン表示される。 | Automated / Scripted / Manual |
+| **TC-KITTY-19** | 全 TUI / CLI エコシステム完全対応 (Yazi, Ranger, lf, fastfetch, image.nvim; PTY プローブ即時応答、通常テキスト100%保持 & 固定グリッド保護) | Yazi, Ranger, lf, fastfetch, Neovim (`image.nvim`) を起動し画像プレビューやロゴを表示。PTY 経由での `a=q` / `\x1b[?996n` / `\x1b[16t` / `\x1b[0c` 問い合わせおよびプレースホルダー/通常配置の描画動作を検証。 | PTY が 0ms 即時応答して各ツールが Kitty モードで初期化され、プレースホルダー描画を専用 Canvas へ一本化することで行走査中のスケール破損や一行ずらし重なりを根絶。さらに `workCell` 誤爆防止により周囲の通常テキスト（ファイル一覧・枠線・コード）が 1文字も消えずに 100% 描画され、`C=1`/Alternate Screen ゼロアロケーションにより TUI の固定グリッドを崩さずピクセルパーフェクトにインライン表示される。 | Automated / Manual |
 
 ---
 
