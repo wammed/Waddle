@@ -86,6 +86,10 @@ export interface KittyVirtualPlacement {
   imageId: number;
   cols: number;
   rows: number;
+  explicitCols?: number;
+  explicitRows?: number;
+  detectedCols?: number;
+  detectedRows?: number;
   srcX?: number;
   srcY?: number;
   srcWidth?: number;

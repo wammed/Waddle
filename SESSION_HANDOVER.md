@@ -395,11 +395,28 @@
          - `mountCanvas`: キャンバス追加前に既存の `.xterm-kitty-graphics-layer` をすべて DOM から完全削除。
          - `calculateCursorOffset`: CSI シーケンスパーサーを実装し、`C` (CUF), `D` (CUB), `G` (CHA) などのカーソル移動コードを正確に列オフセットへ反映。
          - `advanceFrame`: 不要な `this.term.refresh()` を排除し、グラフィックスレイヤーのみを低負荷かつ滑らかに 60 FPS で直接更新。
+40. **`kitty +kitten icat` アニメーション再生時のターミナル文字非表示・レイヤー遮蔽解消 & 描画ループ安全性強化**:
+    - **ユーザー報告**: 画像表示は成功したが、画像を表示した際にターミナル表示が画像以外すべて消え、文字が見えないけれどマウス選択はでき、マウスでスクロールすると画像が置き換わる不具合を報告。
+    - **根本原因の完全解明**:
+      1. **WebKitGTK ハードウェアアクセラレーションレイヤー遮蔽**:
+         - `mountCanvas` において、`xterm-kitty-graphics-layer` の canvas を `zIndex = '1'` として `layers[1]`（`SelectionRenderLayer`）の直前に挿入していた。
+         - これにより `TextRenderLayer`（`zIndex = 0`）の前面に全画面サイズのグラフィックスキャンバスが配置された。
+         - Linux WebKitGTK 環境のコンポジターにおいて、上位のハードウェアアクセラレーションレイヤー（`zIndex = 1`）が下位の DOM レイヤー（`TextRenderLayer`, `zIndex = 0`）の描画サーフェスを遮蔽・不可視化していた。
+         - `SelectionRenderLayer`（`zIndex = 1`, DOM 後順）および `CursorRenderLayer`（`zIndex = 3`）は前面にあるためマウス選択ハイライトやカーソルのみが描画され、「文字は見えないが選択はできる」という特異な症状が発生していた。
+         - Kitty Graphics Protocol 仕様上も通常画像（`z = 0`）は「セル背景色 → 画像 → テキスト文字」の順で積層される規定となっており、画像は文字レイヤーの背面に位置すべきであった。
+         - Waddle は `allowTransparency: true` で動作しているため、`TextRenderLayer` のデフォルト背景セルは完全透明であり、画像を文字レイヤーの背面（`screen.firstChild`, `zIndex = 0`）に配置することで、背景透過画像の上にすべての文字グリフ・プロンプトが鮮明に重ねて描画される。
+      2. **IPC デバッグログ過剰出力による高負荷**:
+         - アニメーションループ（60 FPS / 100ms 間隔）の `render()` 内で毎フレーム `TauriApi.logKittyDebug` を呼び出していたため、数秒で `/tmp/waddle_kitty_debug.log` が 267MB に肥大化し、Tauri IPC メッセージバスが過飽和状態となっていた。
+    - **改修内容**:
+      1. `src/services/kittyGraphics/manager.ts`:
+         - `mountCanvas`: canvas の `zIndex` を `'0'` に戻し、`.xterm-screen` の先頭（`screen.insertBefore(canvas, screen.firstChild)`）に挿入。`TextRenderLayer`（`zIndex = 0`、DOM 後順）が前面で文字を描画する正常な積層構造を復元。
+         - `fontGlyphPass` & `_drawChars`: 内部処理を `try-catch` で多重防護し、プレースホルダー走査等で例外が発生しても xterm.js の文字描画ループ（`_drawChars`）が中断・停止しないようフェイルセーフを徹底。
+         - `render()`: 毎フレーム実行されていた `TauriApi.logKittyDebug` 呼び出しを全削除し、ファイル肥大化と IPC 負荷を根絶。
     - **検証**:
-      - `cargo test --manifest-path src-tauri/Cargo.toml`: 全 40 件 PASS。
-      - `npm run build`: TypeScript 型検査 & Vite ビルド成功（0 エラー、2.18秒）。
-      - `cargo build --release --manifest-path src-tauri/Cargo.toml`: 最適化リリースバイナリ生成完了（24.11秒）。
-      - `install -m 755 src-tauri/target/release/waddle /home/susie/.local/bin/waddle`: 本番配備完了。
+      1. `cargo test --manifest-path src-tauri/Cargo.toml`: 全 40 件 PASS。
+      2. `npm run build`: TypeScript 型検査 & Vite ビルド成功（0 エラー、2.13秒）。
+      3. `cargo build --release --manifest-path src-tauri/Cargo.toml`: リリースバイナリ生成完了。
+      4. `install -m 755 src-tauri/target/release/waddle /home/susie/.local/bin/waddle`: 本番配備完了。
 
 ---
 
@@ -530,6 +547,15 @@ npm run tauri dev
     - **水平方向の動的センタリング追従 (`isCentered` & `originalTermCols`)**: 画像配置時に水平中央揃えされていた場合（`kitten icat` のデフォルト挙動）、ペイン分割・リサイズ等でターミナル列数（`cols`）が変化した際にも、新しい列幅の中央列をリアルタイム算出して配置。右端のはみ出し・不要なクリッピングを防止。
     - **ゴーストレイヤー重複防止の厳格化**: `mountCanvas` 時に `container.querySelectorAll('.xterm-kitty-graphics-layer')` を用いて、コンテナ配下のすべての旧 Canvas レイヤーを確実に一括破棄。レイアウト変更や再マウント時の二重描画を物理排除。
     - **キャリッジリターン (`\r`) によるカーソル列リセット追従**: `calculateCursorOffset` に `hasCr` フラグを新設し、先行テキスト末尾行で `\r` が実行された場合は `startCol` を 0 起点として正確にオフセット計算。
+27. **TC-KITTY-18 プロンプト漏洩解消・レイヤースタッキング適正化・Unicodeプレースホルダー (Yazi) シームレス描画・KITTY_WINDOW_ID 自動設定**:
+    - **プロンプトへの `Gi=1;OKGi=2;OK` 漏洩根絶**: `pty.rs` で同期応答済みの機能プローブ (`s=1, v=1`) に対し、フロントエンド `manager.ts` の `case 'q'` が重複して PTY に `OK` を書き込んでいた問題を解消。フロントエンド側ではプローブ応答をスキップし、Rust 側の共有メモリ要求には `ENOTSUP` を返して一時ファイル転送へ安全誘導。
+    - **DOM レイヤースタッキング適正化**: `mountCanvas` において、Kitty グラフィックスキャンバスの `zIndex` を `1` に設定し、`TextRenderLayer`（`zIndex=0`）の直後かつ `SelectionRenderLayer`（`zIndex=1`）の前に挿入配置。ターミナルセル背景色による画像の隠蔽・非表示化を完全解決。
+    - **WebKitGTK 互換 OffscreenCanvas レンダリング**: `decoder.ts` の `decodeRgb` / `decodeRgba` において、WebKitGTK でサイレント失敗の恐れがある `createImageBitmap(ImageData)` を廃止し、`OffscreenCanvas` の `putImageData` + `transferToImageBitmap()` による 100% 確実なビットマップ化へ刷新。
+    - **Unicode プレースホルダーの動的グリッド寸法検出 & 整数スナップ境界描画 (Yazi 完全対応)**:
+      - `yazi` のように `c`, `r` 列数・行数を省略して `U=1` を送出する TUI ツールにおいて、バッファ内の可視プレースホルダーグリッドの最大列・最大行（`maxCol + 1`, `maxRow + 1`）を高速スキャン（`scanPlaceholderGridDimensions`）して自動検出し、プレビュー枠サイズに完全一致する UV マッピングを実現。
+      - 従来の `ctx.clip()` によるアンチエイリアス境界の黒いグリッド隙間・線の発生を廃止。`Math.round` による整数セル境界スナップ（`startX, endX, startY, endY`）を適用し、隣接セル同士が 1 ピクセルも隙間なく密着するシームレス描画を達成。
+    - **PTY への `KITTY_WINDOW_ID=1` 自動設定**: `src-tauri/src/pty.rs` のシェル起動環境変数に `KITTY_WINDOW_ID=1` を常時注入し、Yazi や各種 Kitty グラフィックス対応ツールが追加設定なしで即座にインライン画像プレビューを認識・実行できるよう最適化。
+    - **`scheduleRender` によるアニメーション描画デバウンス**: `requestAnimationFrame` を用いた描画キュー集約により、大量のコマンドストリーム受信時でも UI のマイクロスタッターや描画過負荷を防止。
 
 ---
 

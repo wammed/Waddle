@@ -280,6 +280,7 @@ impl PtyManager {
         cmd.env("TERM", "xterm-256color");
         cmd.env("COLORTERM", "truecolor");
         cmd.env("WADDLE_TERMINAL", "1");
+        cmd.env("KITTY_WINDOW_ID", "1");
 
         let child = pair
             .slave

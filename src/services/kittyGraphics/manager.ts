@@ -104,16 +104,13 @@ export class KittyGraphicsManager {
     canvas.style.top = '0';
     canvas.style.left = '0';
     canvas.style.pointerEvents = 'none';
-    canvas.style.zIndex = '1';
+    canvas.style.zIndex = '0';
 
-    // Insert after TextRenderLayer (zIndex 0) and before SelectionRenderLayer (zIndex 1)
-    if (screen) {
-      const layers = screen.querySelectorAll('canvas');
-      if (layers.length >= 2) {
-        screen.insertBefore(canvas, layers[1]);
-      } else {
-        screen.appendChild(canvas);
-      }
+    // Insert before TextRenderLayer in .xterm-screen so cell background -> image -> text glyphs
+    if (screen && screen.firstChild) {
+      screen.insertBefore(canvas, screen.firstChild);
+    } else if (screen) {
+      screen.appendChild(canvas);
     } else {
       container.appendChild(canvas);
     }
@@ -121,9 +118,6 @@ export class KittyGraphicsManager {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
     this.syncCanvasSize();
-    TauriApi.logKittyDebug(
-      `[mountCanvas] Mounted canvas zIndex=${canvas.style.zIndex}, screen=${!!screen}, dims=${this.canvas.width}x${this.canvas.height}`
-    );
   }
 
   public syncCanvasSize() {
@@ -145,18 +139,18 @@ export class KittyGraphicsManager {
 
   private attachTerminalEvents() {
     const scrollDisp = this.term.onScroll(() => {
-      this.render();
+      this.scheduleRender();
     });
     this.disposables.push(() => scrollDisp.dispose());
 
     const renderDisp = this.term.onRender(() => {
-      this.render();
+      this.scheduleRender();
     });
     this.disposables.push(() => renderDisp.dispose());
 
     const resizeDisp = this.term.onResize(() => {
       this.syncCanvasSize();
-      this.render();
+      this.scheduleRender();
     });
     this.disposables.push(() => resizeDisp.dispose());
   }
@@ -221,33 +215,44 @@ export class KittyGraphicsManager {
         // Requirement 1: In this loop, if the cell's codepoint is 0x10EEEE or has the placeholder flag,
         // completely skip (continue) glyph search, rasterization, and font drawing!
         const fontGlyphPass = function (this: any, startRow: number, endRow: number) {
+          try {
+            if (startRow === 0) {
+              self.scanPlaceholderGridDimensions();
+            }
+          } catch {}
           this._forEachCell(startRow, endRow, (cell: any, x: number, y: number) => {
-            // Check if cell is Kitty Unicode placeholder
-            if (
-              (typeof cell?.getCode === 'function' && cell.getCode() === PLACEHOLDER_CODEPOINT) ||
-              isPlaceholderCell(cell)
-            ) {
-              // Requirement 2: Exclusive rendering
-              // Render placeholder texture onto canvas, completely bypassing font glyph drawing
-              const w = this._deviceCellWidth > 0 ? this._deviceCellWidth : self.getCellWidth() * (window.devicePixelRatio || 1);
-              const h = this._deviceCellHeight > 0 ? this._deviceCellHeight : self.getCellHeight() * (window.devicePixelRatio || 1);
-              self.drawPlaceholderCell(
-                this._ctx,
-                cell,
-                x,
-                y,
-                w,
-                h
-              );
-              // continue in loop -> completely bypass glyph lookup, atlas rasterization, and font draw
-              return;
-            }
+            try {
+              // Check if cell is Kitty Unicode placeholder
+              if (
+                (typeof cell?.getCode === 'function' && cell.getCode() === PLACEHOLDER_CODEPOINT) ||
+                isPlaceholderCell(cell)
+              ) {
+                // Requirement 2: Exclusive rendering
+                // Render placeholder texture onto canvas, completely bypassing font glyph drawing
+                const w = this._deviceCellWidth > 0 ? this._deviceCellWidth : self.getCellWidth() * (window.devicePixelRatio || 1);
+                const h = this._deviceCellHeight > 0 ? this._deviceCellHeight : self.getCellHeight() * (window.devicePixelRatio || 1);
+                self.drawPlaceholderCell(
+                  this._ctx,
+                  cell,
+                  x,
+                  y,
+                  w,
+                  h
+                );
+                // continue in loop -> completely bypass glyph lookup, atlas rasterization, and font draw
+                return;
+              }
 
-            if (x === 0) {
-              self.lastDecodedPlaceholder = null;
-            }
+              if (x === 0) {
+                self.lastDecodedPlaceholder = null;
+              }
 
-            this._drawChars(cell, x, y);
+              this._drawChars(cell, x, y);
+            } catch {
+              try {
+                this._drawChars(cell, x, y);
+              } catch {}
+            }
           });
         };
 
@@ -326,27 +331,31 @@ export class KittyGraphicsManager {
           textLayer.__kittyHooked = true;
           const origDrawChars = textLayer._drawChars.bind(textLayer);
           textLayer._drawChars = (cell: any, x: number, y: number) => {
-            if (
-              (typeof cell?.getCode === 'function' && cell.getCode() === PLACEHOLDER_CODEPOINT) ||
-              isPlaceholderCell(cell)
-            ) {
-              // Exclusive rendering: draw placeholder texture and completely skip origDrawChars (tofu glyph)
-              const w = textLayer._deviceCellWidth > 0 ? textLayer._deviceCellWidth : self.getCellWidth() * (window.devicePixelRatio || 1);
-              const h = textLayer._deviceCellHeight > 0 ? textLayer._deviceCellHeight : self.getCellHeight() * (window.devicePixelRatio || 1);
-              this.drawPlaceholderCell(
-                textLayer._ctx,
-                cell,
-                x,
-                y,
-                w,
-                h
-              );
-              return;
+            try {
+              if (
+                (typeof cell?.getCode === 'function' && cell.getCode() === PLACEHOLDER_CODEPOINT) ||
+                isPlaceholderCell(cell)
+              ) {
+                // Exclusive rendering: draw placeholder texture and completely skip origDrawChars (tofu glyph)
+                const w = textLayer._deviceCellWidth > 0 ? textLayer._deviceCellWidth : self.getCellWidth() * (window.devicePixelRatio || 1);
+                const h = textLayer._deviceCellHeight > 0 ? textLayer._deviceCellHeight : self.getCellHeight() * (window.devicePixelRatio || 1);
+                this.drawPlaceholderCell(
+                  textLayer._ctx,
+                  cell,
+                  x,
+                  y,
+                  w,
+                  h
+                );
+                return;
+              }
+              if (x === 0) {
+                this.lastDecodedPlaceholder = null;
+              }
+              return origDrawChars(cell, x, y);
+            } catch {
+              return origDrawChars(cell, x, y);
             }
-            if (x === 0) {
-              this.lastDecodedPlaceholder = null;
-            }
-            return origDrawChars(cell, x, y);
           };
         }
       }
@@ -455,6 +464,17 @@ export class KittyGraphicsManager {
     if (!img || !img.bitmap) return;
 
     const vp = this.virtualPlacements.get(img.id) || this.virtualPlacements.get(decoded.imageId);
+    if (vp) {
+      if (!vp.explicitCols && decoded.col + 1 > (vp.detectedCols || 0)) {
+        vp.detectedCols = decoded.col + 1;
+        vp.cols = vp.detectedCols;
+      }
+      if (!vp.explicitRows && decoded.row + 1 > (vp.detectedRows || 0)) {
+        vp.detectedRows = decoded.row + 1;
+        vp.rows = vp.detectedRows;
+      }
+    }
+
     const isSingleCell = !decoded.hasDiacritics && (!vp || (vp.cols <= 1 && vp.rows <= 1));
 
     const totalCols = vp?.cols ?? Math.max(decoded.col + 1, 1);
@@ -486,9 +506,14 @@ export class KittyGraphicsManager {
     const effectiveCellWidth = cellWidth > 0 ? cellWidth : this.getCellWidth() * (window.devicePixelRatio || 1);
     const effectiveCellHeight = cellHeight > 0 ? cellHeight : this.getCellHeight() * (window.devicePixelRatio || 1);
 
-    // Pixel rectangle [cell_x, cell_y, cell_width, cell_height]
-    const dx = col * effectiveCellWidth;
-    const dy = row * effectiveCellHeight;
+    // Pixel rectangle with integer boundary snapping to eliminate seams between adjacent cells
+    const startX = Math.round(col * effectiveCellWidth);
+    const endX = Math.round((col + 1) * effectiveCellWidth);
+    const dw = Math.max(1, endX - startX);
+
+    const startY = Math.round(row * effectiveCellHeight);
+    const endY = Math.round((row + 1) * effectiveCellHeight);
+    const dh = Math.max(1, endY - startY);
 
     try {
       ctx.save();
@@ -498,22 +523,17 @@ export class KittyGraphicsManager {
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
 
-      // Scissor strictly to cell pixel rectangle
-      ctx.beginPath();
-      ctx.rect(dx, dy, effectiveCellWidth, effectiveCellHeight);
-      ctx.clip();
-
-      // Issue draw call
+      // Draw cell texture directly without clipping path to eliminate edge anti-aliasing gaps
       ctx.drawImage(
         img.bitmap,
         uv.sx,
         uv.sy,
         uv.sw,
         uv.sh,
-        dx,
-        dy,
-        effectiveCellWidth,
-        effectiveCellHeight
+        startX,
+        startY,
+        dw,
+        dh
       );
       ctx.restore();
     } catch {
@@ -903,11 +923,17 @@ export class KittyGraphicsManager {
 
           if (cmd.keys.U === 1) {
             // Virtual placement for Unicode placeholders (U+10EEEE)
-            const { cols, rows } = this.computeSpans(cmd.keys, decoded.width, decoded.height);
+            const explicitCols = cmd.keys.c;
+            const explicitRows = cmd.keys.r;
+            const fallback = (!explicitCols || !explicitRows)
+              ? this.computeSpans(cmd.keys, decoded.width, decoded.height)
+              : null;
             this.virtualPlacements.set(id, {
               imageId: id,
-              cols: cmd.keys.c || cols,
-              rows: cmd.keys.r || rows,
+              explicitCols,
+              explicitRows,
+              cols: explicitCols || fallback?.cols || 1,
+              rows: explicitRows || fallback?.rows || 1,
               srcX: cmd.keys.x,
               srcY: cmd.keys.y,
               srcWidth: cmd.keys.w,
@@ -963,11 +989,17 @@ export class KittyGraphicsManager {
 
         if (cmd.keys.U === 1) {
           // Virtual placement for Unicode placeholders (U+10EEEE)
-          const { cols, rows } = this.computeSpans(cmd.keys, cached.width, cached.height);
+          const explicitCols = cmd.keys.c;
+          const explicitRows = cmd.keys.r;
+          const fallback = (!explicitCols || !explicitRows)
+            ? this.computeSpans(cmd.keys, cached.width, cached.height)
+            : null;
           this.virtualPlacements.set(id, {
             imageId: id,
-            cols: cmd.keys.c || cols,
-            rows: cmd.keys.r || rows,
+            explicitCols,
+            explicitRows,
+            cols: explicitCols || fallback?.cols || 1,
+            rows: explicitRows || fallback?.rows || 1,
             srcX: cmd.keys.x,
             srcY: cmd.keys.y,
             srcWidth: cmd.keys.w,
@@ -1130,7 +1162,7 @@ export class KittyGraphicsManager {
             if (cached.frames.length >= 2 && !cached.animation.isPlaying) {
               this.startAnimation(id);
             } else {
-              this.render();
+              this.scheduleRender();
             }
           } else {
             this.cache.set(id, {
@@ -1148,7 +1180,7 @@ export class KittyGraphicsManager {
                 isPlaying: false,
               },
             });
-            this.render();
+            this.scheduleRender();
           }
 
           this.sendPtyResponse(id, 'OK', cmd.keys.q);
@@ -1457,8 +1489,21 @@ export class KittyGraphicsManager {
     if (cachedRec?.frames && cachedRec.frames.length >= 2 && !cachedRec.animation?.isPlaying) {
       this.startAnimation(imageId);
     } else {
-      this.render();
+      this.scheduleRender();
     }
+  }
+
+  private renderScheduled: boolean = false;
+
+  public scheduleRender(): void {
+    if (this.renderScheduled || this.isDisposed) return;
+    this.renderScheduled = true;
+    requestAnimationFrame(() => {
+      this.renderScheduled = false;
+      if (!this.isDisposed) {
+        this.render();
+      }
+    });
   }
 
   public render() {
@@ -1492,9 +1537,6 @@ export class KittyGraphicsManager {
     const cellWidth = this.getCellWidth();
     const cellHeight = this.getCellHeight();
     const viewportY = this.term.buffer.active.viewportY;
-    TauriApi.logKittyDebug(
-      `[render] placements=${this.placements.size}, viewportY=${viewportY}, screenDims=${width}x${height}, cellDims=${cellWidth}x${cellHeight}`
-    );
     const maxScrollback = this.term.options.scrollback || 10000;
     const oldestAllowedLine = Math.max(0, this.term.buffer.active.baseY - maxScrollback);
     const termCols = this.term.cols || 80;
@@ -1633,11 +1675,7 @@ export class KittyGraphicsManager {
           destW,
           destH
         );
-        TauriApi.logKittyDebug(
-          `[drawImage] img=${p.imageId} frame=${img.animation?.currentFrameIndex ?? 0}/${img.frames?.length ?? 1} dest=(${destX},${destY},${destW}x${destH})`
-        );
       } catch (err: any) {
-        TauriApi.logKittyDebug(`[drawImage ERROR] img=${p.imageId}: ${err?.message || err}`);
         console.warn('Failed to draw partially clipped image placement:', err);
       }
     }
@@ -1645,8 +1683,53 @@ export class KittyGraphicsManager {
     this.ctx.restore();
   }
 
+  public scanPlaceholderGridDimensions(): void {
+    if (!this.term?.buffer?.active) return;
+    const buffer = this.term.buffer.active;
+    const viewportY = buffer.viewportY;
+    const termRows = this.term.rows || 24;
+    const termCols = this.term.cols || 80;
+
+    let prevDecoded: DecodedPlaceholder | null = null;
+
+    for (let row = 0; row < termRows; row++) {
+      const line = buffer.getLine(viewportY + row);
+      if (!line) continue;
+      prevDecoded = null;
+
+      for (let col = 0; col < termCols; col++) {
+        const cell = line.getCell(col);
+        if (!cell || !isPlaceholderCell(cell)) {
+          if (col === 0) prevDecoded = null;
+          continue;
+        }
+
+        const decoded = decodePlaceholderCell(cell, prevDecoded, this.lastTransmittedImageId);
+        if (!decoded) {
+          prevDecoded = null;
+          continue;
+        }
+        prevDecoded = decoded;
+
+        const vp = this.virtualPlacements.get(decoded.imageId);
+        if (vp) {
+          if (!vp.explicitCols) {
+            vp.detectedCols = Math.max(vp.detectedCols || 0, decoded.col + 1);
+            vp.cols = vp.detectedCols;
+          }
+          if (!vp.explicitRows) {
+            vp.detectedRows = Math.max(vp.detectedRows || 0, decoded.row + 1);
+            vp.rows = vp.detectedRows;
+          }
+        }
+      }
+    }
+  }
+
   private renderVisiblePlaceholders(): void {
     if (!this.ctx || !this.screenElement || this.cache.size === 0) return;
+
+    this.scanPlaceholderGridDimensions();
 
     const cellWidth = this.getCellWidth();
     const cellHeight = this.getCellHeight();
@@ -1711,8 +1794,13 @@ export class KittyGraphicsManager {
 
         if (uv.sw <= 0 || uv.sh <= 0) continue;
 
-        const destX = padding.left + col * cellWidth;
-        const destY = padding.top + row * cellHeight;
+        const startX = Math.round(padding.left + col * cellWidth);
+        const endX = Math.round(padding.left + (col + 1) * cellWidth);
+        const dw = Math.max(1, endX - startX);
+
+        const startY = Math.round(padding.top + row * cellHeight);
+        const endY = Math.round(padding.top + (row + 1) * cellHeight);
+        const dh = Math.max(1, endY - startY);
 
         try {
           this.ctx.save();
@@ -1721,20 +1809,16 @@ export class KittyGraphicsManager {
           this.ctx.imageSmoothingEnabled = true;
           this.ctx.imageSmoothingQuality = 'high';
 
-          this.ctx.beginPath();
-          this.ctx.rect(destX, destY, cellWidth, cellHeight);
-          this.ctx.clip();
-
           this.ctx.drawImage(
             img.bitmap,
             uv.sx,
             uv.sy,
             uv.sw,
             uv.sh,
-            destX,
-            destY,
-            cellWidth,
-            cellHeight
+            startX,
+            startY,
+            dw,
+            dh
           );
           this.ctx.restore();
         } catch {
