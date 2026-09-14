@@ -929,7 +929,7 @@ export class KittyGraphicsManager {
           );
         }
         this.term.refresh(0, this.term.rows - 1);
-        this.sendPtyResponse(id, 'OK', cmd.keys.q);
+        this.sendPtyResponse(id, 'OK', cmd.keys.q, false, true);
         break;
       }
 
@@ -1091,7 +1091,7 @@ export class KittyGraphicsManager {
             this.scheduleRender();
           }
 
-          this.sendPtyResponse(id, 'OK', cmd.keys.q);
+          this.sendPtyResponse(id, 'OK', cmd.keys.q, false, true);
         } catch (err: any) {
           console.error('[KittyGraphics] Failed to decode frame (f):', err);
           const msg = typeof err === 'string' ? err : (err?.message || 'EBADMSG');
@@ -1179,7 +1179,7 @@ export class KittyGraphicsManager {
           }
         }
 
-        this.sendPtyResponse(id, 'OK', cmd.keys.q);
+        this.sendPtyResponse(id, 'OK', cmd.keys.q, false, true);
         break;
       }
 
@@ -1224,7 +1224,7 @@ export class KittyGraphicsManager {
         }
         this.render();
         this.term.refresh(0, this.term.rows - 1);
-        this.sendPtyResponse(id ?? 0, 'OK', cmd.keys.q);
+        this.sendPtyResponse(id ?? 0, 'OK', cmd.keys.q, false, true);
         break;
       }
     }
@@ -1801,14 +1801,25 @@ export class KittyGraphicsManager {
     return 18; // default fallback cell height
   }
 
-  private sendPtyResponse(id: number, message: string, quiet?: number, force: boolean = false) {
+  private sendPtyResponse(
+    id: number,
+    message: string,
+    quiet?: number,
+    force: boolean = false,
+    defaultSilentOnSuccess: boolean = false
+  ) {
     if (!force) {
       if (quiet === 2) return; // q=2: suppress all responses (silent)
       if (quiet === 1 && message === 'OK') return; // q=1: errors only, suppress OK
-      // When quiet is undefined (Kitty protocol default q=0):
-      // Applications specifying an explicit image ID (id > 0) like ranger wait for an OK response.
-      // Suppress OK only when id is 0 (unspecified) and quiet is omitted to prevent prompt pollution for one-shot CLI tools.
-      if (quiet === undefined && message === 'OK' && id === 0) return;
+      // When quiet is undefined (default):
+      if (quiet === undefined && message === 'OK') {
+        // Actions like delete (a=d), place (a=p), frame (a=f), animation (a=a) are silent on success by Kitty spec.
+        // Suppressing OK on delete is critical to prevent curses TUI applications (like ranger)
+        // from interpreting the OK escape code as keyboard input, which causes severe flicker and UI hangs!
+        if (defaultSilentOnSuccess) return;
+        // Suppress OK only when id is 0 (unspecified) to prevent prompt pollution for one-shot CLI tools.
+        if (id === 0) return;
+      }
       // q=0: send both OK and errors
     }
 

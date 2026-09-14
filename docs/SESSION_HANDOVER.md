@@ -656,6 +656,29 @@ npm run tauri dev
       - `npm run build`（TypeScript/Vite）エラー 0 件。
       - `cargo test --manifest-path src-tauri/Cargo.toml`（Rust 41 件）全テスト PASS。
       - `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets` 警告・エラー 0 件。
+20. **Kitty Graphics Protocol 強化：viu 一時ファイル即時 Base64 化 & ranger フリーズ・画面点滅（フリッカー・ハング）完全解消**:
+    - **背景と課題**:
+      - `viu` が PNG/JPEG 等の画像表示時に十数行の空白の後にプロンプトに戻り画像が表示されない。
+      - `ranger` で画像ファイルを選択すると 1枚目でフリーズする。
+      - 1枚目フリーズ対応後、2枚目の画像を選択しようとすると画面内でテキストや画像が激しく点滅（フリッカー）し、操作不能（ハング）になる（CTRL-Z で離脱可能だがプロセスが残る）。
+      - `viu` で SVG が表示できない（NG）。
+    - **根本原因の究明と対策**:
+      1. **`viu` 一時ファイル (`t=t`) の即時 Base64 インライン化 (`src-tauri/src/kitty.rs`, `src-tauri/src/pty.rs`)**:
+         - 原因: `viu` は DSR クエリ（`\x1b[5n`）への応答（`\x1b[0n`）を受信した直後に、自身が生成した一時ファイル（`t=t`）を即座にローカルから削除（unlink）してしまう。フロントエンドの JS/DOM が非同期にファイルを読もうとした時点ではすでにファイルが存在せず ENOENT になっていた。
+         - 対策: PTY リーダースレッド（Rust）において `t=t` を検知した瞬間に、DSR 応答を送出する前のゼロ・レースコンディション段階で Rust 側から即座にメモリに読み込み、ファイルを unlink した上で、ペイロードを Base64 インラインデータ（`t=d`）に書き換えてフロントエンドへ送出。これにより PNG, JPEG, JPG の完全かつ高速なインライン表示を達成。
+      2. **`ranger` 1枚目フリーズ解消 (`src/services/kittyGraphics/manager.ts`)**:
+         - 原因: `ranger` の `img_display.py` の `draw()` は、送信後に端末からの `OK` 応答を `self.stdbin.read(1)` で同期待ちする仕様。Waddle 側がワンショット CLI 向けのプロンプト汚染防止として `OK` 応答を一律抑制していたため、`ranger` が PTY 入力待ちで無限ブロックしていた。
+         - 対策: クライアントが明示的に指定した画像 ID（`explicitId > 0`）を持つ `case 't':` / `case 'T':` については同期的に `\x1b_Gi=<id>;OK\x1b\` を返信するように改修。
+      3. **`ranger` 2枚目選択時の画面点滅（フリッカー・ハング）根本解消 (`src/services/kittyGraphics/manager.ts`)**:
+         - 原因: `ranger` が前の画像を消すために呼ぶ `clear()` (`a=d, i=<id>`) は、Kitty 公式仕様（「削除コマンドは成功時サイレント」）に則り「Kitty は delete に対して返信しない」という前提で作られており、`clear()` 後に端末からの応答を一切読み出さない。ところが Waddle の `case 'd':` が `\x1b_Gi=<id>;OK\x1b\` を返信していたため、読まれなかったエスケープシーケンスが stdin バッファに残留。`ranger` の curses メインループ（`getch()`）がこれを高速キー入力の嵐として誤認し、毎フレーム `redrawwin` / `refresh` をループ実行して激しい点滅と操作不能に陥っていた。
+         - 対策: Kitty Graphics Protocol の公式仕様に厳密に準拠し、`sendPtyResponse` に `defaultSilentOnSuccess: boolean = false` オプションを導入。`case 'd':` (削除)、`case 'p':` (配置)、`case 'f':` (フレーム追加)、`case 'a':` (アニメーション制御) の成功時はデフォルトで無音（`cmd.keys.q === 0` が明示的に指定された場合のみ `OK` を返信）とし、余計なレスポンスの stdin 混入を根絶。これにより 2枚目以降の連続プレビューが滑らかかつフリーズなしに動作するよう完全解決。
+      4. **`viu` における SVG 非対応の調査・特定**:
+         - 原因: `viu` は内部で Rust の `image-rs` クレートを使用しており、これはラスタ画像（PNG, JPEG, WebP, GIF 等）専用でベクター画像（SVG）のレンダリングエンジン（librsvg や resvg 等）を内蔵していない。実際に `viu -b ./public/waddle-logo.svg` を実行すると `Image(Unsupported(UnsupportedError { format: PathExtension("svg"), kind: Format(PathExtension("svg")) }))` が返され、描画前にプロセスが終了する。これは Waddle 側の不具合ではなく、`viu` ツール固有の仕様・機能制限である。なお、librsvg 等を内蔵する `timg` や `chafa` では SVG も正常に描画される。
+    - **検証結果**:
+      - 単体テスト `test_read_and_unlink_temp_file_base64`, `test_pty_temp_file_inlining`（Rust 全 46 件）PASS。
+      - `test_ranger_multi.py`（draw 1 -> clear 1 -> draw 2 -> clear 2）の完全なノンブロッキング完走を確認。
+      - `npm run build`, `cargo build --release` 成功。
+      - `~/.local/bin/waddle` へ安全に配備完了（`install -m 755`）。
 
 ---
 
