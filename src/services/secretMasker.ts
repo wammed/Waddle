@@ -62,11 +62,14 @@ export function maskSecrets(text: string): { maskedText: string; count: number }
   let count = 0;
 
   for (const rule of RULES) {
+    rule.regex.lastIndex = 0;
     const matches = maskedText.match(rule.regex);
     if (matches) {
       count += matches.length;
+      rule.regex.lastIndex = 0;
       maskedText = maskedText.replace(rule.regex, rule.replace);
     }
+    rule.regex.lastIndex = 0;
   }
 
   return { maskedText, count };
@@ -79,6 +82,8 @@ export function hasSecrets(text: string): boolean {
   if (!text) return false;
   return RULES.some((rule) => {
     rule.regex.lastIndex = 0;
-    return rule.regex.test(text);
+    const matched = rule.regex.test(text);
+    rule.regex.lastIndex = 0;
+    return matched;
   });
 }

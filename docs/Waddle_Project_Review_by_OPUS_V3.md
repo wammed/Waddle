@@ -251,7 +251,7 @@ export function hasSecrets(text: string): boolean {
 | GitHub Push/Pull ドメイン検証 | ✅ 堅固 | 変更なし |
 | Kitty Graphicsサンドボックス | ✅ **強化** | SHM拒否、DA1/CSI対応、kitten icat統合 |
 | PTYバックプレッシャー | ✅ 堅固 | 変更なし |
-| SecretMasker | ⚠️ `hasSecrets` バグ残存 | 変更なし |
+| SecretMasker | ✅ **堅固** | `hasSecrets` の `lastIndex` バグ解消 |
 | CSP | ✅ 堅固 | 変更なし |
 | 壁紙バイナリ検証 | ✅ 堅固 | 変更なし |
 | **Git ref インジェクション防御** | ✅ 🆕 | 新規追加 |
@@ -296,7 +296,7 @@ export function hasSecrets(text: string): boolean {
 
 ## 🧪 テストレビュー
 
-### Rust ユニットテスト (41件, v2から+4件)
+### Rust ユニットテスト (46件, v2から+9件)
 
 | テスト領域 | ファイル | 件数 | v2→v3 |
 |:---|:---|:---:|:---:|
@@ -325,13 +325,13 @@ export function hasSecrets(text: string): boolean {
 
 | # | v2の指摘 | 優先度 | v3での対応 |
 |:---|:---|:---:|:---:|
-| 1 | `hasSecrets()` の `lastIndex` リセット | 高 | ❌ 未対応 |
-| 2 | エラーメッセージの日英統一 | 中 | △ 部分 (i18n強化進行中) |
-| 3 | Session History の `outputSnippet` 短縮 | 中 | — 未対応 |
+| 1 | `hasSecrets()` の `lastIndex` リセット | 高 | ✅ **完全対応** (`secretMasker.ts` にてリセット徹底) |
+| 2 | エラーメッセージの日英統一 | 中 | ✅ **完全対応** (バックエンドPOSIXコード+日英併記、フロントi18n同期) |
+| 3 | Session History の `outputSnippet` 短縮 | 中 | ✅ **完全対応** (500文字制限 + 自動クオータリカバリ実装) |
 | 4 | `.waddle/rules.md` テンプレート追加 | 中 | ✅ **完全対応** (日英デフォルト自動生成) |
-| 5 | `lib.rs` のモジュール分割 | 低 | — 未対応 (1,215行) |
-| 6 | 状態管理のContext/Store分離 | 低 | — 未対応 |
-| 7 | フロントエンド自動テスト導入 | 低 | — 未対応 |
+| 5 | `lib.rs` のモジュール分割 | 低 | — 未対応 (リファクタリング対象) |
+| 6 | 状態管理のContext/Store分離 | 低 | — 未対応 (リファクタリング対象) |
+| 7 | フロントエンド自動テスト導入 | 低 | — 未対応 (今後検討) |
 
 ---
 
@@ -356,7 +356,7 @@ graph TD
     end
     
     subgraph "Threat: Log DoS (NEW)"
-        T8["log_kitty_debug unlimited write"] --> D8[🟡 MITIGATE]
+        T8["log_kitty_debug unlimited write"] -->|10MB limit + 4KB truncate + O_NOFOLLOW| D8[🔴 BLOCKED]
     end
     
     subgraph "Existing Defenses (Unchanged)"
@@ -375,24 +375,24 @@ graph TD
 
 ### 高優先度
 
-| # | アクション | 理由 | 工数 |
+| # | アクション | 理由 | ステータス |
 |:---|:---|:---|:---:|
-| 1 | `log_kitty_debug` にサイズ制限追加 | ディスク枯渇リスク、`msg` の上限とファイルサイズ上限 | 5分 |
-| 2 | `hasSecrets()` の `lastIndex` リセット | v2から残存する機能バグ | 1分 |
+| 1 | `log_kitty_debug` にサイズ制限追加 | ディスク枯渇リスク、`msg` の上限とファイルサイズ上限 | ✅ **対応完了** (10MB上限、4KB UTF-8安全切詰、O_NOFOLLOW) |
+| 2 | `hasSecrets()` の `lastIndex` リセット | v2から残存する機能バグ | ✅ **対応完了** (`lastIndex = 0` リセット徹底) |
 
 ### 中優先度
 
-| # | アクション | 理由 |
-|:---|:---|:---|
-| 3 | `manager.ts` の分割 | 1,849行は保守性に影響 |
-| 4 | エラーメッセージの日英統一 | i18n一貫性 |
+| # | アクション | 理由 | ステータス |
+|:---|:---|:---|:---:|
+| 3 | `manager.ts` の分割 | 1,849行は保守性に影響 | 保留 (リファクタリング対象) |
+| 4 | エラーメッセージの日英統一 | i18n一貫性 | ✅ **対応完了** (AiSidebar i18n辞書化、Rustエラー標準化) |
 
 ### 低優先度
 
-| # | アクション | 理由 |
-|:---|:---|:---|
-| 5 | `lib.rs` のモジュール分割 | 1,215行 |
-| 6 | フロントエンド自動テスト | Jest/Vitest |
+| # | アクション | 理由 | ステータス |
+|:---|:---|:---|:---:|
+| 5 | `lib.rs` のモジュール分割 | 1,215行 | 保留 (リファクタリング対象) |
+| 6 | フロントエンド自動テスト | Jest/Vitest | 今後検討 |
 
 ---
 

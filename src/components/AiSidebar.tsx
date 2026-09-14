@@ -387,7 +387,7 @@ export const AiSidebar: React.FC<AiSidebarProps> = ({
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               <AlertCircle size={12} color="#f43f5e" />
-              <span>直前のエラー: <code>{context.recent_command || 'Command'}</code></span>
+              <span>{t.copilot.recentError} <code>{context.recent_command || 'Command'}</code></span>
             </div>
             <button
               type="button"
@@ -403,12 +403,12 @@ export const AiSidebar: React.FC<AiSidebarProps> = ({
                 whiteSpace: 'nowrap',
               }}
               onClick={() => {
-                const errSnippet = context.recent_output ? context.recent_output.slice(-1000).trim() : '';
-                setInput(`直前のコマンド \`${context.recent_command || ''}\` で以下のエラーが発生しました。原因と具体的な修正コマンドを教えてください:\n\n\`\`\`\n${errSnippet}\n\`\`\``);
+                const errSnippet = context.recent_output ? context.recent_output.slice(-500).trim() : '';
+                setInput(t.copilot.askFixPrompt(context.recent_command || '', errSnippet));
               }}
             >
               <Sparkles size={10} color="#38bdf8" style={{ marginRight: 3 }} />
-              エラー修正を質問
+              {t.copilot.askFixBtn}
             </button>
           </div>
         )}

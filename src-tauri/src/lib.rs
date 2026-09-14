@@ -235,10 +235,10 @@ fn validate_safe_read(path: &Path) -> Result<(), String> {
                     || file_name.starts_with("authorized_keys")
                     || file_name.ends_with(".pub");
                 if !is_safe_ssh_file {
-                    return Err("安全上の理由によりSSH秘密鍵・機密設定の直接読み出しは禁止されています。".to_string());
+                    return Err("EACCES: 安全上の理由によりSSH秘密鍵・機密設定の直接読み出しは禁止されています。 (Access denied: reading SSH private keys or configuration is restricted)".to_string());
                 }
             } else {
-                return Err("安全上の理由によりSSH設定ディレクトリの直接読み出しは禁止されています。".to_string());
+                return Err("EACCES: 安全上の理由によりSSH設定ディレクトリの直接読み出しは禁止されています。 (Access denied: reading SSH configuration directory is restricted)".to_string());
             }
         }
 
@@ -246,20 +246,20 @@ fn validate_safe_read(path: &Path) -> Result<(), String> {
         if let Some(file_name) = canonical.file_name().and_then(|n| n.to_str()) {
             let sensitive_keys = ["id_rsa", "id_ed25519", "id_ecdsa", "id_dsa"];
             if sensitive_keys.contains(&file_name) {
-                return Err("安全上の理由によりSSH秘密鍵の直接読み出しは禁止されています。".to_string());
+                return Err("EACCES: 安全上の理由によりSSH秘密鍵の直接読み出しは禁止されています。 (Access denied: reading SSH private key files is restricted)".to_string());
             }
         }
 
         // 3. Block reading sensitive GPG private keys
         let gpg_private = home_canon.join(".gnupg").join("private-keys-v1.d");
         if canonical.starts_with(&gpg_private) {
-            return Err("安全上の理由によりGPG秘密鍵領域の読み出しは禁止されています。".to_string());
+            return Err("EACCES: 安全上の理由によりGPG秘密鍵領域の読み出しは禁止されています。 (Access denied: reading GPG private keys is restricted)".to_string());
         }
 
         // 4. Block reading system keyrings
         let keyrings_dir = home_canon.join(".local").join("share").join("keyrings");
         if canonical.starts_with(&keyrings_dir) {
-            return Err("安全上の理由によりシステムキーリング領域の読み出しは禁止されています。".to_string());
+            return Err("EACCES: 安全上の理由によりシステムキーリング領域の読み出しは禁止されています。 (Access denied: reading system keyrings is restricted)".to_string());
         }
     }
 
@@ -271,21 +271,21 @@ fn validate_safe_write(path: &Path) -> Result<(), String> {
 
     // 1. Never allow root directory "/"
     if canonical.parent().is_none() || canonical == Path::new("/") {
-        return Err("安全上の理由によりルートディレクトリ (/) への書き込みは禁止されています。".to_string());
+        return Err("EACCES: 安全上の理由によりルートディレクトリ (/) への書き込みは禁止されています。 (Access denied: writing to root directory is restricted)".to_string());
     }
 
     // 2. Protect user home directly and sensitive credential directories
     if let Some(home) = dirs::home_dir() {
         let home_canon = home.canonicalize().unwrap_or(home);
         if canonical == home_canon {
-            return Err("安全上の理由によりホームディレクトリパス自体への書き込みは禁止されています。".to_string());
+            return Err("EACCES: 安全上の理由によりホームディレクトリパス自体への書き込みは禁止されています。 (Access denied: writing to home directory path is restricted)".to_string());
         }
 
         let sensitive_home_dirs = [".ssh", ".gnupg", ".local/share/keyrings"];
         for rel in &sensitive_home_dirs {
             let target = home_canon.join(rel);
             if canonical == target || canonical.starts_with(&target) {
-                return Err(format!("安全上の理由により重要資格情報領域 (~/{}) への書き込みは禁止されています。", rel));
+                return Err(format!("EACCES: 安全上の理由により重要資格情報領域 (~/{}) への書き込みは禁止されています。 (Access denied: writing to credential directory is restricted)", rel));
             }
         }
 
@@ -296,7 +296,7 @@ fn validate_safe_write(path: &Path) -> Result<(), String> {
         for file in &sensitive_shell_files {
             let target = home_canon.join(file);
             if canonical == target {
-                return Err(format!("安全上の理由によりシェル設定ファイル (~/{}) への書き込みは禁止されています。", file));
+                return Err(format!("EACCES: 安全上の理由によりシェル設定ファイル (~/{}) への書き込みは禁止されています。 (Access denied: writing to shell configuration file is restricted)", file));
             }
         }
     }
@@ -313,7 +313,7 @@ fn validate_safe_write(path: &Path) -> Result<(), String> {
             if sys_dir == "/var" && canonical.starts_with("/var/tmp") {
                 continue;
             }
-            return Err(format!("安全上の理由によりシステム領域 ({}) 配下への書き込みは禁止されています。", sys_dir));
+            return Err(format!("EACCES: 安全上の理由によりシステム領域 ({}) 配下への書き込みは禁止されています。 (Access denied: writing to system directory is restricted)", sys_dir));
         }
     }
 
@@ -325,21 +325,21 @@ fn validate_safe_deletion(path: &Path) -> Result<(), String> {
 
     // 1. Never allow root directory "/"
     if canonical.parent().is_none() || canonical == Path::new("/") {
-        return Err("安全上の理由によりルートディレクトリ (/) の削除は禁止されています。".to_string());
+        return Err("EACCES: 安全上の理由によりルートディレクトリ (/) の削除は禁止されています。 (Access denied: deleting root directory is restricted)".to_string());
     }
 
     // 2. Never allow user home directory directly and protect sensitive credential stores
     if let Some(home) = dirs::home_dir() {
         let home_canon = home.canonicalize().unwrap_or(home);
         if canonical == home_canon {
-            return Err("安全上の理由によりホームディレクトリ自体の削除は禁止されています。".to_string());
+            return Err("EACCES: 安全上の理由によりホームディレクトリ自体の削除は禁止されています。 (Access denied: deleting home directory path is restricted)".to_string());
         }
 
         let sensitive_home_dirs = [".ssh", ".gnupg", ".local/share/keyrings"];
         for rel in &sensitive_home_dirs {
             let target = home_canon.join(rel);
             if canonical == target || canonical.starts_with(&target) {
-                return Err(format!("安全上の理由により重要資格情報領域 (~/{}) の削除は禁止されています。", rel));
+                return Err(format!("EACCES: 安全上の理由により重要資格情報領域 (~/{}) の削除は禁止されています。 (Access denied: deleting credential directory is restricted)", rel));
             }
         }
 
@@ -350,13 +350,13 @@ fn validate_safe_deletion(path: &Path) -> Result<(), String> {
         for file in &sensitive_shell_files {
             let target = home_canon.join(file);
             if canonical == target {
-                return Err(format!("安全上の理由によりシェル設定ファイル (~/{}) の削除は禁止されています。", file));
+                return Err(format!("EACCES: 安全上の理由によりシェル設定ファイル (~/{}) の削除は禁止されています。 (Access denied: deleting shell configuration file is restricted)", file));
             }
         }
 
         let config_root = home_canon.join(".config");
         if canonical == config_root {
-            return Err("安全上の理由により設定ルートディレクトリ (~/.config) の削除は禁止されています。".to_string());
+            return Err("EACCES: 安全上の理由により設定ルートディレクトリ (~/.config) の削除は禁止されています。 (Access denied: deleting ~/.config directory is restricted)".to_string());
         }
     }
 
@@ -371,7 +371,7 @@ fn validate_safe_deletion(path: &Path) -> Result<(), String> {
             if sys_dir == "/var" && canonical.starts_with("/var/tmp/") {
                 continue;
             }
-            return Err(format!("安全上の理由によりシステム領域 ({}) 配下の削除は禁止されています。", sys_dir));
+            return Err(format!("EACCES: 安全上の理由によりシステム領域 ({}) 配下の削除は禁止されています。 (Access denied: deleting system directory is restricted)", sys_dir));
         }
     }
 
@@ -432,7 +432,7 @@ fn read_directory(path: String, show_hidden: bool, limit: Option<usize>) -> Resu
     // 1. Block virtual/kernel/device filesystem probing: /proc, /sys, /dev
     let path_str = canonical.to_string_lossy();
     if path_str.starts_with("/proc") || path_str.starts_with("/sys") || path_str.starts_with("/dev") {
-        return Err("安全上の理由により仮想/システムディレクトリ (/proc, /sys, /dev) の参照は禁止されています。".to_string());
+        return Err("EACCES: 安全上の理由により仮想/システムディレクトリ (/proc, /sys, /dev) の参照は禁止されています。 (Access denied: browsing /proc, /sys, /dev is restricted)".to_string());
     }
 
     // 2. Block sensitive credential directory browsing and flag SSH dir
@@ -440,11 +440,11 @@ fn read_directory(path: String, show_hidden: bool, limit: Option<usize>) -> Resu
         let home_canon = home.canonicalize().unwrap_or(home);
         let gpg_private = home_canon.join(".gnupg").join("private-keys-v1.d");
         if canonical == gpg_private || canonical.starts_with(&gpg_private) {
-            return Err("安全上の理由によりGPG秘密鍵領域の参照は禁止されています。".to_string());
+            return Err("EACCES: 安全上の理由によりGPG秘密鍵領域の参照は禁止されています。 (Access denied: browsing GPG private keys is restricted)".to_string());
         }
         let keyrings_dir = home_canon.join(".local").join("share").join("keyrings");
         if canonical == keyrings_dir || canonical.starts_with(&keyrings_dir) {
-            return Err("安全上の理由によりシステムキーリング領域の参照は禁止されています。".to_string());
+            return Err("EACCES: 安全上の理由によりシステムキーリング領域の参照は禁止されています。 (Access denied: browsing system keyrings is restricted)".to_string());
         }
         let ssh_dir = home_canon.join(".ssh");
         canonical == ssh_dir || canonical.starts_with(&ssh_dir)
@@ -853,20 +853,43 @@ fn log_kitty_debug(msg: String) {
     const MAX_MSG_LEN: usize = 4096;
 
     let log_path = "/tmp/waddle_kitty_debug.log";
-    if let Ok(metadata) = std::fs::metadata(log_path) {
-        if metadata.len() > MAX_LOG_SIZE {
+    if let Ok(metadata) = std::fs::symlink_metadata(log_path) {
+        if metadata.file_type().is_symlink() || metadata.len() > MAX_LOG_SIZE {
             let _ = std::fs::remove_file(log_path);
         }
     }
 
-    let trimmed = if msg.len() > MAX_MSG_LEN {
-        &msg[..MAX_MSG_LEN]
+    let end_idx = if msg.len() > MAX_MSG_LEN {
+        // Safely find the closest char boundary <= MAX_MSG_LEN to avoid UTF-8 slice panic
+        match msg.char_indices().take_while(|(idx, _)| *idx <= MAX_MSG_LEN).last() {
+            Some((idx, ch)) => {
+                let next = idx + ch.len_utf8();
+                if next <= MAX_MSG_LEN { next } else { idx }
+            }
+            None => 0,
+        }
     } else {
-        &msg
+        msg.len()
     };
+    let trimmed = &msg[..end_idx];
 
-    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(log_path) {
-        let _ = writeln!(f, "{}", trimmed);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        if let Ok(mut f) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .custom_flags(libc::O_NOFOLLOW)
+            .open(log_path)
+        {
+            let _ = writeln!(f, "{}", trimmed);
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(log_path) {
+            let _ = writeln!(f, "{}", trimmed);
+        }
     }
 }
 

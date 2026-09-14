@@ -139,6 +139,9 @@ export interface Translations {
     exportChat: string;
     exportMarkdown: string;
     exportJson: string;
+    recentError: string;
+    askFixBtn: string;
+    askFixPrompt: (command: string, errSnippet: string) => string;
   };
   errorBanner: {
     detected: (command: string) => string;
@@ -430,6 +433,10 @@ export const translations: Record<Language, Translations> = {
       exportChat: 'Export Chat',
       exportMarkdown: 'Export as Markdown (.md)',
       exportJson: 'Export as JSON (.json)',
+      recentError: 'Recent Error:',
+      askFixBtn: 'Ask AI to Fix',
+      askFixPrompt: (command: string, errSnippet: string) =>
+        `The previous command \`${command}\` failed with the following error. Please explain the cause and provide the exact fix command:\n\n\`\`\`\n${errSnippet}\n\`\`\``,
     },
     errorBanner: {
       detected: (command) => `Command \`${command}\` failed with an error`,
@@ -720,6 +727,10 @@ export const translations: Record<Language, Translations> = {
       exportChat: 'Export Chat',
       exportMarkdown: 'Export as Markdown (.md)',
       exportJson: 'Export as JSON (.json)',
+      recentError: 'Recent Error:',
+      askFixBtn: 'Ask AI to Fix',
+      askFixPrompt: (command: string, errSnippet: string) =>
+        `The previous command \`${command}\` failed with the following error. Please explain the cause and provide the exact fix command:\n\n\`\`\`\n${errSnippet}\n\`\`\``,
     },
     errorBanner: {
       detected: (command) => `Command \`${command}\` failed with an error`,
@@ -1010,6 +1021,10 @@ export const translations: Record<Language, Translations> = {
       exportChat: 'チャット履歴をエクスポート',
       exportMarkdown: 'Markdown形式で保存 (.md)',
       exportJson: 'JSON形式で保存 (.json)',
+      recentError: '直前のエラー:',
+      askFixBtn: 'エラー修正を質問',
+      askFixPrompt: (command: string, errSnippet: string) =>
+        `直前のコマンド \`${command}\` で以下のエラーが発生しました。原因と具体的な修正コマンドを教えてください:\n\n\`\`\`\n${errSnippet}\n\`\`\``,
     },
     errorBanner: {
       detected: (command) => `コマンド \`${command}\` でエラーが検出されました`,

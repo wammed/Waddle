@@ -190,7 +190,7 @@ pub struct ConfigManager {
 
 fn validate_image_data_and_filename(file_name: &str, data: &[u8]) -> Result<String, String> {
     if data.is_empty() {
-        return Err("画像データが空です。".to_string());
+        return Err("EINVAL: 画像データが空です。 (Image data is empty)".to_string());
     }
 
     // 1. Validate magic bytes for supported image formats
@@ -209,7 +209,7 @@ fn validate_image_data_and_filename(file_name: &str, data: &[u8]) -> Result<Stri
     {
         "svg"
     } else {
-        return Err("許可されていないファイル形式です。PNG, JPEG, WebP, GIF, BMP, SVG 画像のみ対応しています。".to_string());
+        return Err("EINVAL: 許可されていないファイル形式です。PNG, JPEG, WebP, GIF, BMP, SVG 画像のみ対応しています。 (Unsupported image format: must be PNG, JPEG, WebP, GIF, BMP, or SVG)".to_string());
     };
 
     // 2. Prevent path traversal by taking only the file name
@@ -349,17 +349,17 @@ pub fn validate_wallpaper_file_path(path_str: &str) -> Result<(), String> {
     };
 
     if !expanded.is_file() {
-        return Err(format!("指定された壁紙ファイルが存在しません: {}", trimmed));
+        return Err(format!("ENOENT: 指定された壁紙ファイルが存在しません: {} (Wallpaper file does not exist)", trimmed));
     }
 
     use std::io::Read;
     let mut file = fs::File::open(&expanded)
-        .map_err(|e| format!("壁紙ファイルを開けませんでした: {}", e))?;
+        .map_err(|e| format!("EACCES: 壁紙ファイルを開けませんでした: {} (Failed to open wallpaper file)", e))?;
     let mut buffer = [0u8; 512];
     let bytes_read = file.read(&mut buffer)
-        .map_err(|e| format!("壁紙ファイルの読み込みに失敗しました: {}", e))?;
+        .map_err(|e| format!("EIO: 壁紙ファイルの読み込みに失敗しました: {} (Failed to read wallpaper file)", e))?;
     if bytes_read == 0 {
-        return Err("壁紙ファイルが空です。".to_string());
+        return Err("EINVAL: 壁紙ファイルが空です。 (Wallpaper file is empty)".to_string());
     }
 
     validate_image_data_and_filename(

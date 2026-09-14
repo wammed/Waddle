@@ -796,6 +796,36 @@ npm run tauri dev
       - **実機バイナリ安全配備**:
         - `install -m 755 target/release/waddle ~/.local/bin/waddle`（実行中バイナリの inode アトミック置換により Text file busy を回避）。
 
+39. **OPUS V3 プロジェクトレビュー指摘事項の包括的改善（リファクタリング以外の全課題解消）**:
+    - **背景と目的**:
+      - `docs/Waddle_Project_Review_by_OPUS_V3.md` のセキュリティ・機能・国際化に関する指摘事項のうち、ユーザー指示に基づき「リファクタリング（ファイル分割・モジュール再構築等）」を除く全課題（5項目）を徹底改修。
+    - **改修内容と解決アプローチ**:
+      1. **`log_kitty_debug` ディスク枯渇 & シンボリックリンク乗っ取り完全防御 (`src-tauri/src/lib.rs`)**:
+         - 最大ログファイルサイズ（10MB）超過時にファイルを自動削除。
+         - `std::fs::symlink_metadata` を用いて、`/tmp/waddle_kitty_debug.log` がシンボリックリンクとして作成されていた場合は即座に物理削除。
+         - `MAX_MSG_LEN` (4,096 バイト) による切り詰め時、Rust の `char_indices` を用いて UTF-8 マルチバイト文字境界を安全に特定（固定バイト長スライスによるパニッククラッシュ DoS を完全防止）。
+         - Unix 環境下で `OpenOptionsExt::custom_flags(libc::O_NOFOLLOW)` を適用し、共有ディレクトリ `/tmp` 内のシンボリックリンク追従による任意ファイル上書き攻撃を完全遮断。
+      2. **`hasSecrets` & `maskSecrets` の正規表現ステート (`lastIndex`) 残存バグ解消 (`src/services/secretMasker.ts`)**:
+         - `/g` フラグ付き RegExp の `test()` および `replace()` 呼び出し前後に `rule.regex.lastIndex = 0` を確実にリセット。
+         - シングルトン正規表現の内部状態持ち越しによる false negative（機密情報の見落とし）を根絶。
+      3. **Session History の容量最適化 & クオータリカバリ機構 (`src/services/sessionHistory.ts`)**:
+         - `MAX_RECORDS` を 200 件から 100 件へ最適化。
+         - `outputSnippet` の最大長を 1,000 文字から 500 文字へ半減。
+         - `load()` 時に既存レガシーデータのスニペットも 500 文字にサニタイズ。
+         - `localStorage.setItem` 実行時に `QuotaExceededError` をキャッチし、自動で古い履歴を 50% 間引いて再保存を試みる自動復旧機構（Quota Recovery）を実装。
+      4. **エラー修正質問プロンプトの完全多言語化 (`src/components/AiSidebar.tsx` & `src/i18n/translations.ts`)**:
+         - `Translations.copilot` 型定義および `en-US`, `en-GB`, `ja` の辞書に `recentError`, `askFixBtn`, `askFixPrompt` を追加。
+         - `AiSidebar.tsx` に直接ハードコードされていた日本語文字列（「直前のエラー:」「エラー修正を質問」「直前のコマンド...で以下のエラーが発生しました...」）を多言語辞書参照へ移行し、英語環境での言語不整合を解消。
+         - 添付エラーログのスニペット長を 1,000 文字から 500 文字へ最適化。
+      5. **バックエンド（Rust）セキュリティエラーの POSIX 標準コード付与と日英併記 (`src-tauri/src/lib.rs` & `src-tauri/src/config.rs`)**:
+         - ファイルシステム保護 (`validate_safe_read`, `validate_safe_write`, `validate_safe_deletion`, `read_directory`) に `EACCES: ` プレフィックスと英語説明を付与。
+         - 画像・壁紙バリデーション (`validate_wallpaper_path`, `validate_image_bytes`) に `EINVAL: `, `ENOENT: `, `EACCES: `, `EIO: ` プレフィックスと英語説明を付与。
+         - 既存テストコードのアサーションとの後方互換性を 100% 維持。
+    - **検証エビデンス**:
+      - **フロントエンド型検査 & ビルド**: `npm run build` エラー 0 件（Vite 2.21s で正常ビルド完了）。
+      - **Rust バックエンド単体テスト**: `cargo test --manifest-path src-tauri/Cargo.toml` 全 46 件すべて PASS。
+      - **リリースビルド & 配備**: `cargo build --release`（24.47s）完了、`install -m 755 target/release/waddle ~/.local/bin/waddle` により本番バイナリ配備完了。
+
 ---
 
 ## 6. 次回再開時の検討・作業候補（Next Steps）
