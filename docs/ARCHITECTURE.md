@@ -229,11 +229,19 @@ Waddle is built on a hybrid architecture combining a high-performance **Rust bac
   - APC escape sequences (`\x1b_G...`) carrying megabytes of Base64 image data are intercepted before reaching `@xterm/xterm`.
   - Stripped text is passed to `term.write()`, preventing parser bottlenecking and terminal lag.
   - **Zero-Latency PTY Query Response & Official `kitten` Compliance**: The Rust PTY background reader (`process_kitty_output`) intercepts capability inquiries (`a=q`) and immediately replies with uppercase `\x1b_Gi=<id>;OK\x1b\` to child stdin with 0ms latency. Strictly satisfies Kitty's Go implementation (`DetectSupport`) check for `g.ResponseMessage() == "OK"`, eliminating probe timeouts in `kitten icat`, `fastfetch`, and CLI tools.
-  - **Universal TUI (Yazi, Ranger, lf, etc.) CSI Probes Emulation**:
-    - Instantly replies to `\x1b[?996n` (Kitty Unicode placeholder support query) with `\x1b[?996;1n` (supported).
-    - Instantly replies to `\x1b[16t` (cell size query) with `\x1b[6;18;9t` (height 18px, width 9px).
-    - Instantly replies to `\x1b[c` / `\x1b[0c` (DA1 Primary Device Attributes queries) with `\x1b[?62;4;22c`.
-    - Intercepts and drains these CSI probes independently of APC (`\x1b_G`) sequences, completing TUI initialization in 0ms.
+  - **PTY-Level Temporary File Inlining (`t=t` -> `t=d`) for Zero Race Conditions**:
+    - CLI tools such as `viu` immediately delete (unlink) temporary files (`/tmp/.tty-graphics-protocol.viuer.*`) upon receiving DSR (`\x1b[5n` -> `\x1b[0n`) before exiting.
+    - Because asynchronous frontend file reading encounters `ENOENT` due to this race condition, the PTY reader thread (`src-tauri/src/pty.rs`) intercepts `t=t` commands at the byte stream level and immediately calls `read_and_unlink_temp_file_base64` (`src-tauri/src/kitty.rs`) in Rust memory.
+    - Re-writing the payload to Base64 inline data (`t=d`) before forwarding it to the webview completely eliminates file deletion race conditions, guaranteeing 100% reliable instant image rendering.
+  - **Protocol Response Policy (`quiet` Key `q` Compliance & TUI Flicker Elimination)**:
+    - **Transmit & Display Commands (`a=t`, `a=T`)**: Synchronous clients such as `ranger` block on `self.stdbin.read(1)` waiting for an `OK` reply after sending `draw()`. For commands carrying an explicit image ID (`explicitId > 0`), `manager.ts` synchronously returns `\x1b_Gi=<id>;OK\x1b\` to the PTY, resolving terminal freezes on first-frame preview.
+    - **Silent Success for Delete, Place, and Frame Commands (`a=d`, `a=p`, `a=f`, `a=a`)**: Conforms strictly to the official Kitty Graphics Protocol specification where success responses are silent by default (returning `OK` only when `cmd.keys.q === 0` is explicitly requested). Because `ranger`'s `clear()` does not read terminal replies by design, suppressing unnecessary `OK` messages prevents escape sequences from polluting the stdin buffer. This completely eliminates curses event loop misfires where escape codes are parsed as rapid user keystrokes, ending screen flicker loops (`redrawwin`/`refresh`) and UI hangs during rapid file navigation.
+  - **Universal CLI / TUI Probes Auto-Detection**:
+    - **XTVERSION (`\x1b[>q` / `\x1b[>0q`)**: PTY reader instantly answers with `\x1bP>|kitty(0.35.0)\x1b\`, enabling `timg` to auto-detect Kitty graphics without requiring `-p k`.
+    - **DA1 Primary Device Attributes (`\x1b[c` / `\x1b[0c`)**: Emits `\x1b[?62c` cleanly without Sixel capabilities (omitting `;4;`), preventing `viuer` from falling back to Sixel mode.
+    - **DSR (`\x1b[5n`)**: Instantly replies with `\x1b[0n` (Terminal OK), completing `viu` status checks in 0ms.
+    - **Unicode Placeholder Probe (`\x1b[?996n`)**: Instantly replies with `\x1b[?996;1n` (supported).
+    - **Cell Size Query (`\x1b[16t`)**: Instantly replies with `\x1b[6;18;9t` (height 18px, width 9px).
   - **Dynamic Pixel Dimension Synchronization (`TIOCGWINSZ`)**: Propagates actual rendered cell dimensions (`cellWidth`, `cellHeight`) from xterm.js Canvas into the kernel PTY window size structure (`pixel_width`, `pixel_height` as `cols * cellWidth`, `rows * cellHeight`) on every resize, enabling accurate aspect ratio calculations for `kitten icat --place`.
   - **Intentional Omission of Shared Memory (`t=s`, `/dev/shm`)**: Refuses shared memory capability queries (`t=s`) to eliminate memory inspection and OOM denial-of-service attack vectors, smoothly falling back to direct Base64 (`t=d`) and sandboxed temp files (`t=t`). High-FPS video streaming is consciously omitted to uphold an uncompromised sandbox security model.
 - **Web Standard zlib / Deflate Decompression (`o=z`)**:
