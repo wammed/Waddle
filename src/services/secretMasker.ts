@@ -77,5 +77,8 @@ export function maskSecrets(text: string): { maskedText: string; count: number }
  */
 export function hasSecrets(text: string): boolean {
   if (!text) return false;
-  return RULES.some((rule) => rule.regex.test(text));
+  return RULES.some((rule) => {
+    rule.regex.lastIndex = 0;
+    return rule.regex.test(text);
+  });
 }

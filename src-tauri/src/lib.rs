@@ -849,8 +849,24 @@ fn kitty_read_file(
 #[tauri::command]
 fn log_kitty_debug(msg: String) {
     use std::io::Write;
-    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/waddle_kitty_debug.log") {
-        let _ = writeln!(f, "{}", msg);
+    const MAX_LOG_SIZE: u64 = 10 * 1024 * 1024; // 10MB
+    const MAX_MSG_LEN: usize = 4096;
+
+    let log_path = "/tmp/waddle_kitty_debug.log";
+    if let Ok(metadata) = std::fs::metadata(log_path) {
+        if metadata.len() > MAX_LOG_SIZE {
+            let _ = std::fs::remove_file(log_path);
+        }
+    }
+
+    let trimmed = if msg.len() > MAX_MSG_LEN {
+        &msg[..MAX_MSG_LEN]
+    } else {
+        &msg
+    };
+
+    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(log_path) {
+        let _ = writeln!(f, "{}", trimmed);
     }
 }
 

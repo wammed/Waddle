@@ -933,6 +933,20 @@ export const TEST_CASES: TestCase[] = [
     type: 'Automated / Manual',
     command: 'cd ~/GitHUB/wammed/Waddle && npx tsx scratch/simulate_canvas_draw.mjs',
   },
+  {
+    id: 'TC-KITTY-20',
+    suiteId: 7,
+    suiteName: 'Kitty Graphics Protocol',
+    suiteNameJa: 'Kitty Graphics Protocol (完全サブシステム)',
+    title: 'Universal CLI/TUI Ecosystem Integration: viu, timg, ranger, lf (XTVERSION, Clean DA1, DSR 5n, TERM=xterm-kitty)',
+    titleJa: '汎用 CLI/TUI 互換性完全対応: viu, timg, ranger, lf (XTVERSION 応答・DA1 Sixel排除・DSR 5n同期・TERM=xterm-kitty)',
+    procedure: 'Run viu, timg, and ranger without special protocol options. Verify PTY responses to XTVERSION (\\x1b[>q / \\x1b[>0q), DSR (\\x1b[5n -> \\x1b[0n), DA1 without Sixel (;4;) flag (\\x1b[?62c), and TERM=xterm-kitty environment propagation.',
+    procedureJa: '特別なプロトコル指定なしで viu, timg, ranger を起動。PTY による XTVERSION (\\x1b[>q / \\x1b[>0q) 応答、DSR (\\x1b[5n -> \\x1b[0n) 同期、DA1 からの Sixel (;4;) 除外 (\\x1b[?62c)、および TERM=xterm-kitty による端末認識を検証。',
+    expected: 'timg automatically detects Kitty graphics via XTVERSION; viu avoids Sixel misdetection and selects Kitty protocol; ranger passes TERM check and previews images; DSR 5n returns 0n for seamless synchronization.',
+    expectedJa: 'timg が XTVERSION により Kitty グラフィックスを自動検出、viu が Sixel 誤認を起こさず Kitty プロトコルを選択、ranger が TERM チェックを通過して画像プレビューを実行、DSR 5n が 0n を返して描画同期が 0ms で完了する。',
+    type: 'Automated / Manual',
+    command: 'cargo test --manifest-path src-tauri/Cargo.toml test_kitty_query_xtversion test_kitty_query_dsr_5n test_viu_combined_fifo_order',
+  },
 
   // Suite 8: Security & Defense-in-Depth (15)
   {

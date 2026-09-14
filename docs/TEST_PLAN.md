@@ -17,11 +17,11 @@ This document provides a comprehensive, end-to-end test plan for **Waddle**, cov
 4. **AI Assistant & Context Integration** (9 Test Cases)
 5. **Git Integration & Remote Guardrails** (9 Test Cases)
 6. **Theming, UI Glow, Wallpapers & Icons** (7 Test Cases)
-7. **Kitty Graphics Protocol (Complete Subsystem)** (18 Test Cases)
+7. **Kitty Graphics Protocol (Complete Subsystem)** (19 Test Cases)
 8. **Security Policy & Multi-Layer Safety Guardrails** (18 Test Cases)
 9. **Performance, Resource Bounds & Leak Prevention** (5 Test Cases)
 10. **Next-Gen Workflow & Productivity** (6 Test Cases)
-**Total: 98 Comprehensive Test Cases**
+**Total: 99 Comprehensive Test Cases**
 
 ### 1.3 Prerequisites & Environment
 - **Operating System**: Linux (Ubuntu 22.04+, Debian 12+, Arch Linux, etc., WebKitGTK 4.1 / 4.0)
@@ -153,6 +153,7 @@ This document provides a comprehensive, end-to-end test plan for **Waddle**, cov
 | **TC-KITTY-16** | Delta Frame 32-bit RGBA Auto-Detection & Alpha Blending (`a=f, c=<num>`) | Transmit base RGB image (`f=24`) followed by delta frames (`a=f`) with RGBA raw payload ($s \times v \times 4$ bytes). | Delta frames auto-detect as 32-bit RGBA, preserving alpha channel and blending smoothly without black-and-white static dots. | Automated / Scripted |
 | **TC-KITTY-17** | Ghost Layer Prevention & Single Active Canvas Stacking | Re-mount terminal view or change split layout while displaying Kitty graphics. | Previous `.xterm-kitty-graphics-layer` canvases are cleanly purged; single canvas renders between text and selection layers. | Manual |
 | **TC-KITTY-19** | Universal Linux TUI/CLI Ecosystem Integration (Yazi, Ranger, lf, fastfetch, image.nvim; 0ms PTY Probes, 100% Text Preservation & Grid Protection) | Launch Yazi, Ranger, lf, fastfetch, and Neovim (`image.nvim`) to display image previews and logos; verify PTY handling of `a=q` / `\x1b[?996n` / `\x1b[16t` / `\x1b[0c` inquiries and rendering pipelines. | PTY answers queries in 0ms to initialize Kitty mode; dedicated graphics canvas eliminates scaling errors and row-shift overlaps; `workCell` memory hygiene preserves 100% of surrounding text (file trees, borders, code lines); and `C=1`/alternate screen zero-allocation maintains rigid TUI grid geometry without vertical scrolling disruption. | Automated / Manual |
+| **TC-KITTY-20** | Universal CLI/TUI Ecosystem Integration: viu, timg, ranger, lf (XTVERSION, Clean DA1, DSR 5n, TERM=xterm-kitty) | Run `viu`, `timg`, and `ranger` without special protocol options. Verify PTY responses to XTVERSION (`\x1b[>q` / `\x1b[>0q`), DSR (`\x1b[5n` -> `\x1b[0n`), DA1 without Sixel (`;4;`) flag (`\x1b[?62c`), and `TERM=xterm-kitty` environment propagation. | `timg` automatically detects Kitty graphics via XTVERSION; `viu` avoids Sixel misdetection and selects Kitty protocol; `ranger` passes TERM check and previews images; DSR 5n returns 0n for seamless synchronization. | Automated / Manual |
 
 ---
 

@@ -401,9 +401,39 @@
   - **各主要ツールの動作検証実績**:
     - **`fastfetch` (`"type": "kitty"`)**: 0ms プローブ応答により、即座に公式ロゴを高精細グラフィックスで表示。
     - **`kitten icat`**: `TIOCGWINSZ` による動的ピクセル解像度同期により、`--place` やアスペクト比計算を正確に反映し、改行回り込みのない指定列配置を実現。
-    - **`chafa` (`--format kitty`) / `timg` (`-pk`) / `viu`**: CLI 出力後のプロンプト復帰位置が崩れず、画像直下の行へ正確にプロンプトが配置。
+    - **`chafa` (`--format kitty`)**: CLI 出力後のプロンプト復帰位置が崩れず、画像直下の行へ正確にプロンプトが配置。
+    - **`timg` (オプション不要・完全自動検出)**:
+      - 端末バージョン問い合わせ（XTVERSION: `\x1b[>q` / `\x1b[>0q`）に対し、PTY が `\x1bP>|kitty(0.35.0)\x1b\` を 0ms 即時返信。
+      - オプション（`-p k`）を指定することなく、標準の `timg image.png` コマンドで端末が Kitty 対応であることを自動認識し、高精細インライン表示を直接実行。
+    - **`viu` (オプション不要・完全自動検出)**:
+      - DA1 クエリ（`\x1b[c`）において、本家 Kitty 公式に厳格準拠した `\x1b[?62c` を返答（Sixel 識別子 `;4;` を完全排除）。
+      - `viuer` の Sixel 優先判定による誤認・Sixel 出力フォールバックを防止し、Kitty Graphics Protocol（一時ファイル転送 `t=t` / Base64 直接転送 `t=d`）を自動選択。
+      - 描画完了待機の DSR クエリ（`\x1b[5n`）に対し、端末正常稼働を示す `\x1b[0n` を 0ms 返信することで、画面スタッターのないゼロレイテンシ同期を達成。
     - **`yazi`**: 右ペインプレビュー枠内へのピクセルパーフェクト描画、一行ずらし重なりゼロ、左・中央ペインの通常テキスト 100% 表示。
-    - **`ranger` (`method=kitty`) / `lf`**: TUI 固定グリッド保護により、画面スクロールを起こさずにプレビューペインへインライン表示。
+    - **`ranger` (`set preview_images_method kitty`)**:
+      - Waddle の PTY 起動環境変数を `TERM=xterm-kitty` に最適化。
+      - `ranger` 内部のハードコードされた `if 'kitty' not in os.environ['TERM']` チェックを難なく通過し、TUI 固定グリッド保護により画面スクロール崩壊を起こさずに右側プレビューペインへインライン画像を描画。
+    - **`lf` (外部プレビュー連携)**:
+      - `lf` は組み込み画像描画エンジンを持たない設計のため、`~/.config/lf/lfrc` にてプレビュースクリプトを指定することで Kitty グラフィックスを利用可能：
+        ```bash
+        # ~/.config/lf/lfrc
+        set previewer ~/.config/lf/pv.sh
+        ```
+        ```bash
+        # ~/.config/lf/pv.sh (chmod +x)
+        #!/bin/sh
+        file="$1"; width="$2"; height="$3"; x="$4"; y="$5"
+        case "$(file -Lb --mime-type "$file")" in
+          image/*)
+            kitty +kitten icat --silent --stdin no --transfer-mode file \
+              --place "${width}x${height}@${x}x${y}" "$file" < /dev/null > /dev/tty
+            exit 1
+            ;;
+          *)
+            cat "$file"
+            ;;
+        esac
+        ```
     - **`image.nvim` (Neovim)**: ドキュメントバッファの通常文字を一切損なわずに Markdown 内画像のインラインプレビューを描画。
   - **一括クリーンアップ (`a=d, d=A`)**:
     - 大文字削除 (`d=A`) に対応し、プレビュー切り替え時やツール終了時に全配置・テクスチャキャッシュ・タイマーを即時破棄。残骸やゴースト重複をゼロ化。

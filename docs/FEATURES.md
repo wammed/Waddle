@@ -410,9 +410,38 @@ Welcome to the comprehensive feature guide for **Waddle**, the AI-integrated, pr
   - **Verified Tool Compatibility**:
     - **`fastfetch` (`"type": "kitty"`)**: Displays official distro logos in high-resolution graphics with 0ms startup.
     - **`kitten icat`**: Dynamic `TIOCGWINSZ` pixel reporting ensures `--place`, `--fit contain`, and aspect ratio mathematics align perfectly without unexpected wrapping.
-    - **`chafa` (`--format kitty`) / `timg` (`-pk`) / `viu`**: Restores prompt positions cleanly beneath images upon CLI return.
+    - **`chafa` (`--format kitty`)**: Restores prompt positions cleanly beneath images upon CLI return.
+    - **`timg` (Zero-Config Auto-Detection)**:
+      - Responds immediately (0ms) to XTVERSION inquiries (`\x1b[>q` / `\x1b[>0q`) with `\x1bP>|kitty(0.35.0)\x1b\`.
+      - Eliminates the need for manual flags (`-p k`), automatically detecting Kitty Graphics capability for plain `timg image.png` invocations.
+    - **`viu` (Zero-Config Auto-Detection)**:
+      - Strictly emits clean DA1 responses (`\x1b[?62c`) without Sixel capabilities (omitting `;4;`), preventing `viuer` from incorrectly prioritizing Sixel over Kitty.
+      - Intercepts and answers Device Status Report (DSR: `\x1b[5n`) with `\x1b[0n` (Terminal OK) in 0ms, enabling instantaneous synchronization.
     - **`yazi`**: Pixel-perfect preview rendering within right pane bounds, zero row-shift overlap, and 100% text display in left/middle panes.
-    - **`ranger` (`method=kitty`) / `lf`**: Seamless preview pane integration without vertical scrolling disruption.
+    - **`ranger` (`set preview_images_method kitty`)**:
+      - Shell startup environment is set to `TERM=xterm-kitty`, effortlessly satisfying ranger's hardcoded `if 'kitty' not in os.environ['TERM']` check.
+      - Rigid TUI grid geometry protection prevents unexpected vertical scrolling when rendering previews.
+    - **`lf` (External Preview Integration)**:
+      - Since `lf` lacks an internal image renderer by design, Kitty Graphics previews are configured via `~/.config/lf/lfrc`:
+        ```bash
+        # ~/.config/lf/lfrc
+        set previewer ~/.config/lf/pv.sh
+        ```
+        ```bash
+        # ~/.config/lf/pv.sh (chmod +x)
+        #!/bin/sh
+        file="$1"; width="$2"; height="$3"; x="$4"; y="$5"
+        case "$(file -Lb --mime-type "$file")" in
+          image/*)
+            kitty +kitten icat --silent --stdin no --transfer-mode file \
+              --place "${width}x${height}@${x}x${y}" "$file" < /dev/null > /dev/tty
+            exit 1
+            ;;
+          *)
+            cat "$file"
+            ;;
+        esac
+        ```
     - **`image.nvim` (Neovim)**: Displays inline Markdown and image previews without hiding buffer text or triggering missing-glyph tofu boxes.
   - **Universal Image Deletion (`a=d, d=A`)**:
     - Fully supports uppercase deletion (`d=A`), purging all placements, cached textures, and animation timers instantly on file change or tool exit.

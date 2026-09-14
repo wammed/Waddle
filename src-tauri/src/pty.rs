@@ -81,7 +81,10 @@ pub fn process_kitty_output<W: Write + ?Sized>(
     let has_csi_query = decoded.contains("\x1b[c")
         || decoded.contains("\x1b[0c")
         || decoded.contains("\x1b[16t")
-        || decoded.contains("\x1b[?996n");
+        || decoded.contains("\x1b[?996n")
+        || decoded.contains("\x1b[>q")
+        || decoded.contains("\x1b[>0q")
+        || decoded.contains("\x1b[5n");
 
     if !has_apc && !has_csi_query {
         if decoded.ends_with("\x1b_") {
@@ -215,26 +218,66 @@ pub fn process_kitty_output<W: Write + ?Sized>(
         }
     }
 
+    // Check if XTVERSION query "\x1b[>q" or "\x1b[>0q" is present (used by timg and terminal capability analyzers)
+    while let Some(xt_pos) = decoded.find("\x1b[>0q") {
+        let response = b"\x1bP>|kitty(0.35.0)\x1b\\";
+        if let Err(e) = writer.write_all(response) {
+            eprintln!("[Kitty Graphics] Error writing XTVERSION (0q) response: {}", e);
+        } else if let Err(e) = writer.flush() {
+            eprintln!("[Kitty Graphics] Error flushing XTVERSION (0q) response: {}", e);
+        } else {
+            println!("[Kitty Graphics] Responded to XTVERSION (0q) query: \\x1bP>|kitty(0.35.0)\\x1b\\");
+        }
+        decoded.drain(xt_pos..xt_pos + 5);
+    }
+    while let Some(xt_pos) = decoded.find("\x1b[>q") {
+        let response = b"\x1bP>|kitty(0.35.0)\x1b\\";
+        if let Err(e) = writer.write_all(response) {
+            eprintln!("[Kitty Graphics] Error writing XTVERSION query response: {}", e);
+        } else if let Err(e) = writer.flush() {
+            eprintln!("[Kitty Graphics] Error flushing XTVERSION query response: {}", e);
+        } else {
+            println!("[Kitty Graphics] Responded to XTVERSION query: \\x1bP>|kitty(0.35.0)\\x1b\\");
+        }
+        decoded.drain(xt_pos..xt_pos + 4);
+    }
+
+    // Check if DSR (Device Status Report) query "\x1b[5n" is present (used by viu and timg for render synchronization)
+    while let Some(dsr_pos) = decoded.find("\x1b[5n") {
+        // \x1b[0n = Terminal OK (Operating normally)
+        let response = b"\x1b[0n";
+        if let Err(e) = writer.write_all(response) {
+            eprintln!("[Kitty Graphics] Error writing DSR response: {}", e);
+        } else if let Err(e) = writer.flush() {
+            eprintln!("[Kitty Graphics] Error flushing DSR response: {}", e);
+        } else {
+            println!("[Kitty Graphics] Responded to DSR (5n) query: \\x1b[0n");
+        }
+        decoded.drain(dsr_pos..dsr_pos + 4);
+    }
+
     // Check if DA1 query "\x1b[c" or "\x1b[0c" is present in decoded (frequently sent at the end of Kitty capability probes)
+    // NOTE: Official Kitty terminal responds with "\x1b[?62c". We must NOT include ";4;" (Sixel capability)
+    // because tools like viu (viuer crate) prioritize Sixel if ";4;" is present in DA1 response.
     while let Some(da1_pos) = decoded.find("\x1b[c") {
-        let response = b"\x1b[?62;4;22c";
+        let response = b"\x1b[?62c";
         if let Err(e) = writer.write_all(response) {
             eprintln!("[Kitty Graphics] Error writing DA1 response: {}", e);
         } else if let Err(e) = writer.flush() {
             eprintln!("[Kitty Graphics] Error flushing DA1 response: {}", e);
         } else {
-            println!("[Kitty Graphics] Responded to DA1 query: \\x1b[?62;4;22c");
+            println!("[Kitty Graphics] Responded to DA1 query: \\x1b[?62c");
         }
         decoded.drain(da1_pos..da1_pos + 3);
     }
     while let Some(da1_0_pos) = decoded.find("\x1b[0c") {
-        let response = b"\x1b[?62;4;22c";
+        let response = b"\x1b[?62c";
         if let Err(e) = writer.write_all(response) {
             eprintln!("[Kitty Graphics] Error writing DA1 (0c) response: {}", e);
         } else if let Err(e) = writer.flush() {
             eprintln!("[Kitty Graphics] Error flushing DA1 (0c) response: {}", e);
         } else {
-            println!("[Kitty Graphics] Responded to DA1 (0c) query: \\x1b[?62;4;22c");
+            println!("[Kitty Graphics] Responded to DA1 (0c) query: \\x1b[?62c");
         }
         decoded.drain(da1_0_pos..da1_0_pos + 4);
     }
@@ -324,7 +367,7 @@ impl PtyManager {
 
         let mut cmd = CommandBuilder::new(&shell_cmd);
         cmd.cwd(&target_cwd);
-        cmd.env("TERM", "xterm-256color");
+        cmd.env("TERM", "xterm-kitty");
         cmd.env("COLORTERM", "truecolor");
         cmd.env("WADDLE_TERMINAL", "1");
         cmd.env("KITTY_WINDOW_ID", "1");
@@ -1341,8 +1384,8 @@ mod tests {
 
         process_kitty_output(&mut decoded, &mut writer, &mut pending);
 
-        // Expect OK for i=1, OK for i=2, refusal (ENOTSUP) for i=3 (shm), and DA1 response
-        assert_eq!(writer, b"\x1b_Gi=1;OK\x1b\\\x1b_Gi=2;OK\x1b\\\x1b_Gi=3;ENOTSUP\x1b\\\x1b[?62;4;22c");
+        // Expect OK for i=1, OK for i=2, refusal (ENOTSUP) for i=3 (shm), and DA1 response (without Sixel 4)
+        assert_eq!(writer, b"\x1b_Gi=1;OK\x1b\\\x1b_Gi=2;OK\x1b\\\x1b_Gi=3;ENOTSUP\x1b\\\x1b[?62c");
         assert_eq!(decoded, "");
         assert_eq!(pending, "");
     }
@@ -1416,7 +1459,7 @@ mod tests {
         let mut data3 = "\x1b[0c".to_string();
         process_kitty_output(&mut data3, &mut writer, &mut pending);
         assert_eq!(data3, "");
-        assert_eq!(writer, b"\x1b[?62;4;22c");
+        assert_eq!(writer, b"\x1b[?62c");
 
         // 4. Combined with normal data
         writer.clear();
@@ -1424,6 +1467,50 @@ mod tests {
         process_kitty_output(&mut data4, &mut writer, &mut pending);
         assert_eq!(data4, "helloworld");
         assert_eq!(writer, b"\x1b[?996;1n");
+    }
+
+    #[test]
+    fn test_kitty_query_xtversion() {
+        let mut writer = Vec::new();
+        let mut pending = String::new();
+
+        // Test \x1b[>q (timg terminal name probe)
+        let mut data1 = "\x1b[>q".to_string();
+        process_kitty_output(&mut data1, &mut writer, &mut pending);
+        assert_eq!(data1, "");
+        assert_eq!(writer, b"\x1bP>|kitty(0.35.0)\x1b\\");
+
+        // Test \x1b[>0q
+        writer.clear();
+        let mut data2 = "prefix\x1b[>0qsuffix".to_string();
+        process_kitty_output(&mut data2, &mut writer, &mut pending);
+        assert_eq!(data2, "prefixsuffix");
+        assert_eq!(writer, b"\x1bP>|kitty(0.35.0)\x1b\\");
+    }
+
+    #[test]
+    fn test_kitty_query_dsr_5n() {
+        let mut writer = Vec::new();
+        let mut pending = String::new();
+
+        // Test \x1b[5n (DSR query from viu/timg)
+        let mut data = "\x1b[5n".to_string();
+        process_kitty_output(&mut data, &mut writer, &mut pending);
+        assert_eq!(data, "");
+        assert_eq!(writer, b"\x1b[0n");
+    }
+
+    #[test]
+    fn test_viu_combined_fifo_order() {
+        // viu sends kitty probe + DA1 together: \x1b_Gi=31,s=1,v=1,a=q,t=d,f=24;AAAA\x1b\\\x1b[c
+        // It requires the Kitty response FIRST, followed by DA1 response
+        let mut data = "\x1b_Gi=31,s=1,v=1,a=q,t=d,f=24;AAAA\x1b\\\x1b[c".to_string();
+        let mut writer = Vec::new();
+        let mut pending = String::new();
+
+        process_kitty_output(&mut data, &mut writer, &mut pending);
+        assert_eq!(data, "");
+        assert_eq!(writer, b"\x1b_Gi=31;OK\x1b\\\x1b[?62c");
     }
 }
 

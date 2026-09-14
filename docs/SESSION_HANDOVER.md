@@ -413,10 +413,29 @@
          - `fontGlyphPass` & `_drawChars`: 内部処理を `try-catch` で多重防護し、プレースホルダー走査等で例外が発生しても xterm.js の文字描画ループ（`_drawChars`）が中断・停止しないようフェイルセーフを徹底。
          - `render()`: 毎フレーム実行されていた `TauriApi.logKittyDebug` 呼び出しを全削除し、ファイル肥大化と IPC 負荷を根絶。
     - **検証**:
-      1. `cargo test --manifest-path src-tauri/Cargo.toml`: 全 40 件 PASS。
-      2. `npm run build`: TypeScript 型検査 & Vite ビルド成功（0 エラー、2.13秒）。
-      3. `cargo build --release --manifest-path src-tauri/Cargo.toml`: リリースバイナリ生成完了。
-      4. `install -m 755 src-tauri/target/release/waddle /home/susie/.local/bin/waddle`: 本番配備完了。
+41. **汎用 Linux CLI/TUI エコシステム（`viu`, `timg`, `ranger`, `lf`）完全対応 & 端末自動認識の確立 (`TC-KITTY-20`)**:
+    - **ユーザー報告**: `yazi`, `kitty icat`, `fastfetch`, `chafa` は正常表示されるが、`ranger`, `lf`, `viu`, `timg` の 4 ツールで画像表示が失敗（NG）する事象を報告。
+    - **根本原因の完全解明**:
+      1. **`viu`**: 内部の `viuer` クレートが Kitty 判定より前に Sixel 判定（`is_sixel_supported()`）を実行。Waddle の DA1 応答に Sixel 識別子 `;4;`（`\x1b[?62;4;22c`）が含まれていたため、Sixel 端末と誤認され Kitty ではなく Sixel シーケンスが出力されていた。さらに Kitty クエリ（`a=q`）と DA1 が同時送出された際の FIFO レスポンス順序、および描画同期クエリ `\x1b[5n`（DSR）への応答 `\x1b[0n` が欠落していた。
+      2. **`timg`**: 端末種別の自動判定に XTVERSION（`\x1b[>q` / `\x1b[>0q`）を使用していたが、Waddle が未応答だったため端末名解決に失敗し、DA1 の `;4;` を見て Sixel 等にフォールバックしていた。
+      3. **`ranger`**: `ranger/ext/img_display.py` 内で `if 'kitty' not in os.environ['TERM']` がハードコードされており、Waddle の初期環境変数 `TERM=xterm-256color` では画像プレビュー処理自体が即座に例外中断されていた。
+      4. **`lf`**: バイナリ単体に画像描画機能を持たず、`~/.config/lf/lfrc` による外部プレビュースクリプト（`previewer`）の指定が必須であった。
+    - **改修内容**:
+      1. `src-tauri/src/pty.rs`:
+         - XTVERSION（`\x1b[>q` / `\x1b[>0q`）の検知・迎撃を実装し、`\x1bP>|kitty(0.35.0)\x1b\` を 0ms 即時返信。ストリームから削除。
+         - DSR（`\x1b[5n`）の検知・迎撃を実装し、`\x1b[0n`（Terminal OK）を 0ms 即時返信。ストリームから削除。
+         - DA1（`\x1b[c` / `\x1b[0c`）の返答から Sixel 識別子 `;4;` を完全排除し、本家 Kitty 公式と同じ `\x1b[?62c` に変更。
+         - Kitty クエリ（`a=q`）と DA1 が同一バッファで到着した際、必ず Kitty クエリ応答を先にマスターへ書き込む FIFO 順序を保証。
+         - PTY 起動環境変数を `TERM=xterm-kitty` に変更。
+         - 単体テスト 3 件追加（`test_kitty_query_xtversion`, `test_kitty_query_dsr_5n`, `test_viu_combined_fifo_order`）。
+      2. `src/data/testPlanData.ts`, `docs/TEST_PLAN.md` & `.ja.md`:
+         - `TC-KITTY-20`（汎用 CLI/TUI 互換性完全対応: viu, timg, ranger, lf）を新設（全 99 項目へ拡充）。
+      3. `docs/FEATURES.md` & `.ja.md`, `docs/README.md` & `.ja.md`:
+         - `viu`, `timg`, `ranger` のゼロコンフィグ自動認識仕様、および `lf` のプレビュースクリプト設定例を詳細明記。
+    - **検証**:
+      - `cargo test --manifest-path src-tauri/Cargo.toml`: 全 44 件 PASS（+3 件テスト追加）。
+      - `npm run build`: TypeScript 型検査 & Vite ビルド成功（0 エラー、2.20秒）。
+      - 実機 PTY ハーネス（`scratch/test_tools_after_fix.py`）により、オプションなしの `timg` および `viu` から直接 Kitty Graphics Protocol シーケンス（`\x1b_G...`）が出力されることを実証完了。
 
 ---
 
