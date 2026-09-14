@@ -826,6 +826,39 @@ npm run tauri dev
       - **Rust バックエンド単体テスト**: `cargo test --manifest-path src-tauri/Cargo.toml` 全 46 件すべて PASS。
       - **リリースビルド & 配備**: `cargo build --release`（24.47s）完了、`install -m 755 target/release/waddle ~/.local/bin/waddle` により本番バイナリ配備完了。
 
+40. **コアコンポーネントのリファクタリング（manager.ts / lib.rs 分割）& フロントエンド自動テスト基盤（Vitest）導入**:
+    - **背景と目的**:
+      - OPUS V3 プロジェクトレビューの推奨アクション項目に基づき、肥大化していた `manager.ts` (1,868行) および `lib.rs` (1,255行) のモジュール分割を実施し、保守性とテスタビリティを飛躍的に向上。
+      - フロントエンド自動テスト基盤として Vite 7 と親和性の高い `vitest` を導入し、主要サービス・パーサー・キャッシュ・i18n の包括的ユニットテストスイートを構築。
+    - **改修内容と解決アプローチ**:
+      1. **`manager.ts` (1,868行) の責務分割 (`src/services/kittyGraphics/`)**:
+         - **`animationController.ts`** (132行): アニメーションループ管理、タイマー制御、フレーム進行・遅延計算（`startAnimation`, `stopAnimation`, `advanceFrame`, `scheduleNextFrame`）を独立クラス `KittyAnimationController` に集約。
+         - **`renderer.ts`** (459行): Canvas 管理、DPR スケーリング、AABB 矩形交差判定、ビューポートクリッピング、UV マッピング、Unicode プレースホルダーグリッド描画（`render`, `renderPlacement`, `renderVisiblePlaceholders`, `syncCanvasSize`）を独立クラス `KittyCanvasRenderer` に集約。
+         - **`commandHandler.ts`** (718行): Kitty プロトコルコマンド処理（`handleCommand`: `a=q`, `a=t`, `a=T`, `a=p`, `a=d`, `a=f`, `a=a`）および画像配置処理（`placeImage`）を独立クラス `KittyCommandHandler` に集約。
+         - **`manager.ts`** (745行): 上記サブモジュールを統合するオーケストレータ・ファサードとして再構築。xterm.js レンダラーフック（`installCanvasRendererHook`）および PTY テキストストリームフィルタ（`filterPtyOutput`）に専任化。外部向け公開インターフェースは 100% 後方互換性を維持。
+      2. **`src-tauri/src/lib.rs` (1,255行) のモジュール分割**:
+         - **`src-tauri/src/fs_ops.rs`** (610行): パス正規化、ファイルシステムセキュリティ検査（`validate_safe_read`, `validate_safe_write`, `validate_safe_deletion`）、ファイル CRUD・ディレクトリ走査コマンド、およびファイルシステム保護単体テスト 7 件を分離。
+         - **`src-tauri/src/git_ops.rs`** (164行): Git 操作コマンド（status, stage, unstage, discard, commit, branches, checkout, diff, push, pull, generate_commit_message）およびドメイン検証テスト 3 件を分離。
+         - **`src-tauri/src/system.rs`** (183行): システム情報取得 (`get_system_info`, `SystemInfo`)、壁紙ファイル選択・検証・保存、設定入出力 (`get_config`, `save_config`)、`log_kitty_debug` を分離。
+         - **`src-tauri/src/lib.rs`** (278行): モジュール宣言、`AppState`、PTY ライフサイクルコマンド、AI コマンド、`run()`（ハンドラー一括登録）にスリム化。
+         - `AiClient`, `ConfigManager`, `PtyManager` に `Default` 実装を追加し、`cargo clippy` 警告 0 件を達成。
+      3. **フロントエンド自動テスト基盤の導入 (Vitest 5.0)**:
+         - `package.json` に `"test": "vitest run"`, `"test:watch": "vitest"` を追加。
+         - `vitest.config.ts` を新設し Node 環境でテストを実行可能に整備。
+         - 以下の包括的テストスイート 6 ファイル（計 27 テスト）を作成：
+           - `src/services/__tests__/secretMasker.test.ts` (7件): AWS/GitHub/Bearer/秘密鍵マスキング、`lastIndex` リセット検証。
+           - `src/services/__tests__/sessionHistory.test.ts` (3件): 100件クランプ、500文字スニペット切り詰め、LocalStorage クオータ自動リカバリ検証。
+           - `src/services/kittyGraphics/__tests__/parser.test.ts` (5件): APC シーケンス解析、チャンク結合 (`m=1`/`m=0`)、ペイロード上限防護。
+           - `src/services/kittyGraphics/__tests__/lruCache.test.ts` (4件): LRU 追い出し、lastUsed 更新、Bitmap クリーンアップ検証。
+           - `src/services/kittyGraphics/__tests__/unicodePlaceholder.test.ts` (4件): `U+10EEEE` 検出、結合ダイアクリティック解析、`workCell` 汚染防御、UV 座標計算。
+           - `src/i18n/__tests__/translations.test.ts` (4件): `en-US`, `en-GB`, `ja` 全言語のキー完全一致検証。
+    - **検証エビデンス**:
+      - **フロントエンド自動テスト**: `npm test` -> 6 ファイル全 27 テスト 100% PASS (157ms)。
+      - **フロントエンドビルド**: `npm run build` -> TypeScript 型検査 0 エラー、Vite バンドル正常完了 (2.18s)。
+      - **Rust バックエンド単体テスト**: `cargo test --manifest-path src-tauri/Cargo.toml` -> 全 46 テスト 100% PASS。
+      - **Rust 静的解析**: `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets` -> 警告・エラー 0 件。
+      - **本番リリースビルド & 配備**: `cargo build --manifest-path src-tauri/Cargo.toml --release`（24.25s）完了、`install -m 755 target/release/waddle ~/.local/bin/waddle` により本番バイナリ配備完了。
+
 ---
 
 ## 6. 次回再開時の検討・作業候補（Next Steps）

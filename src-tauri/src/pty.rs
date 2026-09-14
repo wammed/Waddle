@@ -355,6 +355,12 @@ pub struct PtyManager {
     sessions: Arc<Mutex<HashMap<String, Session>>>,
 }
 
+impl Default for PtyManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PtyManager {
     pub fn new() -> Self {
         Self {

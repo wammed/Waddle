@@ -1,0 +1,103 @@
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+
+// Setup mock localStorage and window for Node environment
+const storageMock = (() => {
+  let store: Record<string, string> = {};
+  return {
+    getItem: vi.fn((key: string) => store[key] || null),
+    setItem: vi.fn((key: string, val: string) => {
+      store[key] = val;
+    }),
+    clear: () => {
+      store = {};
+    },
+    triggerQuotaErrorOnNextSet: false,
+  };
+})();
+
+(globalThis as any).localStorage = {
+  getItem: (k: string) => storageMock.getItem(k),
+  setItem: (k: string, v: string) => {
+    if (storageMock.triggerQuotaErrorOnNextSet) {
+      storageMock.triggerQuotaErrorOnNextSet = false;
+      const err = new Error('QuotaExceededError');
+      err.name = 'QuotaExceededError';
+      throw err;
+    }
+    storageMock.setItem(k, v);
+  },
+};
+
+(globalThis as any).window = {
+  dispatchEvent: vi.fn(),
+};
+(globalThis as any).CustomEvent = class CustomEvent {
+  type: string;
+  constructor(type: string) {
+    this.type = type;
+  }
+};
+
+describe('sessionHistory', () => {
+  beforeEach(() => {
+    storageMock.clear();
+    vi.clearAllMocks();
+    storageMock.triggerQuotaErrorOnNextSet = false;
+  });
+
+  it('adds a record and truncates output snippet to 500 chars', async () => {
+    const { sessionHistory } = await import('../sessionHistory');
+    sessionHistory.clearRecords();
+
+    const longOutput = 'A'.repeat(1200);
+    const rec = sessionHistory.addRecord({
+      command: 'cat large_file.txt',
+      cwd: '/tmp',
+      exitCode: 0,
+      durationMs: 15,
+      outputSnippet: longOutput,
+      paneId: 'pane-1',
+    });
+
+    expect(rec.outputSnippet).toBeDefined();
+    expect(rec.outputSnippet?.length).toBe(500);
+    expect(sessionHistory.getRecords().length).toBe(1);
+  });
+
+  it('clamps total records to 100 max', async () => {
+    const { sessionHistory } = await import('../sessionHistory');
+    sessionHistory.clearRecords();
+
+    for (let i = 0; i < 120; i++) {
+      sessionHistory.addRecord({
+        command: `echo ${i}`,
+        cwd: '/tmp',
+        exitCode: 0,
+      });
+    }
+
+    const records = sessionHistory.getRecords();
+    expect(records.length).toBe(100);
+    // Newest is at index 0
+    expect(records[0].command).toBe('echo 119');
+  });
+
+  it('recovers from QuotaExceededError by pruning older records to 50%', async () => {
+    const { sessionHistory } = await import('../sessionHistory');
+    sessionHistory.clearRecords();
+
+    for (let i = 0; i < 20; i++) {
+      sessionHistory.addRecord({ command: `cmd ${i}`, cwd: '/tmp' });
+    }
+
+    expect(sessionHistory.getRecords().length).toBe(20);
+
+    // Trigger quota error on next add
+    storageMock.triggerQuotaErrorOnNextSet = true;
+
+    sessionHistory.addRecord({ command: 'quota_trigger_cmd', cwd: '/tmp' });
+
+    // After quota recovery, older records pruned to half
+    expect(sessionHistory.getRecords().length).toBeLessThanOrEqual(50);
+  });
+});

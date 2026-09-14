@@ -314,6 +314,12 @@ pub struct AiClient {
     client: reqwest::Client,
 }
 
+impl Default for AiClient {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AiClient {
     pub fn new() -> Self {
         Self {

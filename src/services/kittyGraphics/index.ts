@@ -3,4 +3,7 @@ export * from './parser';
 export * from './decoder';
 export * from './lruCache';
 export * from './unicodePlaceholder';
+export * from './animationController';
+export * from './renderer';
+export * from './commandHandler';
 export * from './manager';

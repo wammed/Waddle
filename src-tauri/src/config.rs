@@ -238,6 +238,12 @@ fn validate_image_data_and_filename(file_name: &str, data: &[u8]) -> Result<Stri
     Ok(final_name)
 }
 
+impl Default for ConfigManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ConfigManager {
     pub fn new() -> Self {
         let config_dir = dirs::config_dir()
