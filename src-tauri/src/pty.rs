@@ -97,8 +97,6 @@ pub fn process_kitty_output<W: Write + ?Sized>(
 
     if has_apc {
         let mut search_idx = 0;
-        let mut to_remove_ranges: Vec<std::ops::Range<usize>> = Vec::new();
-
         while let Some(rel_start) = decoded[search_idx..].find("\x1b_G") {
             let start = search_idx + rel_start;
             let header_start = start + 3; // Length of "\x1b_G"
@@ -176,29 +174,66 @@ pub fn process_kitty_output<W: Write + ?Sized>(
                         }
                     }
 
-                    // Remove the query sequence from decoded
+                    // Remove the query sequence from decoded immediately
                     if let Some(t_pos) = term_pos {
                         let seq_end = header_start + t_pos + term_len;
-                        to_remove_ranges.push(start..seq_end);
-                        search_idx = seq_end;
+                        decoded.replace_range(start..seq_end, "");
+                        search_idx = start;
                         continue;
                     } else if let Some(s_pos) = semi_pos {
                         let after_semi = &rest[s_pos + 1..];
                         if after_semi.starts_with("\x1b\\") {
                             let seq_end = header_start + s_pos + 1 + 2;
-                            to_remove_ranges.push(start..seq_end);
-                            search_idx = seq_end;
+                            decoded.replace_range(start..seq_end, "");
+                            search_idx = start;
                             continue;
                         } else if after_semi.starts_with('\x07') {
                             let seq_end = header_start + s_pos + 1 + 1;
-                            to_remove_ranges.push(start..seq_end);
-                            search_idx = seq_end;
+                            decoded.replace_range(start..seq_end, "");
+                            search_idx = start;
                             continue;
                         }
                     }
+                } else if matches!(medium, Some('t') | Some('T')) {
+                    // Inline temporary file (t=t) to prevent race conditions when client unlinks file upon DSR reply
+                    if let (Some(s_pos), Some(t_pos)) = (semi_pos, term_pos) {
+                        if s_pos < t_pos {
+                            let payload = &rest[s_pos + 1..t_pos];
+                            match crate::kitty::read_and_unlink_temp_file_base64(payload, 16 * 1024 * 1024) {
+                                Ok(inlined_data) => {
+                                    // Replace t=t with t=d in header
+                                    let mut new_parts = Vec::new();
+                                    for part in header.split(',') {
+                                        let trimmed = part.trim();
+                                        let mut kv = trimmed.split('=');
+                                        if let (Some(k), Some(_v)) = (kv.next(), kv.next()) {
+                                            if k.trim().eq_ignore_ascii_case("t") {
+                                                new_parts.push("t=d".to_string());
+                                                continue;
+                                            }
+                                        }
+                                        new_parts.push(trimmed.to_string());
+                                    }
+                                    let new_header = new_parts.join(",");
+                                    let new_command = format!("\x1b_G{};{}\x1b\\", new_header, inlined_data);
+                                    let seq_end = header_start + t_pos + term_len;
+                                    decoded.replace_range(start..seq_end, &new_command);
+                                    search_idx = start + new_command.len();
+                                    println!("[Kitty Graphics] Successfully inlined temporary file (t=t -> t=d, {} bytes)", inlined_data.len());
+                                    continue;
+                                }
+                                Err(e) => {
+                                    eprintln!("[Kitty Graphics] Failed to inline temporary file: {}", e);
+                                }
+                            }
+                        }
+                    } else if term_pos.is_none() {
+                        // Incomplete command at end of buffer, wait for subsequent chunks
+                        break;
+                    }
                 }
 
-                // For non-queries, advance search_idx past this header
+                // For non-queries and non-inlined commands, advance search_idx past this header
                 search_idx = header_start + h_end + 1;
             } else {
                 // Header is incomplete at end of buffer (< 256 bytes)
@@ -207,13 +242,6 @@ pub fn process_kitty_output<W: Write + ?Sized>(
                 } else {
                     search_idx = header_start;
                 }
-            }
-        }
-
-        // Drain removed ranges in reverse order so indices remain valid
-        for range in to_remove_ranges.into_iter().rev() {
-            if range.end <= decoded.len() {
-                decoded.drain(range);
             }
         }
     }
@@ -1512,5 +1540,34 @@ mod tests {
         assert_eq!(data, "");
         assert_eq!(writer, b"\x1b_Gi=31;OK\x1b\\\x1b[?62c");
     }
+
+    #[test]
+    fn test_pty_temp_file_inlining() {
+        use base64::Engine;
+        let temp_dir = std::env::temp_dir();
+        let file_path = temp_dir.join(format!("waddle_pty_inlining_{}.bin", std::process::id()));
+        let dummy_data = b"InlinedKittyImageData";
+        std::fs::write(&file_path, dummy_data).unwrap();
+        assert!(file_path.exists());
+
+        let path_b64 = base64::engine::general_purpose::STANDARD.encode(file_path.to_str().unwrap().as_bytes());
+        let mut data = format!("\x1b_Gf=32,s=10,v=10,a=T,t=t;{}\x1b\\\x1b[5n", path_b64);
+        let mut writer = Vec::new();
+        let mut pending = String::new();
+
+        process_kitty_output(&mut data, &mut writer, &mut pending);
+
+        // 1. \x1b[5n should be intercepted and replied with \x1b[0n
+        assert_eq!(writer, b"\x1b[0n");
+
+        // 2. data should now contain t=d with base64 encoded dummy_data
+        let expected_payload = base64::engine::general_purpose::STANDARD.encode(dummy_data);
+        assert!(data.contains("t=d"), "Command must be transformed from t=t to t=d: {}", data);
+        assert!(data.contains(&expected_payload), "Payload must contain inlined base64 data");
+
+        // 3. File must be deleted
+        assert!(!file_path.exists(), "Temporary file must be deleted upon inlining!");
+    }
 }
+
 

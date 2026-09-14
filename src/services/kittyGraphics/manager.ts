@@ -736,7 +736,8 @@ export class KittyGraphicsManager {
 
       case 't': {
         // Transmit and store in cache
-        const id = (cmd.keys.i !== undefined ? cmd.keys.i : cmd.keys.I) ?? this.nextImageId++;
+        const explicitId = cmd.keys.i !== undefined ? cmd.keys.i : cmd.keys.I;
+        const id = explicitId ?? this.nextImageId++;
         this.lastTransmittedImageId = id;
         let resolveLoad!: () => void;
         const loadPromise = new Promise<void>((resolve) => {
@@ -774,10 +775,11 @@ export class KittyGraphicsManager {
             },
           });
           this.term.refresh(0, this.term.rows - 1);
-          this.sendPtyResponse(id, 'OK', cmd.keys.q);
+          this.sendPtyResponse(explicitId ?? 0, 'OK', cmd.keys.q);
         } catch (err: any) {
           console.error('[KittyGraphics] Failed to decode image (t):', err);
-          this.sendPtyResponse(id, err.message || 'EBADMSG', cmd.keys.q);
+          const msg = typeof err === 'string' ? err : (err?.message || 'EBADMSG');
+          this.sendPtyResponse(explicitId ?? 0, msg, cmd.keys.q);
         } finally {
           resolveLoad();
           this.loadingImages.delete(id);
@@ -787,7 +789,8 @@ export class KittyGraphicsManager {
 
       case 'T': {
         // Transmit and display immediately
-        const id = (cmd.keys.i !== undefined ? cmd.keys.i : cmd.keys.I) ?? this.nextImageId++;
+        const explicitId = cmd.keys.i !== undefined ? cmd.keys.i : cmd.keys.I;
+        const id = explicitId ?? this.nextImageId++;
         this.lastTransmittedImageId = id;
         let resolveLoad!: () => void;
         const loadPromise = new Promise<void>((resolve) => {
@@ -860,10 +863,11 @@ export class KittyGraphicsManager {
             );
           }
           this.term.refresh(0, this.term.rows - 1);
-          this.sendPtyResponse(id, 'OK', cmd.keys.q);
+          this.sendPtyResponse(explicitId ?? 0, 'OK', cmd.keys.q);
         } catch (err: any) {
           console.error('[KittyGraphics] Failed to decode image (T):', err);
-          this.sendPtyResponse(id, err.message || 'EBADMSG', cmd.keys.q);
+          const msg = typeof err === 'string' ? err : (err?.message || 'EBADMSG');
+          this.sendPtyResponse(explicitId ?? 0, msg, cmd.keys.q);
         } finally {
           resolveLoad();
           this.loadingImages.delete(id);
@@ -1090,7 +1094,8 @@ export class KittyGraphicsManager {
           this.sendPtyResponse(id, 'OK', cmd.keys.q);
         } catch (err: any) {
           console.error('[KittyGraphics] Failed to decode frame (f):', err);
-          this.sendPtyResponse(id, err.message || 'EBADMSG', cmd.keys.q);
+          const msg = typeof err === 'string' ? err : (err?.message || 'EBADMSG');
+          this.sendPtyResponse(id, msg, cmd.keys.q);
         } finally {
           resolveLoad();
           this.loadingImages.delete(id);
@@ -1800,7 +1805,10 @@ export class KittyGraphicsManager {
     if (!force) {
       if (quiet === 2) return; // q=2: suppress all responses (silent)
       if (quiet === 1 && message === 'OK') return; // q=1: errors only, suppress OK
-      if (quiet === undefined && message === 'OK') return; // quiet unspecified: suppress OK to prevent prompt pollution
+      // When quiet is undefined (Kitty protocol default q=0):
+      // Applications specifying an explicit image ID (id > 0) like ranger wait for an OK response.
+      // Suppress OK only when id is 0 (unspecified) and quiet is omitted to prevent prompt pollution for one-shot CLI tools.
+      if (quiet === undefined && message === 'OK' && id === 0) return;
       // q=0: send both OK and errors
     }
 

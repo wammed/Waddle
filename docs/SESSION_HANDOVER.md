@@ -432,12 +432,38 @@
          - `TC-KITTY-20`（汎用 CLI/TUI 互換性完全対応: viu, timg, ranger, lf）を新設（全 99 項目へ拡充）。
       3. `docs/FEATURES.md` & `.ja.md`, `docs/README.md` & `.ja.md`:
          - `viu`, `timg`, `ranger` のゼロコンフィグ自動認識仕様、および `lf` のプレビュースクリプト設定例を詳細明記。
+42. **`ranger` 画像選択時フリーズ解消（画像ID同期 `OK` 応答）& `viu` 一時ファイル削除レースコンディション根絶（PTY 即時インライン化 `t=t` -> `t=d`）**:
+    - **ユーザー報告**:
+      - `timg`: 画像表示に成功（完全動作確認）。
+      - `ranger`: 画像ファイルを選択するとフリーズ（ハング）。
+      - `viu`: 十数行のブランク（空行プレースホルダー）のあとプロンプトが表示され、プロンプトに `Gi=2;EBADMSG` が漏洩して画像が表示されない。
+    - **根本原因の完全解明**:
+      1. **`ranger` フリーズ**: `ranger/ext/img_display.py` の `draw()` は画像描画コマンド（`a=T,i=<id>`）送信後、端末から `OK`（`\x1b_Gi=<id>;OK\x1b\`）が返るまで `self.stdbin.read(1)` で同期待機する仕様であった。Waddle の `manager.ts` はプロンプト汚染防止のため `quiet === undefined` 時の `OK` 応答を無条件に抑制していたため、ranger が永遠にブロックしていた。
+      2. **`viu` の `EBADMSG` & プロンプト漏洩**: `viu` は一時ファイル（`t=t`, 生 RGBA `f=32`）送信直後に端末の読み込み完了を DSR クエリ（`\x1b[5n`）で待機する仕様。Waddle の PTY スレッドがフロントエンドの非同期読み取り完了前に 0ms で `\x1b[0n` を先走って返信したため、`viu` が 0.01 秒以内に一時ファイルを削除して終了。遅れてフロントエンドが `kittyReadFile` を呼び出した時にはファイルが存在せず `ENOENT` となり、catch で `err.message`（string のため undefined）から `EBADMSG` にフォールバックしてプロンプトへ漏洩していた。
+    - **改修内容**:
+      1. `src-tauri/src/kitty.rs`:
+         - `read_and_unlink_temp_file_base64` ヘルパー関数を新設。サンドボックス検証・サイズ検証（16MB上限）を行い、安全にファイルを読み取って Base64 化し即座に unlink。
+         - 単体テスト `test_read_and_unlink_temp_file_base64` を追加。
+      2. `src-tauri/src/pty.rs`:
+         - PTY リーダースレッドの `\x1b_G` 迎撃処理において、一時ファイル（`t=t`）を検知した瞬間に `read_and_unlink_temp_file_base64` を呼び出し、ヘッダーを `t=d` に置換してペイロードを Base64 データにインライン化。後続の DSR（`\x1b[5n` -> `\x1b[0n`）で `viu` がファイルを消してもメモリ上のデータが完全に保護されるゼロ・レースコンディション構造を確立。
+         - 単体テスト `test_pty_temp_file_inlining` を追加。
+      3. `src/services/kittyGraphics/manager.ts`:
+         - `case 't':` および `case 'T':` においてクライアントが明示的に指定した画像 ID（`explicitId`）を追跡。
+         - `sendPtyResponse`: クライアントが明示的に画像 ID（`id > 0`）を指定している場合は `quiet === undefined` であっても `OK` を返信（`ranger` の同期待機ブロックを即座に解除）。ID 未指定時（`id === 0`）は `OK` を抑制してプロンプト汚染を防止。
+         - catch ブロックでのエラー文字列ハンドリングを `typeof err === 'string' ? err : (err?.message || 'EBADMSG')` に修正。
+      4. ドキュメント & テスト同期:
+         - `src/data/testPlanData.ts`, `docs/TEST_PLAN.md` & `.ja.md` の `TC-KITTY-20` を更新（全 99 項目）。
+         - `docs/FEATURES.md` & `.ja.md` に PTY レベル一時ファイルインライン化および ranger OK 応答同期の詳細仕様を追記。
     - **検証**:
-      - `cargo test --manifest-path src-tauri/Cargo.toml`: 全 44 件 PASS（+3 件テスト追加）。
-      - `npm run build`: TypeScript 型検査 & Vite ビルド成功（0 エラー、2.20秒）。
-      - 実機 PTY ハーネス（`scratch/test_tools_after_fix.py`）により、オプションなしの `timg` および `viu` から直接 Kitty Graphics Protocol シーケンス（`\x1b_G...`）が出力されることを実証完了。
+      - `cargo test`: 46 件全 PASS（+2 件テスト追加）。
+      - `cargo clippy -- -D warnings`: 警告 0 件。
+      - `npm run build`: 0 エラー成功。
+      - 実機ハーネス（`scratch/test_ranger.py`）により、ranger の `draw()` がフリーズせず `DRAW FINISHED` で復帰することを実証。
+      - 本番バイナリ配備: `~/.local/bin/waddle`（リリースビルド完了・配備済み）。
 
 ---
+
+
 
 ## 3. 実施された主要な改善と技術的解決策
 

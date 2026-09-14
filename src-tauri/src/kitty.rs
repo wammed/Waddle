@@ -311,6 +311,74 @@ pub fn read_kitty_file(
     })
 }
 
+/// Reads a temporary file specified by its Base64-encoded path, verifies that it is
+/// strictly inside a system temporary directory, ensures its size does not exceed `max_bytes`,
+/// deletes the file immediately (Kitty protocol `t=t` requirement), and returns its contents
+/// as a Base64-encoded string.
+pub fn read_and_unlink_temp_file_base64(path_b64: &str, max_bytes: usize) -> Result<String, String> {
+    // 1. Decode path from Base64
+    let path_bytes = BASE64_STANDARD
+        .decode(path_b64.trim().as_bytes())
+        .map_err(|e| format!("EBADMSG: Invalid Base64 temporary file path: {}", e))?;
+    let path_str = String::from_utf8(path_bytes)
+        .map_err(|e| format!("EBADMSG: Non-UTF8 temporary file path: {}", e))?;
+    let path_trimmed = path_str.trim();
+
+    // 2. Reject directory traversal patterns
+    if path_trimmed.contains("..") {
+        return Err("EACCES: Directory traversal prohibited in temporary file path".to_string());
+    }
+
+    // 3. Resolve and canonicalize path
+    let raw_target = expand_path(path_trimmed);
+    let target_to_check = if raw_target.is_relative() {
+        std::env::temp_dir().join(&raw_target)
+    } else {
+        raw_target
+    };
+
+    let canonical_target = fs::canonicalize(&target_to_check)
+        .map_err(|e| format!("ENOENT: Temporary file not found or inaccessible: {}", e))?;
+
+    // 4. Strict dangerous system path check
+    if is_dangerous_path(&canonical_target) {
+        return Err("EACCES: Target path is restricted by security policy".to_string());
+    }
+
+    // 5. Enforce that file MUST be inside system temporary directories
+    if !is_in_temp_dir(&canonical_target) {
+        return Err("EACCES: Temporary file (t=t) must reside inside a system temp directory".to_string());
+    }
+
+    // 6. Must be a regular file
+    if !canonical_target.is_file() {
+        return Err("ENOENT: Path is not a regular file".to_string());
+    }
+
+    // 7. Check file size against max_bytes
+    let metadata = fs::metadata(&canonical_target)
+        .map_err(|e| format!("ENOENT: Failed to read temporary file metadata: {}", e))?;
+
+    if metadata.len() as usize > max_bytes {
+        let _ = fs::remove_file(&canonical_target);
+        return Err(format!(
+            "EFBIG: Temporary file size ({} bytes) exceeds maximum allowed payload limit ({} bytes)",
+            metadata.len(),
+            max_bytes
+        ));
+    }
+
+    // 8. Read file contents
+    let bytes = fs::read(&canonical_target)
+        .map_err(|e| format!("EIO: Failed to read temporary file: {}", e))?;
+
+    // 9. Automatically delete temporary file immediately (Kitty protocol t=t spec)
+    let _ = fs::remove_file(&canonical_target);
+
+    // 10. Return Base64 encoded payload
+    Ok(BASE64_STANDARD.encode(&bytes))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -558,4 +626,25 @@ mod tests {
             assert!(!file_path.exists(), "Temporary files in /dev/shm must be unlinked after read!");
         }
     }
+
+    #[test]
+    fn test_read_and_unlink_temp_file_base64() {
+        let temp_dir = std::env::temp_dir();
+        let file_path = temp_dir.join(format!("waddle_test_inlining_{}.bin", std::process::id()));
+        let dummy_data = b"HelloKittyGraphics12345";
+        fs::write(&file_path, dummy_data).unwrap();
+        assert!(file_path.exists());
+
+        let path_b64 = BASE64_STANDARD.encode(file_path.to_str().unwrap().as_bytes());
+        let res = read_and_unlink_temp_file_base64(&path_b64, 1024 * 1024);
+        assert!(res.is_ok(), "Inlining read failed: {:?}", res);
+
+        let data_b64 = res.unwrap();
+        let decoded = BASE64_STANDARD.decode(data_b64.as_bytes()).unwrap();
+        assert_eq!(decoded, dummy_data);
+
+        // File must be deleted!
+        assert!(!file_path.exists(), "Temporary file must be deleted after inlining!");
+    }
 }
+

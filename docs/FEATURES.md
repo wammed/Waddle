@@ -414,12 +414,13 @@ Welcome to the comprehensive feature guide for **Waddle**, the AI-integrated, pr
     - **`timg` (Zero-Config Auto-Detection)**:
       - Responds immediately (0ms) to XTVERSION inquiries (`\x1b[>q` / `\x1b[>0q`) with `\x1bP>|kitty(0.35.0)\x1b\`.
       - Eliminates the need for manual flags (`-p k`), automatically detecting Kitty Graphics capability for plain `timg image.png` invocations.
-    - **`viu` (Zero-Config Auto-Detection)**:
-      - Strictly emits clean DA1 responses (`\x1b[?62c`) without Sixel capabilities (omitting `;4;`), preventing `viuer` from incorrectly prioritizing Sixel over Kitty.
-      - Intercepts and answers Device Status Report (DSR: `\x1b[5n`) with `\x1b[0n` (Terminal OK) in 0ms, enabling instantaneous synchronization.
+    - **`viu` (Zero-Config Auto-Detection & Race-Free Inlining)**:
+      - Strictly emits clean DA1 responses (`\x1b[?62c`) without Sixel capabilities (omitting `;4;`), ensuring `viuer` reliably detects Kitty graphics support.
+      - **PTY-Level Temporary File Inlining (`t=t` -> `t=d`)**: Securely inspects and inlines temporary file payloads (`/tmp/.tty-graphics-protocol.viuer.*`) into Base64 within the PTY reader thread before immediately unlinking them, completely eliminating file deletion race conditions when `viu` exits upon receiving DSR (`\x1b[5n` -> `\x1b[0n`). Prevents `EBADMSG` and terminal prompt pollution.
     - **`yazi`**: Pixel-perfect preview rendering within right pane bounds, zero row-shift overlap, and 100% text display in left/middle panes.
     - **`ranger` (`set preview_images_method kitty`)**:
       - Shell startup environment is set to `TERM=xterm-kitty`, effortlessly satisfying ranger's hardcoded `if 'kitty' not in os.environ['TERM']` check.
+      - **Explicit Image ID `OK` Response Synchronization**: Automatically sends `\x1b_Gi=<id>;OK\x1b\` for draw requests specifying an explicit image ID (`i=<id>`), unblocking ranger's synchronous `self.stdbin.read(1)` wait loop and preventing terminal freeze/hangs.
       - Rigid TUI grid geometry protection prevents unexpected vertical scrolling when rendering previews.
     - **`lf` (External Preview Integration)**:
       - Since `lf` lacks an internal image renderer by design, Kitty Graphics previews are configured via `~/.config/lf/lfrc`:
