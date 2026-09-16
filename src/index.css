@@ -80,6 +80,13 @@ body, html {
   position: relative;
 }
 
+/* Embedded Script Editor Textarea */
+.editor-code-textarea::selection {
+  background: rgba(56, 189, 248, 0.35);
+  color: transparent !important;
+  -webkit-text-fill-color: transparent !important;
+}
+
 .main-content {
   display: flex;
   flex: 1;

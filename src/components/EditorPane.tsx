@@ -863,11 +863,36 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
     }
   };
 
+  // Detected secrets in active tab
+  const detectedSecrets = React.useMemo<SecretRange[]>(() => {
+    if (!activeTab?.content) return [];
+    return findSecretRanges(activeTab.content);
+  }, [activeTab?.content]);
+
   // Syntax highlight for active tab
+  // When secret masking is active, secrets are replaced with SPACES (preserving \n)
+  // so that the syntax highlight layer NEVER renders plain text secrets underneath!
   const highlightedHtml = React.useMemo(() => {
     if (!activeTab) return '';
-    return highlightSyntax(activeTab.content, activeTab.fileName);
-  }, [activeTab?.content, activeTab?.fileName]);
+    let codeToHighlight = activeTab.content;
+    if (isSecretMaskingActive && detectedSecrets.length > 0) {
+      let maskedCode = '';
+      let lastIndex = 0;
+      for (const range of detectedSecrets) {
+        if (range.start > lastIndex) {
+          maskedCode += codeToHighlight.slice(lastIndex, range.start);
+        }
+        const secretSlice = codeToHighlight.slice(range.start, range.end);
+        maskedCode += secretSlice.replace(/[^\n]/g, ' ');
+        lastIndex = range.end;
+      }
+      if (lastIndex < codeToHighlight.length) {
+        maskedCode += codeToHighlight.slice(lastIndex);
+      }
+      codeToHighlight = maskedCode;
+    }
+    return highlightSyntax(codeToHighlight, activeTab.fileName);
+  }, [activeTab?.content, activeTab?.fileName, isSecretMaskingActive, detectedSecrets]);
 
   // Search match highlights overlay
   const searchHighlightHtml = React.useMemo(() => {
@@ -894,12 +919,6 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
     return result;
   }, [isSearchOpen, searchQuery, activeTab?.content, matches, currentMatchIdx]);
 
-  // Detected secrets in active tab
-  const detectedSecrets = React.useMemo<SecretRange[]>(() => {
-    if (!activeTab?.content) return [];
-    return findSecretRanges(activeTab.content);
-  }, [activeTab?.content]);
-
   // Secret mask overlay: preserves newlines and non-secret monospace spacing
   const secretMaskHighlightHtml = React.useMemo(() => {
     if (!activeTab || !isSecretMaskingActive || detectedSecrets.length === 0) return '';
@@ -915,7 +934,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
       }
       const secretSlice = content.slice(range.start, range.end);
       const maskedBullets = secretSlice.replace(/[^\n]/g, '•');
-      result += `<span style="background: #181e2e; color: #f87171; outline: 1px dashed rgba(239, 68, 68, 0.7); border-radius: 2px;">${maskedBullets}</span>`;
+      result += `<span style="background: rgba(239, 68, 68, 0.2); color: #f87171; outline: 1px dashed rgba(239, 68, 68, 0.7); border-radius: 2px;">${maskedBullets}</span>`;
       lastIndex = range.end;
     }
     if (lastIndex < content.length) {
@@ -1480,6 +1499,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
                   pointerEvents: 'none',
                   userSelect: 'none',
                   boxSizing: 'border-box',
+                  zIndex: 1,
                 }}
               />
 
@@ -1504,7 +1524,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
                     pointerEvents: 'none',
                     userSelect: 'none',
                     boxSizing: 'border-box',
-                    zIndex: 0,
+                    zIndex: 2,
                   }}
                 />
               )}
@@ -1529,7 +1549,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
                     pointerEvents: 'none',
                     userSelect: 'none',
                     boxSizing: 'border-box',
-                    zIndex: 0,
+                    zIndex: 3,
                   }}
                 />
               )}
@@ -1537,6 +1557,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
               {/* Text Area */}
               <textarea
                 ref={textareaRef}
+                className="editor-code-textarea"
                 value={activeTab.content}
                 readOnly={activeTab.isReadOnly}
                 onChange={(e) => updateActiveTabContent(e.target.value)}
@@ -1563,7 +1584,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
                   whiteSpace: 'pre',
                   overflow: 'auto',
                   boxSizing: 'border-box',
-                  zIndex: 1,
+                  zIndex: 4,
                   cursor: activeTab.isReadOnly ? 'default' : 'text',
                 }}
                 placeholder={t.editor.textareaPlaceholder}

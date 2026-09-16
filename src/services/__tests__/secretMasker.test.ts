@@ -189,5 +189,34 @@ MIIEowIBAAKCAQEA0Y...
     expect(res.maskedText).toBe(text);
     expect(findSecretRanges(text)).toEqual([]);
   });
+
+  it('guarantees complete zero-bleed secret replacement for editor syntax layer', () => {
+    const code = `const token = "ghp_AbCdEfGhIjKlMnOpQrStUvWxYz0123456789";\nconst key = "sk-proj-1234567890123456789012345678901234567890";`;
+    const ranges = findSecretRanges(code);
+    expect(ranges.length).toBe(2);
+
+    let maskedCode = '';
+    let lastIndex = 0;
+    for (const range of ranges) {
+      if (range.start > lastIndex) {
+        maskedCode += code.slice(lastIndex, range.start);
+      }
+      const secretSlice = code.slice(range.start, range.end);
+      maskedCode += secretSlice.replace(/[^\n]/g, ' ');
+      lastIndex = range.end;
+    }
+    if (lastIndex < code.length) {
+      maskedCode += code.slice(lastIndex);
+    }
+
+    // Length and newlines are preserved 1-to-1
+    expect(maskedCode.length).toBe(code.length);
+    expect(maskedCode.split('\n').length).toBe(code.split('\n').length);
+
+    // Absolutely zero plaintext secret characters remain in masked code
+    expect(maskedCode).not.toContain('ghp_');
+    expect(maskedCode).not.toContain('sk-proj-');
+    expect(maskedCode).toContain('const token = "                                        ";');
+  });
 });
 
