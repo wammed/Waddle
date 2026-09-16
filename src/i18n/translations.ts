@@ -144,6 +144,10 @@ export interface Translations {
     secretsDetected: (count: number) => string;
     maskSecretsTooltip: string;
     unmaskSecretsTooltip: string;
+    secretMaskOn: string;
+    secretMaskOff: string;
+    secretMaskProtected: string;
+    secretMaskExposed: string;
   };
   aiCommand: {
     title: string;
@@ -465,6 +469,10 @@ export const translations: Record<Language, Translations> = {
       secretsDetected: (count: number) => `${count} secret${count > 1 ? 's' : ''} detected`,
       maskSecretsTooltip: 'Mask secrets with bullet overlay',
       unmaskSecretsTooltip: 'Reveal plain-text secrets',
+      secretMaskOn: 'Mask ON',
+      secretMaskOff: 'Mask OFF',
+      secretMaskProtected: 'Protected with visual mask',
+      secretMaskExposed: 'Plain-text exposed',
     },
     aiCommand: {
       title: 'AI Command Assistant',
@@ -787,6 +795,10 @@ export const translations: Record<Language, Translations> = {
       secretsDetected: (count: number) => `${count} secret${count > 1 ? 's' : ''} detected`,
       maskSecretsTooltip: 'Mask secrets with bullet overlay',
       unmaskSecretsTooltip: 'Reveal plain-text secrets',
+      secretMaskOn: 'Mask ON',
+      secretMaskOff: 'Mask OFF',
+      secretMaskProtected: 'Protected with visual mask',
+      secretMaskExposed: 'Plain-text exposed',
     },
     aiCommand: {
       title: 'AI Command Assistant',
@@ -1109,6 +1121,10 @@ export const translations: Record<Language, Translations> = {
       secretsDetected: (count: number) => `${count} 件のシークレットを検知`,
       maskSecretsTooltip: 'シークレットを伏字マスク',
       unmaskSecretsTooltip: 'シークレットを平文表示',
+      secretMaskOn: 'マスク ON',
+      secretMaskOff: 'マスク OFF',
+      secretMaskProtected: '伏字で保護中',
+      secretMaskExposed: '平文表示中・漏洩注意',
     },
     aiCommand: {
       title: 'AI Command Assistant',

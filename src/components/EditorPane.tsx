@@ -956,7 +956,8 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
       tabIndex={-1}
       onKeyDownCapture={handleContainerKeyDownCapture}
       style={{
-        width: '490px',
+        width: '520px',
+        maxWidth: '90vw',
         height: '100%',
         background: 'var(--bg-secondary)',
         borderLeft: '1px solid var(--border)',
@@ -1064,28 +1065,53 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
           background: 'rgba(0, 0, 0, 0.2)',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0 }}>
-          <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--fg-main)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0, overflow: 'hidden' }}>
+          <span
+            style={{
+              fontSize: '13px',
+              fontWeight: 600,
+              color: 'var(--fg-main)',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              maxWidth: '160px',
+            }}
+            title={activeTab?.fileName || t.editor.title}
+          >
             {activeTab?.fileName || t.editor.title}
           </span>
+
+          {activeTab?.isDirty && (
+            <span
+              style={{
+                width: '6px',
+                height: '6px',
+                borderRadius: '50%',
+                background: '#38bdf8',
+                flexShrink: 0,
+              }}
+              title="未保存の変更"
+            />
+          )}
 
           {activeTab?.isReadOnly && (
             <span
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '4px',
-                padding: '2px 6px',
+                gap: '3px',
+                padding: '1px 5px',
                 background: 'rgba(251, 191, 36, 0.15)',
                 border: '1px solid rgba(251, 191, 36, 0.4)',
-                borderRadius: '4px',
-                fontSize: '11px',
+                borderRadius: '3px',
+                fontSize: '10px',
                 fontWeight: 600,
                 color: '#fbbf24',
+                flexShrink: 0,
               }}
               title={activeTab.readOnlyReason || t.editor.readOnlyTooltip}
             >
-              <Lock size={11} />
+              <Lock size={10} />
               <span>{t.editor.readOnlyBadge}</span>
             </span>
           )}
@@ -1098,6 +1124,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
                 background: 'rgba(56, 189, 248, 0.15)',
                 color: '#38bdf8',
                 borderRadius: '3px',
+                flexShrink: 0,
               }}
               title="シンボリックリンク"
             >
@@ -1106,44 +1133,33 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
           )}
 
           {detectedSecrets.length > 0 && (
-            <span
+            <button
+              type="button"
+              onClick={() => setIsSecretMaskingActive((prev) => !prev)}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '4px',
                 padding: '2px 6px',
-                background: 'rgba(239, 68, 68, 0.15)',
-                border: '1px solid rgba(239, 68, 68, 0.4)',
+                background: isSecretMaskingActive ? 'rgba(239, 68, 68, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                border: '1px solid ' + (isSecretMaskingActive ? 'rgba(239, 68, 68, 0.4)' : 'rgba(245, 158, 11, 0.4)'),
                 borderRadius: '4px',
-                fontSize: '11px',
+                fontSize: '10px',
                 fontWeight: 600,
-                color: '#f87171',
+                color: isSecretMaskingActive ? '#f87171' : '#fbbf24',
+                cursor: 'pointer',
+                flexShrink: 0,
               }}
-              title={t.editor.secretsDetected(detectedSecrets.length)}
+              title={isSecretMaskingActive ? t.editor.unmaskSecretsTooltip : t.editor.maskSecretsTooltip}
             >
-              <ShieldAlert size={11} color="#f87171" />
-              <span>{t.editor.secretsDetected(detectedSecrets.length)}</span>
-              <button
-                type="button"
-                onClick={() => setIsSecretMaskingActive((prev) => !prev)}
-                title={isSecretMaskingActive ? t.editor.unmaskSecretsTooltip : t.editor.maskSecretsTooltip}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  background: 'none',
-                  border: 'none',
-                  padding: '0 2px',
-                  cursor: 'pointer',
-                  color: '#f87171',
-                }}
-              >
-                {isSecretMaskingActive ? <EyeOff size={11} /> : <Eye size={11} />}
-              </button>
-            </span>
+              <ShieldAlert size={11} color={isSecretMaskingActive ? '#f87171' : '#fbbf24'} />
+              <span>{detectedSecrets.length}</span>
+              {isSecretMaskingActive ? <EyeOff size={11} /> : <Eye size={11} />}
+            </button>
           )}
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
           {onRichPreview && activeTab && (
             <button
               className="action-btn"
@@ -1276,6 +1292,110 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
           </select>
         )}
       </div>
+
+      {/* Secret Masking Security Banner & Toggle Switch */}
+      {detectedSecrets.length > 0 && (
+        <div
+          style={{
+            padding: '6px 12px',
+            borderBottom: '1px solid ' + (isSecretMaskingActive ? 'rgba(239, 68, 68, 0.3)' : 'rgba(245, 158, 11, 0.4)'),
+            background: isSecretMaskingActive ? 'rgba(239, 68, 68, 0.08)' : 'rgba(245, 158, 11, 0.1)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            fontSize: '11px',
+            flexShrink: 0,
+            gap: '8px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, overflow: 'hidden' }}>
+            <ShieldAlert
+              size={13}
+              color={isSecretMaskingActive ? '#f87171' : '#fbbf24'}
+              style={{ flexShrink: 0 }}
+            />
+            <span
+              style={{
+                fontWeight: 600,
+                color: isSecretMaskingActive ? '#f87171' : '#fbbf24',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {t.editor.secretsDetected(detectedSecrets.length)}
+            </span>
+            <span
+              style={{
+                fontSize: '10px',
+                color: 'var(--fg-dim)',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+            >
+              {isSecretMaskingActive ? `(${t.editor.secretMaskProtected})` : `(⚠️ ${t.editor.secretMaskExposed})`}
+            </span>
+          </div>
+
+          {/* Toggle Switch Component */}
+          <button
+            type="button"
+            role="switch"
+            aria-checked={isSecretMaskingActive}
+            onClick={() => setIsSecretMaskingActive((prev) => !prev)}
+            title={isSecretMaskingActive ? t.editor.unmaskSecretsTooltip : t.editor.maskSecretsTooltip}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              background: 'rgba(0, 0, 0, 0.25)',
+              border: '1px solid ' + (isSecretMaskingActive ? 'rgba(239, 68, 68, 0.4)' : 'rgba(255, 255, 255, 0.15)'),
+              borderRadius: '14px',
+              padding: '2px 8px',
+              cursor: 'pointer',
+              flexShrink: 0,
+              userSelect: 'none',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            <span
+              style={{
+                fontSize: '11px',
+                fontWeight: 600,
+                color: isSecretMaskingActive ? '#f87171' : 'var(--fg-muted)',
+              }}
+            >
+              {isSecretMaskingActive ? t.editor.secretMaskOn : t.editor.secretMaskOff}
+            </span>
+
+            {/* Toggle Track and Knob */}
+            <div
+              style={{
+                width: '32px',
+                height: '18px',
+                borderRadius: '9px',
+                background: isSecretMaskingActive ? '#ef4444' : '#475569',
+                position: 'relative',
+                transition: 'background-color 0.2s ease, box-shadow 0.2s ease',
+                boxShadow: isSecretMaskingActive ? '0 0 6px rgba(239, 68, 68, 0.4)' : 'none',
+              }}
+            >
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '2px',
+                  left: isSecretMaskingActive ? '16px' : '2px',
+                  width: '14px',
+                  height: '14px',
+                  borderRadius: '50%',
+                  background: '#ffffff',
+                  transition: 'left 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.4)',
+                }}
+              />
+            </div>
+          </button>
+        </div>
+      )}
 
       {/* Find & Replace Mini Bar (Ctrl+F / Ctrl+H) */}
       {isSearchOpen && (
