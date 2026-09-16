@@ -18,6 +18,7 @@ import {
   ShieldCheck,
   Zap,
   ClipboardCheck,
+  FileCode,
 } from 'lucide-react';
 import { AppConfig, Language, OllamaStatus } from '../types';
 import { THEMES } from '../theme';
@@ -394,6 +395,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               cache_limit_mb: Math.max(64, Math.min(1024, formData.kitty_graphics.cache_limit_mb || 256)),
             }
           : undefined,
+        editor: {
+          autosave: formData.editor?.autosave ?? true,
+        },
       };
       await TauriApi.saveConfig(sanitizedConfig);
       onSaveConfig(sanitizedConfig);
@@ -1646,6 +1650,62 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <span>{t.settings.kittyAllowedDirWarning}</span>
                 </div>
               )}
+            </div>
+          </div>
+
+          {/* Editor Settings Section */}
+          <div className="settings-section">
+            <div className="section-title">
+              <FileCode size={14} style={{ display: 'inline', marginRight: 6, color: '#38bdf8' }} />
+              {t.settings.editorSectionTitle}
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0' }}>
+              <div style={{ paddingRight: '16px' }}>
+                <div style={{ fontSize: '13px', fontWeight: 600, color: '#f8fafc', marginBottom: '4px' }}>
+                  {t.settings.editorAutosaveLabel}
+                </div>
+                <div style={{ fontSize: '12px', color: '#94a3b8', lineHeight: 1.5 }}>
+                  {t.settings.editorAutosaveDesc}
+                </div>
+              </div>
+              <label className="toggle-switch" style={{ position: 'relative', display: 'inline-block', width: '44px', height: '24px', flexShrink: 0 }}>
+                <input
+                  type="checkbox"
+                  id="toggle-editor-autosave"
+                  checked={formData.editor?.autosave ?? true}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setFormData((prev) => ({
+                      ...prev,
+                      editor: {
+                        ...prev.editor,
+                        autosave: checked,
+                      },
+                    }));
+                  }}
+                  style={{ opacity: 0, width: 0, height: 0 }}
+                />
+                <span style={{
+                  position: 'absolute',
+                  cursor: 'pointer',
+                  top: 0, left: 0, right: 0, bottom: 0,
+                  backgroundColor: (formData.editor?.autosave ?? true) ? 'var(--accent)' : 'rgba(255, 255, 255, 0.2)',
+                  borderRadius: '24px',
+                  transition: '0.2s',
+                }}>
+                  <span style={{
+                    position: 'absolute',
+                    height: '18px',
+                    width: '18px',
+                    left: (formData.editor?.autosave ?? true) ? '23px' : '3px',
+                    bottom: '3px',
+                    backgroundColor: '#fff',
+                    borderRadius: '50%',
+                    transition: '0.2s',
+                  }} />
+                </span>
+              </label>
             </div>
           </div>
 

@@ -1,0 +1,175 @@
+import { describe, it, expect } from 'vitest';
+import {
+  pathToAutosaveFilename,
+  handleTabIndentation,
+  handleAutoClosePair,
+  findExactMatches,
+  replaceSingleMatch,
+  replaceAllExactMatches,
+  EditorHistoryManager,
+} from '../editorService';
+
+describe('editorService', () => {
+  describe('pathToAutosaveFilename', () => {
+    it('escapes slashes to percent characters', () => {
+      const canonical = '/home/user/.config/fish/config.fish';
+      expect(pathToAutosaveFilename(canonical)).toBe('%home%user%.config%fish%config.fish');
+    });
+
+    it('handles root or shallow paths', () => {
+      expect(pathToAutosaveFilename('/etc/hosts')).toBe('%etc%hosts');
+    });
+  });
+
+  describe('handleTabIndentation', () => {
+    it('inserts 4 spaces when no text is selected', () => {
+      const content = 'echo';
+      const res = handleTabIndentation(content, 4, 4, false);
+      expect(res.newContent).toBe('echo    ');
+      expect(res.newStart).toBe(8);
+      expect(res.newEnd).toBe(8);
+    });
+
+    it('indents multiple lines by 4 spaces on Tab', () => {
+      const content = 'line 1\nline 2\nline 3';
+      // select from line 1 to line 2
+      const res = handleTabIndentation(content, 2, 9, false);
+      expect(res.newContent).toBe('    line 1\n    line 2\nline 3');
+    });
+
+    it('unindents multiple lines by up to 4 spaces on Shift+Tab', () => {
+      const content = '    line 1\n  line 2\nline 3';
+      const res = handleTabIndentation(content, 4, 15, true);
+      expect(res.newContent).toBe('line 1\nline 2\nline 3');
+    });
+  });
+
+  describe('handleAutoClosePair', () => {
+    it('auto-inserts closing brackets and positions cursor in-between', () => {
+      const content = 'const a = ';
+      const res = handleAutoClosePair(content, 10, 10, '[');
+      expect(res.handled).toBe(true);
+      expect(res.newContent).toBe('const a = []');
+      expect(res.newStart).toBe(11);
+      expect(res.newEnd).toBe(11);
+    });
+
+    it('auto-inserts closing quotes and positions cursor in-between', () => {
+      const content = 'name: ';
+      const res = handleAutoClosePair(content, 6, 6, '"');
+      expect(res.handled).toBe(true);
+      expect(res.newContent).toBe('name: ""');
+      expect(res.newStart).toBe(7);
+      expect(res.newEnd).toBe(7);
+    });
+
+    it('wraps selected text in brackets', () => {
+      const content = 'foo bar baz';
+      // select "bar" (index 4 to 7)
+      const res = handleAutoClosePair(content, 4, 7, '{');
+      expect(res.handled).toBe(true);
+      expect(res.newContent).toBe('foo {bar} baz');
+      expect(res.newStart).toBe(5);
+      expect(res.newEnd).toBe(8);
+    });
+
+    it('skips inserting duplicate closing character when typed before one', () => {
+      const content = 'const a = []';
+      // cursor is at index 11 (right before ']')
+      const res = handleAutoClosePair(content, 11, 11, ']');
+      expect(res.handled).toBe(true);
+      expect(res.newContent).toBe('const a = []'); // no duplicate
+      expect(res.newStart).toBe(12); // advances past ']'
+    });
+
+    it('returns handled: false for non-bracket characters', () => {
+      const content = 'hello';
+      const res = handleAutoClosePair(content, 2, 2, 'x');
+      expect(res.handled).toBe(false);
+      expect(res.newContent).toBe('hello');
+    });
+  });
+
+  describe('findExactMatches (ReDoS-free)', () => {
+    it('finds exact matches case-insensitively by default', () => {
+      const content = 'Foo bar FOO baz foo';
+      const matches = findExactMatches(content, 'foo', false);
+      expect(matches.length).toBe(3);
+      expect(matches[0]).toEqual({ start: 0, end: 3 });
+      expect(matches[1]).toEqual({ start: 8, end: 11 });
+      expect(matches[2]).toEqual({ start: 16, end: 19 });
+    });
+
+    it('finds exact matches case-sensitively when requested', () => {
+      const content = 'Foo bar FOO baz foo';
+      const matches = findExactMatches(content, 'foo', true);
+      expect(matches.length).toBe(1);
+      expect(matches[0]).toEqual({ start: 16, end: 19 });
+    });
+
+    it('handles special regex characters safely as plain text', () => {
+      const content = 'price is $10.00 (discount? [yes/no]) *.*';
+      const matches = findExactMatches(content, '$10.00 (discount? [yes/no]) *.*', true);
+      expect(matches.length).toBe(1);
+      expect(matches[0].start).toBe(9);
+    });
+
+    it('returns empty array when query is empty', () => {
+      expect(findExactMatches('sample text', '', false)).toEqual([]);
+    });
+  });
+
+  describe('replaceSingleMatch and replaceAllExactMatches', () => {
+    it('replaces a single match and returns updated cursor position', () => {
+      const content = 'Hello world, hello everyone';
+      const match = { start: 6, end: 11 }; // "world"
+      const res = replaceSingleMatch(content, match, 'Waddle');
+      expect(res.newContent).toBe('Hello Waddle, hello everyone');
+      expect(res.nextCursor).toBe(12);
+    });
+
+    it('replaces all matches correctly', () => {
+      const content = 'apple orange apple banana APPLE';
+      const res = replaceAllExactMatches(content, 'apple', 'pear', false);
+      expect(res.count).toBe(3);
+      expect(res.newContent).toBe('pear orange pear banana pear');
+    });
+  });
+
+  describe('EditorHistoryManager (Undo/Redo)', () => {
+    it('manages undo and redo states with bounded history', () => {
+      const history = new EditorHistoryManager('v1', 5);
+      expect(history.canUndo()).toBe(false);
+      expect(history.canRedo()).toBe(false);
+
+      history.push('v2');
+      history.push('v3');
+      expect(history.canUndo()).toBe(true);
+
+      const undov2 = history.undo('v3');
+      expect(undov2).toBe('v2');
+      expect(history.canRedo()).toBe(true);
+
+      const undov1 = history.undo('v2');
+      expect(undov1).toBe('v1');
+      expect(history.canUndo()).toBe(false);
+
+      const redov2 = history.redo();
+      expect(redov2).toBe('v2');
+
+      const redov3 = history.redo();
+      expect(redov3).toBe('v3');
+      expect(history.canRedo()).toBe(false);
+    });
+
+    it('clears redo stack upon new push', () => {
+      const history = new EditorHistoryManager('v1');
+      history.push('v2');
+      history.undo('v2');
+      expect(history.canRedo()).toBe(true);
+
+      history.push('v2_branch');
+      expect(history.canRedo()).toBe(false);
+    });
+  });
+});

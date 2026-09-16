@@ -27,11 +27,19 @@ describe('translations', () => {
     }
   });
 
-  it('has matching common keys across all languages', () => {
-    const enCommonKeys = Object.keys(translations['en-US'].common).sort();
+  it('has matching sub-keys in editor category across all languages', () => {
+    const enEditorKeys = Object.keys(translations['en-US'].editor).sort();
     for (const lang of languages) {
-      const keys = Object.keys(translations[lang].common).sort();
-      expect(keys).toEqual(enCommonKeys);
+      const keys = Object.keys(translations[lang].editor).sort();
+      expect(keys).toEqual(enEditorKeys);
+    }
+  });
+
+  it('has matching sub-keys in settings category across all languages', () => {
+    const enSettingsKeys = Object.keys(translations['en-US'].settings).sort();
+    for (const lang of languages) {
+      const keys = Object.keys(translations[lang].settings).sort();
+      expect(keys).toEqual(enSettingsKeys);
     }
   });
 });

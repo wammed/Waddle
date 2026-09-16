@@ -53,12 +53,53 @@ export interface KittyGraphicsConfig {
   allowed_dir: string;
 }
 
+export interface EditorConfig {
+  autosave: boolean;
+}
+
 export interface AppConfig {
   general?: GeneralConfig;
   ai: AiConfig;
   terminal: TerminalConfig;
   git?: GitConfig;
   kitty_graphics?: KittyGraphicsConfig;
+  editor?: EditorConfig;
+}
+
+export interface EditorOpenResult {
+  content: string;
+  original_path: string;
+  canonical_path: string;
+  is_symlink: boolean;
+  is_readonly: boolean;
+  readonly_reason?: string | null;
+  has_autosave: boolean;
+  autosave_content?: string | null;
+  autosave_timestamp?: number | null;
+}
+
+export interface EditorSaveResult {
+  saved_path: string;
+  is_symlink: boolean;
+  message?: string | null;
+}
+
+export interface EditorTab {
+  id: string;
+  filePath: string;
+  canonicalPath: string;
+  fileName: string;
+  content: string;
+  savedContent: string;
+  isDirty: boolean;
+  isReadOnly: boolean;
+  readOnlyReason?: string | null;
+  isSymlink: boolean;
+  undoStack: string[];
+  redoStack: string[];
+  cursorPosition: number;
+  scrollTop: number;
+  scrollLeft: number;
 }
 
 export interface OllamaStatus {

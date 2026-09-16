@@ -859,6 +859,47 @@ npm run tauri dev
       - **Rust 静的解析**: `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets` -> 警告・エラー 0 件。
       - **本番リリースビルド & 配備**: `cargo build --manifest-path src-tauri/Cargo.toml --release`（24.25s）完了、`install -m 755 target/release/waddle ~/.local/bin/waddle` により本番バイナリ配備完了。
 
+41. **Waddle 内蔵コードエディタ（Ctrl+E）機能強化・多層防御セキュリティ堅牢化**:
+    - **背景と目的**:
+      - Linux 設定ファイル（TOML, YAML, Conf等）の編集用途に特化した機能強化と多層防御セキュリティの堅牢化。
+      - Monaco Editor などの重量級ライブラリを採用せず、既存の「Prism.js 着色 `<pre>` ＋ 透明 `<textarea>`（`-webkit-text-fill-color: transparent !important;`）」による超軽量デュアルレイヤー構成を 100% 維持。
+    - **改修内容と解決アプローチ**:
+      1. **セキュリティ & 権限境界（完全非特権・安全最優先）**:
+         - **編集可能スコープ制限**: 実体パス（`std::fs::canonicalize`）が `$HOME` 配下、かつファイルの所有者 UID がプロセスの実効 UID（`$USER`）と完全一致する場合のみ編集・保存を許可。
+         - **root 権限の排除**: エディタからの `sudo` / `pkexec` 等の特権昇格操作を完全禁止。
+         - **強制 Read-Only モード**: `$HOME` 外、他ユーザー所有、またはファイルシステム書き込み権限不足（モード等）の場合は強制的に Read-Only モードとし、オレンジ色の `[Read Only]` バッジを表示して保存を物理遮断。
+         - **シンボリックリンク防御**: リンク先が `$HOME` 内の実体ファイルである場合は実体へ安全にアトミック保存しトーストで通知。実体が `$HOME` 外を指す場合はパストラバーサル脱出とみなし保存をブロックして Read-Only を強制。
+      2. **マルチタブ管理（最大 5 タブ） & 遅延描画**:
+         - **ハードリミット**: 最大 5 タブ上限管理（6個目を開こうとした場合は上限警告ダイアログを表示しブロック）。
+         - **Lazy Tab Rendering**: アクティブなタブのみ DOM 上に `<pre>` と `<textarea>` をレンダリング。非アクティブなタブはメモリ状態（`EditorTab`）として保持し、DOM 要素数を最小化して高速性を維持。
+         - **オープン前検査**: 5MB 超過ファイルおよび先頭 1KB 内の Null バイト（`\0`）検出によるバイナリファイルのオープンを拒否。
+      3. **テキスト編集 UX 向上**:
+         - **ソフトタブ（4 スペース）**: Tab で 4 スペース挿入。複数行選択時の Tab（インデント） / Shift+Tab（アンインデント）完全対応。
+         - **通常 Enter**: 余計なオートインデントを行わず標準的な改行のみを実行。
+         - **括弧・クォートの自動補完・ラッピング**: `[`, `{`, `(`, `"`, `'` のペア自動挿入、閉じ括弧オーバースキップ、Backspace での空ペア一括削除、選択範囲の囲み（Wrap selection）に対応。
+      4. **状態保護 & ReDoS-free 安全検索・置換**:
+         - **自己完結型 Undo / Redo**: ブラウザ標準の textarea undo に依存せず、400ms デバウンスマージおよび最大 100 履歴を保持する専用 UndoManager を各タブごとに独立実装。
+         - **ReDoS 脆弱性の根絶**: 正規表現エンジンを一切使用せず、純粋な文字列走査（`indexOf` と `slice`）によるプレーンテキスト完全一致検索（`Ctrl+F`）および一括置換（`Ctrl+H`）を実装。
+      5. **自動保存キャッシュ & クラッシュリカバリ**:
+         - **専用キャッシュディレクトリ**: `~/.cache/waddle/autosave/`（パーミッション `0700`、ファイルパスを `%` エスケープ）。
+         - **120 秒タイマー**: 設定画面で On/Off 切替可能（デフォルト有効）。変更検知時のみバックグラウンドでキャッシュ保存。
+         - **アトミック保存とキャッシュ削除**: 保存成功時にキャッシュを自動クリーンアップ。未保存キャッシュが存在するファイルを開いた際はクラッシュリカバリモーダルを提示。
+      6. **フォーカス排他ショートカット & モーダル保護**:
+         - エディタコンテナ（`tabIndex={-1}`）の `onKeyDownCapture` により、`Ctrl+F`, `Ctrl+H`, `Ctrl+S`, `Esc`, `Ctrl+Z`, `Ctrl+Y` を優先捕捉し `e.stopPropagation()`。
+         - グローバルショートカット `Ctrl+W`（ターミナルタブ閉じる）がエディタフォーカス時に誤爆しないよう `.editor-container` 内フォーカス判定を追加。
+         - 未保存変更があるタブを閉じる際は破棄確認モーダルを提示。
+      7. **バックエンド `editor_ops.rs` モジュール分離 & コマンド登録**:
+         - `editor_open_file`, `editor_save_file`, `editor_save_autosave`, `editor_remove_autosave` を独立モジュール `src-tauri/src/editor_ops.rs` に実装。単体テスト 7 件を包含。
+      8. **フロントエンド自動テスト拡充**:
+         - `src/services/__tests__/editorService.test.ts` 新設（18件テスト全パス）。
+         - `src/i18n/__tests__/translations.test.ts` 拡張（全言語の editor / settings サブキー完全一致検証）。
+    - **検証エビデンス**:
+      - **フロントエンド自動テスト**: `npm test` -> 7 ファイル全 46 テスト 100% PASS (184ms)。
+      - **フロントエンドビルド**: `npm run build` -> TypeScript 型検査 0 エラー、Vite バンドル正常完了 (2.19s)。
+      - **Rust バックエンド単体テスト**: `cargo test --manifest-path src-tauri/Cargo.toml` -> 全 53 テスト 100% PASS。
+      - **Rust 静的解析**: `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets` -> 警告・エラー 0 件。
+      - **本番リリースビルド & 配備**: `cargo build --manifest-path src-tauri/Cargo.toml --release` 完了、`install -m 755 target/release/waddle ~/.local/bin/waddle` により本番バイナリ配備完了。
+
 ---
 
 ## 6. 次回再開時の検討・作業候補（Next Steps）
@@ -867,8 +908,8 @@ npm run tauri dev
    - ファイルやフォルダを別のディレクトリへドラッグして移動する操作の追加。
 2. **GitHub Issue / PR 参照連携**:
    - GitHub 限定ポリシーの枠組みの中で、GitHub CLI (`gh`) または GitHub API 経由でカレントブランチに関連する Issue や PR の簡易ステータスを表示する拡張。
-3. **エディタペインのタブ化**:
-   - 複数ファイルを同時に開いて切り替えられるタブ型エディタへの発展。
+3. **エディタ差分プレビュー（Git Diff 連携）**:
+   - カレントブランチ・コミットに対するエディタ内の変更差分（インライン diff）プレビュー表示。
 
 ---
 

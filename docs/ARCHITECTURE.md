@@ -274,15 +274,28 @@ Waddle is built on a hybrid architecture combining a high-performance **Rust bac
 
 ---
 
-### 6. File System & Embedded Editor Subsystem
+### 6. File System & Hardened Embedded Editor Subsystem
 
 - **Bounded Directory Listing & Pagination (`read_directory`)**:
   - `read_directory(path, show_hidden, limit)` returns `DirectoryListing { entries, total_count, has_more }`.
   - Enforces a safe default ceiling of 500 entries, preventing WebKitGTK DOM memory bloat on massive trees (`node_modules`, `/usr/bin`).
   - Client can request dynamic on-demand expansion (+500 items) via interactive `[+] Load more...` button.
-- **Dual-Layer Syntax Highlighting Architecture**:
-  - Overlay design with background `<pre>` Prism.js tokenized markup and foreground transparent editable `<textarea>` (`-webkit-text-fill-color: transparent !important;`).
-  - Delivers zero-latency native typing while rendering synchronized syntax colors across 15+ programming languages without complex rich text engines.
+- **Multi-Tab Architecture & Lazy Tab Rendering**:
+  - State manages up to 5 concurrent `EditorTab` instances (`MAX_TABS = 5`).
+  - Active tab only mounts the DOM (`<textarea>` + Prism `<pre>`), saving cursor position and scroll offsets before switching tabs.
+- **Multi-Layer Non-Privileged Security Boundary (`editor_ops.rs`)**:
+  - `editor_open_file` & `editor_save_file` enforce strict security guards:
+    - Root execution (`libc::geteuid() == 0`) strictly denied.
+    - Path canonicalization (`std::fs::canonicalize`) to verify real physical target.
+    - Physical target must be under `$HOME` and file owner UID (`MetadataExt::uid()`) must match process effective UID (`$USER`).
+    - Symlinks pointing outside `$HOME` are detected as path traversal escapes and forced into Read-Only mode.
+    - Pre-open 5MB ceiling and initial 1KB null-byte binary probe.
+- **Dedicated AutoSave Cache Aggregation (`~/.cache/waddle/autosave/`)**:
+  - Dirty tabs trigger a 120-second background write to `~/.cache/waddle/autosave/` (directory permission `0700`, file permission `0600`).
+  - Target paths are escaped (`/` -> `%`, e.g., `%home%user%.config%fish%config.fish`), keeping git repositories untouched.
+  - Clean saves atomically update real files (`.tmp` write -> mode restore -> `rename`) and remove the cache file.
+- **Focus-Exclusive Shortcut Isolation**:
+  - Container element (`tabIndex={-1}`) intercepts keystrokes via `onKeyDownCapture` and `e.stopPropagation()`, isolating editor-specific shortcuts (`Ctrl+F`, `Ctrl+H`, `Ctrl+S`, `Esc`, `Ctrl+Z`, `Ctrl+Y`) from global terminal bindings.
 
 ---
 

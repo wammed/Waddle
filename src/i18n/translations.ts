@@ -119,6 +119,28 @@ export interface Translations {
     aiModalTitle: string;
     aiPromptPlaceholder: string;
     applyAiEdit: string;
+    readOnlyBadge: string;
+    readOnlyTooltip: string;
+    find: string;
+    replace: string;
+    replaceAll: string;
+    findPlaceholder: string;
+    replacePlaceholder: string;
+    matchCase: string;
+    previousMatch: string;
+    nextMatch: string;
+    closeSearch: string;
+    noMatches: string;
+    maxTabsExceeded: string;
+    unsavedTitle: string;
+    unsavedMessage: string;
+    discardAndClose: string;
+    recoveryTitle: string;
+    recoveryMessage: string;
+    restoreBackup: string;
+    discardBackup: string;
+    newTab: string;
+    closeTab: string;
   };
   aiCommand: {
     title: string;
@@ -270,6 +292,9 @@ export interface Translations {
     testPlanCardTitle: string;
     testPlanCardDesc: string;
     testPlanBtn: string;
+    editorSectionTitle: string;
+    editorAutosaveLabel: string;
+    editorAutosaveDesc: string;
   };
   errorBoundary: {
     fallbackTitle: string;
@@ -412,6 +437,28 @@ export const translations: Record<Language, Translations> = {
       aiModalTitle: 'Ollama AI Code Assistant',
       aiPromptPlaceholder: 'Enter instructions for code (e.g., add error handling, refactor to async, add comments)',
       applyAiEdit: 'Apply AI Edit',
+      readOnlyBadge: 'Read-Only',
+      readOnlyTooltip: 'This file is opened in Read-Only mode',
+      find: 'Find',
+      replace: 'Replace',
+      replaceAll: 'Replace All',
+      findPlaceholder: 'Find (exact match)...',
+      replacePlaceholder: 'Replace with...',
+      matchCase: 'Match Case',
+      previousMatch: 'Previous Match (Shift+Enter)',
+      nextMatch: 'Next Match (Enter)',
+      closeSearch: 'Close Search (Esc)',
+      noMatches: 'No matches',
+      maxTabsExceeded: 'You can only open up to 5 tabs. Please close unused tabs before opening more.',
+      unsavedTitle: 'Unsaved Changes',
+      unsavedMessage: 'There are unsaved changes. Discard and close?',
+      discardAndClose: 'Discard and Close',
+      recoveryTitle: 'Unsaved Backup Found',
+      recoveryMessage: 'An unsaved backup from a previous session was found. Would you like to restore it?',
+      restoreBackup: 'Restore',
+      discardBackup: 'Discard',
+      newTab: 'New File',
+      closeTab: 'Close Tab',
     },
     aiCommand: {
       title: 'AI Command Assistant',
@@ -565,6 +612,9 @@ export const translations: Record<Language, Translations> = {
       testPlanCardTitle: 'Interactive Test Verification Form',
       testPlanCardDesc: 'Run, verify, and document all 81 automated and manual test cases covering PTY, splits, AI, Git, Kitty Graphics, and security controls.',
       testPlanBtn: 'Open Test Form',
+      editorSectionTitle: 'Editor Settings',
+      editorAutosaveLabel: 'Auto-backup (AutoSave)',
+      editorAutosaveDesc: 'Automatically backup uncommitted changes to ~/.cache/waddle/autosave/ every 120 seconds',
     },
     errorBoundary: {
       fallbackTitle: 'An error occurred in the component',
@@ -706,6 +756,28 @@ export const translations: Record<Language, Translations> = {
       aiModalTitle: 'Ollama AI Code Assistant',
       aiPromptPlaceholder: 'Enter instructions for code (e.g. add error handling, refactor to async, add comments)',
       applyAiEdit: 'Apply AI Edit',
+      readOnlyBadge: 'Read-Only',
+      readOnlyTooltip: 'This file is opened in Read-Only mode',
+      find: 'Find',
+      replace: 'Replace',
+      replaceAll: 'Replace All',
+      findPlaceholder: 'Find (exact match)...',
+      replacePlaceholder: 'Replace with...',
+      matchCase: 'Match Case',
+      previousMatch: 'Previous Match (Shift+Enter)',
+      nextMatch: 'Next Match (Enter)',
+      closeSearch: 'Close Search (Esc)',
+      noMatches: 'No matches',
+      maxTabsExceeded: 'You can only open up to 5 tabs. Please close unused tabs before opening more.',
+      unsavedTitle: 'Unsaved Changes',
+      unsavedMessage: 'There are unsaved changes. Discard and close?',
+      discardAndClose: 'Discard and Close',
+      recoveryTitle: 'Unsaved Backup Found',
+      recoveryMessage: 'An unsaved backup from a previous session was found. Would you like to restore it?',
+      restoreBackup: 'Restore',
+      discardBackup: 'Discard',
+      newTab: 'New File',
+      closeTab: 'Close Tab',
     },
     aiCommand: {
       title: 'AI Command Assistant',
@@ -859,6 +931,9 @@ export const translations: Record<Language, Translations> = {
       testPlanCardTitle: 'Interactive Test Verification Form',
       testPlanCardDesc: 'Run, verify, and document all 81 automated and manual test cases covering PTY, splits, AI, Git, Kitty Graphics, and security controls.',
       testPlanBtn: 'Open Test Form',
+      editorSectionTitle: 'Editor Settings',
+      editorAutosaveLabel: 'Auto-backup (AutoSave)',
+      editorAutosaveDesc: 'Automatically backup uncommitted changes to ~/.cache/waddle/autosave/ every 120 seconds',
     },
     errorBoundary: {
       fallbackTitle: 'An error occurred in the component',
@@ -1000,6 +1075,28 @@ export const translations: Record<Language, Translations> = {
       aiModalTitle: 'Ollama AI Code Assistant',
       aiPromptPlaceholder: 'コードへの指示を入力 (例: エラーハンドリングを追加して, 非同期処理にリファクタリングして, コメントを追加して)',
       applyAiEdit: 'AIで編集を適用',
+      readOnlyBadge: 'Read-Only',
+      readOnlyTooltip: 'このファイルは閲覧専用（Read-Only）です',
+      find: '検索',
+      replace: '置換',
+      replaceAll: 'すべて置換',
+      findPlaceholder: '完全一致検索...',
+      replacePlaceholder: '置換後の文字列...',
+      matchCase: '大文字/小文字を区別',
+      previousMatch: '前の一致 (Shift+Enter)',
+      nextMatch: '次の一致 (Enter)',
+      closeSearch: '検索バーを閉じる (Esc)',
+      noMatches: '一致なし',
+      maxTabsExceeded: '一度に開けるタブは最大 5 件までです。不要なタブを閉じてから再度お試しください。',
+      unsavedTitle: '未保存の変更',
+      unsavedMessage: '保存されていない変更があります。破棄して閉じますか？',
+      discardAndClose: '破棄して閉じる',
+      recoveryTitle: 'リカバリ検知',
+      recoveryMessage: '前回の未保存バックアップデータが見つかりました。復元しますか？',
+      restoreBackup: '復元する',
+      discardBackup: '破棄する',
+      newTab: '新規ファイル',
+      closeTab: 'タブを閉じる',
     },
     aiCommand: {
       title: 'AI Command Assistant',
@@ -1153,6 +1250,9 @@ export const translations: Record<Language, Translations> = {
       testPlanCardTitle: '包括的検証テスト入力フォーム',
       testPlanCardDesc: 'PTY基盤、画面分割、AI、Git、Kitty画像プロトコル、セキュリティ多層防御など全81項目のテストケースの合否判定とエビデンス記録・レポート出力を行えます。',
       testPlanBtn: 'テスト入力フォームを開く',
+      editorSectionTitle: 'エディタ設定',
+      editorAutosaveLabel: 'エディタの自動バックアップ（AutoSave）',
+      editorAutosaveDesc: '未保存の変更を 120 秒ごとに ~/.cache/waddle/autosave/ へ自動退避します',
     },
     errorBoundary: {
       fallbackTitle: 'コンポーネントでエラーが発生しました',

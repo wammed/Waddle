@@ -1,0 +1,283 @@
+/**
+ * Editor service utilities for soft tabs, quote/bracket auto-pairing,
+ * plain-text (ReDoS-free) exact search/replace, autosave filename mapping,
+ * and Undo/Redo history tracking.
+ */
+
+export const SOFT_TAB = '    '; // 4 spaces
+
+export function pathToAutosaveFilename(canonicalPath: string): string {
+  return canonicalPath.replace(/\//g, '%');
+}
+
+/**
+ * Handle Tab and Shift+Tab key indentation.
+ * - Soft tab: 4 spaces.
+ * - Single-line without selection: insert 4 spaces at cursor.
+ * - Multi-line selection: indent/unindent all selected lines by up to 4 spaces.
+ */
+export function handleTabIndentation(
+  content: string,
+  selectionStart: number,
+  selectionEnd: number,
+  isShift: boolean
+): { newContent: string; newStart: number; newEnd: number } {
+  if (!isShift) {
+    // Tab (Indent)
+    if (selectionStart === selectionEnd) {
+      // Single cursor: insert 4 spaces
+      const newContent =
+        content.slice(0, selectionStart) + SOFT_TAB + content.slice(selectionEnd);
+      const newPos = selectionStart + SOFT_TAB.length;
+      return { newContent, newStart: newPos, newEnd: newPos };
+    } else {
+      // Range selection: find lines to indent
+      const lineStart = content.lastIndexOf('\n', selectionStart - 1) + 1;
+      let lineEnd = content.indexOf('\n', selectionEnd);
+      if (lineEnd === -1) lineEnd = content.length;
+
+      const selectedBlock = content.slice(lineStart, lineEnd);
+      const lines = selectedBlock.split('\n');
+      const indentedLines = lines.map((l) => SOFT_TAB + l);
+      const newBlock = indentedLines.join('\n');
+
+      const newContent =
+        content.slice(0, lineStart) + newBlock + content.slice(lineEnd);
+      const addedChars = SOFT_TAB.length * lines.length;
+
+      return {
+        newContent,
+        newStart: selectionStart + SOFT_TAB.length,
+        newEnd: selectionEnd + addedChars,
+      };
+    }
+  } else {
+    // Shift+Tab (Unindent)
+    const lineStart = content.lastIndexOf('\n', selectionStart - 1) + 1;
+    let lineEnd = content.indexOf('\n', selectionEnd);
+    if (lineEnd === -1) lineEnd = content.length;
+
+    const selectedBlock = content.slice(lineStart, lineEnd);
+    const lines = selectedBlock.split('\n');
+    let removedCharsTotal = 0;
+    let firstLineRemoved = 0;
+
+    const unindentedLines = lines.map((line, idx) => {
+      let removeCount = 0;
+      for (let i = 0; i < Math.min(SOFT_TAB.length, line.length); i++) {
+        if (line[i] === ' ') {
+          removeCount++;
+        } else {
+          break;
+        }
+      }
+      removedCharsTotal += removeCount;
+      if (idx === 0) firstLineRemoved = removeCount;
+      return line.slice(removeCount);
+    });
+
+    const newBlock = unindentedLines.join('\n');
+    const newContent =
+      content.slice(0, lineStart) + newBlock + content.slice(lineEnd);
+
+    return {
+      newContent,
+      newStart: Math.max(lineStart, selectionStart - firstLineRemoved),
+      newEnd: Math.max(lineStart, selectionEnd - removedCharsTotal),
+    };
+  }
+}
+
+/**
+ * Auto-close brackets and quotes, with selection wrapping.
+ * Supported: [, {, (, ", '
+ */
+const PAIRS: Record<string, string> = {
+  '[': ']',
+  '{': '}',
+  '(': ')',
+  '"': '"',
+  "'": "'",
+};
+
+const CLOSING_CHARS = new Set([']', '}', ')', '"', "'"]);
+
+export function handleAutoClosePair(
+  content: string,
+  selectionStart: number,
+  selectionEnd: number,
+  char: string
+): { newContent: string; newStart: number; newEnd: number; handled: boolean } {
+  // Check if user is typing closing character directly before an identical closing character
+  if (selectionStart === selectionEnd && CLOSING_CHARS.has(char)) {
+    if (content[selectionStart] === char) {
+      // Skip inserting duplicate closing character, advance cursor
+      return {
+        newContent: content,
+        newStart: selectionStart + 1,
+        newEnd: selectionStart + 1,
+        handled: true,
+      };
+    }
+  }
+
+  const matchingClose = PAIRS[char];
+  if (!matchingClose) {
+    return { newContent: content, newStart: selectionStart, newEnd: selectionEnd, handled: false };
+  }
+
+  if (selectionStart !== selectionEnd) {
+    // Wrap selection
+    const selectedText = content.slice(selectionStart, selectionEnd);
+    const newContent =
+      content.slice(0, selectionStart) +
+      char +
+      selectedText +
+      matchingClose +
+      content.slice(selectionEnd);
+    return {
+      newContent,
+      newStart: selectionStart + 1,
+      newEnd: selectionEnd + 1,
+      handled: true,
+    };
+  } else {
+    // Insert pair and place cursor between them
+    const newContent =
+      content.slice(0, selectionStart) + char + matchingClose + content.slice(selectionEnd);
+    return {
+      newContent,
+      newStart: selectionStart + 1,
+      newEnd: selectionStart + 1,
+      handled: true,
+    };
+  }
+}
+
+export interface TextMatch {
+  start: number;
+  end: number;
+}
+
+/**
+ * Plain-text exact string matching (ReDoS 0% risk).
+ * Completely avoids regular expressions.
+ */
+export function findExactMatches(
+  content: string,
+  query: string,
+  caseSensitive = false
+): TextMatch[] {
+  if (!query || !content) return [];
+
+  const matches: TextMatch[] = [];
+  const src = caseSensitive ? content : content.toLowerCase();
+  const q = caseSensitive ? query : query.toLowerCase();
+  const qLen = q.length;
+
+  let idx = 0;
+  while (idx <= src.length - qLen) {
+    const found = src.indexOf(q, idx);
+    if (found === -1) break;
+    matches.push({ start: found, end: found + qLen });
+    idx = found + Math.max(1, qLen);
+  }
+
+  return matches;
+}
+
+/**
+ * Replace single match in content.
+ */
+export function replaceSingleMatch(
+  content: string,
+  match: TextMatch,
+  replacement: string
+): { newContent: string; nextCursor: number } {
+  const newContent =
+    content.slice(0, match.start) + replacement + content.slice(match.end);
+  const nextCursor = match.start + replacement.length;
+  return { newContent, nextCursor };
+}
+
+/**
+ * Replace all exact matches in content without Regex.
+ */
+export function replaceAllExactMatches(
+  content: string,
+  query: string,
+  replacement: string,
+  caseSensitive = false
+): { newContent: string; count: number } {
+  if (!query || !content) return { newContent: content, count: 0 };
+
+  const matches = findExactMatches(content, query, caseSensitive);
+  if (matches.length === 0) return { newContent: content, count: 0 };
+
+  let result = '';
+  let lastIndex = 0;
+
+  for (const m of matches) {
+    result += content.slice(lastIndex, m.start) + replacement;
+    lastIndex = m.end;
+  }
+  result += content.slice(lastIndex);
+
+  return { newContent: result, count: matches.length };
+}
+
+/**
+ * Self-contained Undo/Redo stack manager with bounded history.
+ */
+export class EditorHistoryManager {
+  private undoStack: string[] = [];
+  private redoStack: string[] = [];
+  private maxHistory: number;
+
+  constructor(initialContent = '', maxHistory = 100) {
+    this.maxHistory = maxHistory;
+    this.undoStack = [initialContent];
+  }
+
+  push(content: string): void {
+    const last = this.undoStack[this.undoStack.length - 1];
+    if (last === content) return;
+
+    this.undoStack.push(content);
+    if (this.undoStack.length > this.maxHistory) {
+      this.undoStack.shift();
+    }
+    this.redoStack = []; // clear redo on new change
+  }
+
+  canUndo(): boolean {
+    return this.undoStack.length > 1;
+  }
+
+  canRedo(): boolean {
+    return this.redoStack.length > 0;
+  }
+
+  undo(currentContent: string): string | null {
+    if (!this.canUndo()) return null;
+
+    const current = this.undoStack.pop()!;
+    this.redoStack.push(currentContent === current ? current : currentContent);
+
+    const previous = this.undoStack[this.undoStack.length - 1];
+    return previous;
+  }
+
+  redo(): string | null {
+    if (!this.canRedo()) return null;
+
+    const next = this.redoStack.pop()!;
+    this.undoStack.push(next);
+    return next;
+  }
+
+  reset(initialContent: string): void {
+    this.undoStack = [initialContent];
+    this.redoStack = [];
+  }
+}

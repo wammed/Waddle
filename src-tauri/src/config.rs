@@ -171,6 +171,24 @@ impl Default for KittyGraphicsConfig {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct EditorConfig {
+    #[serde(default = "default_editor_autosave")]
+    pub autosave: bool,
+}
+
+fn default_editor_autosave() -> bool {
+    true
+}
+
+impl Default for EditorConfig {
+    fn default() -> Self {
+        Self {
+            autosave: default_editor_autosave(),
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct AppConfig {
     #[serde(default)]
@@ -181,6 +199,8 @@ pub struct AppConfig {
     pub git: GitIntegrationConfig,
     #[serde(default)]
     pub kitty_graphics: KittyGraphicsConfig,
+    #[serde(default)]
+    pub editor: EditorConfig,
 }
 
 pub struct ConfigManager {

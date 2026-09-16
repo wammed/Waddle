@@ -13,6 +13,8 @@ import {
   SystemInfo,
   TerminalContext,
   ProjectRulesInfo,
+  EditorOpenResult,
+  EditorSaveResult,
 } from '../types';
 
 export const isTauri = () => {
@@ -223,6 +225,44 @@ export const TauriApi = {
   async writeFile(path: string, content: string): Promise<void> {
     if (!isTauri()) return;
     return await invoke('write_file', { path, content });
+  },
+
+  async editorOpenFile(path: string): Promise<EditorOpenResult> {
+    if (!isTauri()) {
+      return {
+        content: `# Mock File\necho "Hello from Waddle!"\n`,
+        original_path: path,
+        canonical_path: path,
+        is_symlink: false,
+        is_readonly: false,
+        readonly_reason: null,
+        has_autosave: false,
+        autosave_content: null,
+        autosave_timestamp: null,
+      };
+    }
+    return await invoke<EditorOpenResult>('editor_open_file', { path });
+  },
+
+  async editorSaveFile(path: string, content: string): Promise<EditorSaveResult> {
+    if (!isTauri()) {
+      return {
+        saved_path: path,
+        is_symlink: false,
+        message: null,
+      };
+    }
+    return await invoke<EditorSaveResult>('editor_save_file', { path, content });
+  },
+
+  async editorSaveAutosave(path: string, content: string): Promise<void> {
+    if (!isTauri()) return;
+    return await invoke('editor_save_autosave', { path, content });
+  },
+
+  async editorRemoveAutosave(path: string): Promise<void> {
+    if (!isTauri()) return;
+    return await invoke('editor_remove_autosave', { path });
   },
 
   async readDirectory(path: string, showHidden = false, limit?: number): Promise<DirectoryListing> {

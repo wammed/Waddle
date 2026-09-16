@@ -1,5 +1,6 @@
 pub mod ai;
 pub mod config;
+pub mod editor_ops;
 pub mod fs_ops;
 pub mod git_ops;
 pub mod kitty;
@@ -13,6 +14,7 @@ use config::ConfigManager;
 use pty::{PtyManager, PtySessionInfo};
 use tauri::{AppHandle, State};
 
+pub use editor_ops::*;
 pub use fs_ops::{
     create_directory, create_file, delete_entry, read_directory, read_file, rename_entry,
     reveal_in_file_manager, write_file, DirectoryListing, FileEntry,
@@ -272,6 +274,10 @@ pub fn run() {
             get_system_info,
             kitty_read_file,
             log_kitty_debug,
+            editor_open_file,
+            editor_save_file,
+            editor_save_autosave,
+            editor_remove_autosave,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Waddle terminal application");

@@ -103,20 +103,43 @@ Welcome to the comprehensive feature guide for **Waddle**, the AI-integrated, pr
 
 ---
 
-### 4. 📝 Embedded Lightweight Code Editor & AI Code Assistant (`Ctrl + E`)
+### 4. 📝 Hardened Embedded Code Editor & Multi-Tab Workspace (`Ctrl + E`)
 
-- **Embedded Split Workspace**:
-  - Toggles a side-by-side editing canvas directly within Waddle without switching windows.
-- **Prism.js Syntax Highlighting (`TC-FILE-07`)**:
-  - Integrated tokenization and color highlighting for 15+ programming languages (TS/JS, Rust, Python, Bash, JSON, Markdown, CSS, HTML, C/C++, etc.).
-  - Dual-layer composition: background syntax-colored `<pre>` layer aligned pixel-perfectly underneath a transparent editable `<textarea>` (`-webkit-text-fill-color: transparent !important;`), delivering silky-smooth typing with full syntax rendering.
-- **File Management**:
-  - Quick open from working directory, path input, and shortcut saving (`Ctrl + S`).
-- **Run in Terminal**:
-  - Executes current file or selected buffer in the active terminal session.
-  - Intercepted by `DangerousCommandModal` if script content matches destructive patterns.
-- **AI Code Edit (`Ctrl + Shift + K`)**:
-  - Instruct local Ollama models to refactor code, generate tests, add docstrings, or fix errors directly in the editor buffer.
+- **Ultra-Lightweight Dual-Layer Architecture**:
+  - Maintains zero-lag typing and instant startup by strictly avoiding heavy web editors like Monaco. Uses Prism.js background `<pre>` layer pixel-perfectly aligned beneath a transparent editable `<textarea>` (`-webkit-text-fill-color: transparent !important;`).
+- **Multi-Layer Security & Privilege Boundary**:
+  - **Editable Scope Restriction**: Only files whose canonical real path resides within `$HOME` and whose file owner UID matches the process effective UID (`$USER`) are permitted for editing and saving.
+  - **Root Operation Elimination**: Root/elevated operations (`sudo`, `pkexec`, etc.) are completely prohibited inside the editor.
+  - **Forced Read-Only Mode**: Files outside `$HOME`, non-matching owner UIDs, or filesystem write-protected files are automatically mounted in Read-Only mode (`readOnly` textarea attribute, `🔒 Read-Only` header badge with reason tooltip, and `Ctrl + S` disabled).
+  - **Pre-Open Security Guards**: Hard 5MB file size limit (prompts user to use terminal `less`), initial 1KB null byte (`\0`) binary detection, system virtual directories (`/proc`, `/sys`, `/dev`), and sensitive credentials (`~/.ssh/id_*`, `~/.gnupg/private-keys-v1.d`, `~/.local/share/keyrings`) are blocked immediately at the Rust backend.
+- **Symlink Resolution & Escape Prevention**:
+  - Evaluates target canonical paths via Rust `std::fs::canonicalize(path)`.
+  - **Safe Symlinks (Target inside `$HOME`)**: Preserves symlink relationship by atomically writing directly to the target file. Triggers warning toast: `[注意] シンボリックリンク先のファイルを保存しました: <実体パス>`.
+  - **Dangerous Symlinks (Target outside `$HOME`)**: Treated as path traversal escape attempts; automatically forced into Read-Only mode and saving is strictly blocked: `[保存不可] このファイルはシンボリックリンクですが、リンク先の実ファイル (<実体パス>) が $HOME 外にあるため編集・保存は遮断されました。`
+- **Multi-Tab Management & Lazy Tab Rendering**:
+  - **Hard Limit**: Maximum 5 concurrent tabs. 6th tab attempt triggers an informational blocking dialog: `[上限超過] 一度に開けるタブは最大 5 件までです。不要なタブを閉じてから再度お試しください。`
+  - **Lazy Tab Rendering**: Only the active tab mounts the DOM (`<textarea>` + Prism `<pre>`), keeping memory minimal. Inactive tabs retain content, scroll position, and undo/redo stacks in state.
+  - **Unsaved Dirty Guards**: Displays `●` dirty indicator on tabs. Requesting tab or editor close prompts confirmation: `[未保存の変更] 保存されていない変更があります。破棄して閉じますか？`
+- **Text Editing & Input Assistance**:
+  - **Soft Tabs (4 Spaces)**: `Tab` inserts 4 spaces; multi-line selection indents all lines by 4 spaces. `Shift + Tab` unindents up to 4 leading spaces.
+  - **Standard Newline**: Pure `\n` newline without smart auto-indentation to prevent YAML/TOML syntax corruption.
+  - **Auto-Closing Brackets & Quotes**: Automatically pairs `[`, `{`, `(`, `"`, `'` and wraps active selections.
+- **State Protection, Undo/Redo & Plain-Text Search/Replace**:
+  - **Self-Contained Undo/Redo**: `Ctrl + Z` (Undo) and `Ctrl + Shift + Z` / `Ctrl + Y` (Redo) with 400ms debounce merge during typing.
+  - **ReDoS-Free Exact Match Search/Replace**: Strictly forbids regular expressions, using exact substring matching. Mini-bar opened with `Ctrl + F` (Search) or `Ctrl + H` (Replace), featuring match count indicator (`1 / 5`), jump to match, single replace, and replace all.
+- **Automated Backup Cache (AutoSave / Dedicated Cache Aggregation)**:
+  - **Settings Toggle**: Configurable in Settings (`Ctrl + ,`).
+  - **Dedicated Cache Directory**: Saves to `~/.cache/waddle/autosave/` (enforcing `0700` permissions), mapping canonical paths by escaping separators (e.g., `%home%user%.config%fish%config.fish`).
+  - **Lifecycle**: Dirty buffers automatically write to cache after 120 seconds. Explicit save (`Ctrl + S`) atomically saves the real file (`.tmp` -> permissions restore -> `rename`) and deletes the cache. On file open, recovery dialog prompts if an uncommitted backup is detected: `[リカバリ検知] 前回の未保存バックアップデータが見つかりました。復元しますか？`
+- **Focus-Exclusive Shortcut Handling**:
+  - Container (`tabIndex={-1}`) intercepts keystrokes via `onKeyDownCapture` and `e.stopPropagation()`:
+    - `Ctrl + F`: Opens/closes Find mini-bar (suppresses terminal log search).
+    - `Ctrl + H`: Opens/closes Replace mini-bar (suppresses timeline modal).
+    - `Ctrl + S`: Atomically saves active tab (disabled when Read-Only).
+    - `Esc`: Closes Find/Replace mini-bar if open; otherwise closes editor (with unsaved confirmation).
+- **Run in Terminal & AI Code Edit**:
+  - `Play` button runs script in active terminal (with `DangerousCommandModal` interception).
+  - `Ctrl + Shift + K`: Prompts local Ollama AI to refactor code or add error handling.
 
 ---
 

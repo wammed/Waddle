@@ -170,6 +170,10 @@ export function useGlobalShortcuts({
           e.stopPropagation();
           createNewTab();
         } else if (!e.shiftKey && (keyLower === 'w' || code === 'KeyW')) {
+          const isInsideEditor = (e.target as HTMLElement)?.closest('.editor-container');
+          if (isInsideEditor) {
+            return; // Allow editor container to handle its own tab closure
+          }
           // Ctrl+W: Close current tab
           e.preventDefault();
           e.stopPropagation();

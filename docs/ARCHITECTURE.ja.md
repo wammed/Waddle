@@ -256,15 +256,27 @@ Waddle は、高速・堅牢な **Rust バックエンド** と、最新の **Re
 
 ---
 
-### 6. ファイルシステム & 簡易エディタ サブシステム
-
-- **上限付きディレクトリ走査 & 動的ページネーション (`read_directory`)**:
-  - `read_directory(path, show_hidden, limit)` は `DirectoryListing { entries, total_count, has_more }` を返却。
-  - デフォルト 500 件の上限ガードにより、`node_modules` や `/usr/bin` などの巨大ディレクトリ展開時でも WebKitGTK DOM のメモリ肥大化を完全防止。
-  - クライアント側からインタラクティブな `[+] さらに読み込む (残り N 件)...` ボタン経由で +500 件ずつ動的オンデマンド展開が可能。
-- **デュアルレイヤー方式シンタックスハイライト**:
-  - Prism.js による構文着色済み `<pre>` 背景レイヤーの上に、透明テキストの編集可能 `<textarea>`（`-webkit-text-fill-color: transparent !important;`）を 1:1 ピクセル完全一致で重ね合わせ。
-  - 重量級リッチテキストエンジンを介さず、ネイティブのゼロ遅延タイピング速度を保ちながら 15 言語以上のシンタックスハイライト描画を実現。
+### 6. ファイルシステム & 堅牢化内蔵エディタ サブシステム
+ 
+ - **上限付きディレクトリ走査 & 動的ページネーション (`read_directory`)**:
+   - `read_directory(path, show_hidden, limit)` は `DirectoryListing { entries, total_count, has_more }` を返却。
+   - デフォルト 500 件の上限ガードにより、`node_modules` や `/usr/bin` などの巨大ディレクトリ展開時でも WebKitGTK DOM のメモリ肥大化を完全防止。
+   - クライアント側からインタラクティブな `[+] さらに読み込む (残り N 件)...` ボタン経由で +500 件ずつ動的オンデマンド展開が可能。
+ - **マルチタブ設計 & 遅延マウント（Lazy Tab Rendering）**:
+   - State 管理により最大 5 件のタブ（`MAX_TABS = 5`）を保持。
+   - DOM（`<textarea>` ＋ Prism 着色 `<pre>`）を描画するのはアクティブな 1 タブのみに限定し、タブ切り替え時にカーソル位置およびスクロール量を保存・復元することでメモリとレンダリング負荷を極小化。
+ - **多層防御・完全非特権セキュリティ境界 (`editor_ops.rs`)**:
+   - `editor_open_file` および `editor_save_file` による多層セキュリティ防護：
+     - root 権限実行（`libc::geteuid() == 0`）を完全遮断。
+     - 実体パスの解決（`std::fs::canonicalize`）により、シンボリックリンク経由のトラバーサル脱出を検知。
+     - `$HOME` 外の実体ファイル、または所有者 UID（`MetadataExt::uid()`）が実行ユーザーと不一致な場合は強制的に Read-Only 化（編集・保存を遮断）。
+     - 5MB 上限ガードおよび先頭 1KB ヌルバイト走査によるバイナリファイルオープン遮断。
+ - **専用キャッシュ集約 AutoSave (`~/.cache/waddle/autosave/`)**:
+   - 変更検知から 120 秒タイマーで専用ディレクトリ（パーミッション `0700`）へ退避。
+   - 実体パスの区切り文字を `%` にエスケープ（例: `%home%user%.config%fish%config.fish`）することで、Git ワーキングツリーを一切汚さずに安全管理。
+   - 明示的保存時に実ファイルへアトミック保存（`.tmp` -> 元パーミッション復元 -> `rename`）し、キャッシュを自動破棄。
+ - **フォーカス限定ショートカット排他制御**:
+   - エディタコンテナ（`tabIndex={-1}`）が capture フェーズ（`onKeyDownCapture`）と `e.stopPropagation()` により、エディタ固有キー（`Ctrl+F`, `Ctrl+H`, `Ctrl+S`, `Esc`, `Ctrl+Z`, `Ctrl+Y`）をターミナル側と競合させずに独占処理。
 
 ---
 

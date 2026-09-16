@@ -48,6 +48,14 @@ Path validation is performed **before** checking file existence or invoking unde
 ### 4. Large Directory Bounded Pagination (Client DoS Prevention)
 Browsing massive directories (such as `node_modules` or system libraries with tens of thousands of entries) could cause client-side WebKitGTK DOM memory exhaustion and application hangs. Waddle's `read_directory` backend command enforces an initial hard cap of 500 entries with explicit pagination metadata (`DirectoryListing { entries, total_count, has_more }`). Clients must explicitly request user-driven incremental pagination (`limit`), preventing automated or accidental memory exhaustion DoS attacks.
 
+### 5. Embedded Code Editor Security Boundaries & Non-Privileged Execution
+- **Strict Non-Privileged Operation**: Root privilege escalation or execution (`libc::geteuid() == 0`) inside the editor is completely prohibited (`[権限エラー] エディタ内での root 権限操作（sudo等）は禁止されています。ターミナルをご利用ください。`).
+- **Owner UID & `$HOME` Boundary Verification**: Editing and saving are strictly limited to files whose canonical real path resides under `$HOME` and whose file owner UID (`MetadataExt::uid()`) matches the process effective UID (`$USER`).
+- **Forced Read-Only Protection**: Files outside `$HOME` (e.g. `/etc/hosts`), files owned by other system users, or filesystem write-protected files are mounted as forced `🔒 Read-Only` with tooltip explanation, preventing accidental or unauthorized modifications.
+- **Symlink Canonicalization & Escape Defense**: Every file open and save verifies the resolved canonical path (`std::fs::canonicalize`). Links targeting files outside `$HOME` are blocked as traversal escapes (`[保存不可] このファイルはシンボリックリンクですが、リンク先の実ファイル (<実体パス>) が $HOME 外にあるため編集・保存は遮断されました。`). Links targeting files inside `$HOME` are safely saved directly to the real target file while preserving symlink structure and original file permissions.
+- **File Pre-Validation**: Files larger than 5MB are refused with guidance to use terminal `less`, and binary files (containing null bytes `\0` in the first 1KB) are blocked from editor mounting.
+- **Dedicated AutoSave Sandbox**: AutoSave caches uncommitted changes to `~/.cache/waddle/autosave/` (directory permission `0700`, file permission `0600`), replacing path separators with `%` (e.g., `%home%user%.config%fish%config.fish`). This isolates recovery buffers completely from project git trees.
+
 ---
 
 ## ⚡ PTY Flow Control & Memory Exhaustion Defense
