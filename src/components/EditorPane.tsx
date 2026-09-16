@@ -16,11 +16,14 @@ import {
   ChevronUp,
   AlertTriangle,
   Lock,
+  ShieldAlert,
+  EyeOff,
 } from 'lucide-react';
 import { AppConfig, TerminalContext, EditorTab } from '../types';
 import { TauriApi } from '../services/tauriApi';
 import { useI18n } from '../i18n';
 import { DangerousCommandModal, isDangerousCommand } from './DangerousCommandModal';
+import { findSecretRanges, type SecretRange } from '../services/secretMasker';
 import {
   handleTabIndentation,
   handleAutoClosePair,
@@ -160,6 +163,9 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
   const [caseSensitive, setCaseSensitive] = useState(false);
   const [currentMatchIdx, setCurrentMatchIdx] = useState(0);
 
+  // Secret Masking state
+  const [isSecretMaskingActive, setIsSecretMaskingActive] = useState(true);
+
   // Dialogs & Toasts
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [showMaxTabsModal, setShowMaxTabsModal] = useState(false);
@@ -184,6 +190,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
   const lineNumbersRef = useRef<HTMLDivElement>(null);
   const highlightRef = useRef<HTMLPreElement>(null);
   const searchOverlayRef = useRef<HTMLPreElement>(null);
+  const secretOverlayRef = useRef<HTMLPreElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const replaceInputRef = useRef<HTMLInputElement>(null);
 
@@ -242,6 +249,10 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
       if (searchOverlayRef.current) {
         searchOverlayRef.current.scrollTop = textareaRef.current.scrollTop;
         searchOverlayRef.current.scrollLeft = textareaRef.current.scrollLeft;
+      }
+      if (secretOverlayRef.current) {
+        secretOverlayRef.current.scrollTop = textareaRef.current.scrollTop;
+        secretOverlayRef.current.scrollLeft = textareaRef.current.scrollLeft;
       }
     }
   };
@@ -883,6 +894,37 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
     return result;
   }, [isSearchOpen, searchQuery, activeTab?.content, matches, currentMatchIdx]);
 
+  // Detected secrets in active tab
+  const detectedSecrets = React.useMemo<SecretRange[]>(() => {
+    if (!activeTab?.content) return [];
+    return findSecretRanges(activeTab.content);
+  }, [activeTab?.content]);
+
+  // Secret mask overlay: preserves newlines and non-secret monospace spacing
+  const secretMaskHighlightHtml = React.useMemo(() => {
+    if (!activeTab || !isSecretMaskingActive || detectedSecrets.length === 0) return '';
+    const content = activeTab.content;
+    let result = '';
+    let lastIndex = 0;
+
+    for (const range of detectedSecrets) {
+      if (range.start > lastIndex) {
+        // Non-secret span: replace all non-newline characters with spaces
+        const nonSecret = content.slice(lastIndex, range.start);
+        result += nonSecret.replace(/[^\n]/g, ' ');
+      }
+      const secretSlice = content.slice(range.start, range.end);
+      const maskedBullets = secretSlice.replace(/[^\n]/g, '•');
+      result += `<span style="background: #181e2e; color: #f87171; outline: 1px dashed rgba(239, 68, 68, 0.7); border-radius: 2px;">${maskedBullets}</span>`;
+      lastIndex = range.end;
+    }
+    if (lastIndex < content.length) {
+      const remainder = content.slice(lastIndex);
+      result += remainder.replace(/[^\n]/g, ' ');
+    }
+    return result;
+  }, [activeTab?.content, isSecretMaskingActive, detectedSecrets]);
+
   const lineCount = Math.max(1, (activeTab?.content || '').split('\n').length);
   const lineNumbers = Array.from({ length: lineCount }, (_, i) => i + 1);
 
@@ -1041,6 +1083,43 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
               title="シンボリックリンク"
             >
               symlink
+            </span>
+          )}
+
+          {detectedSecrets.length > 0 && (
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '2px 6px',
+                background: 'rgba(239, 68, 68, 0.15)',
+                border: '1px solid rgba(239, 68, 68, 0.4)',
+                borderRadius: '4px',
+                fontSize: '11px',
+                fontWeight: 600,
+                color: '#f87171',
+              }}
+              title={t.editor.secretsDetected(detectedSecrets.length)}
+            >
+              <ShieldAlert size={11} color="#f87171" />
+              <span>{t.editor.secretsDetected(detectedSecrets.length)}</span>
+              <button
+                type="button"
+                onClick={() => setIsSecretMaskingActive((prev) => !prev)}
+                title={isSecretMaskingActive ? t.editor.unmaskSecretsTooltip : t.editor.maskSecretsTooltip}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  background: 'none',
+                  border: 'none',
+                  padding: '0 2px',
+                  cursor: 'pointer',
+                  color: '#f87171',
+                }}
+              >
+                {isSecretMaskingActive ? <EyeOff size={11} /> : <Eye size={11} />}
+              </button>
             </span>
           )}
         </div>
@@ -1417,6 +1496,31 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
                     padding: '10px',
                     background: 'transparent',
                     color: 'transparent',
+                    fontFamily: config.terminal.font_family,
+                    fontSize: `${config.terminal.font_size}px`,
+                    lineHeight: '1.5',
+                    whiteSpace: 'pre',
+                    overflow: 'hidden',
+                    pointerEvents: 'none',
+                    userSelect: 'none',
+                    boxSizing: 'border-box',
+                    zIndex: 0,
+                  }}
+                />
+              )}
+
+              {/* Secret Mask Overlay */}
+              {detectedSecrets.length > 0 && isSecretMaskingActive && (
+                <pre
+                  ref={secretOverlayRef}
+                  aria-hidden="true"
+                  dangerouslySetInnerHTML={{ __html: secretMaskHighlightHtml + '\n' }}
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    margin: 0,
+                    padding: '10px',
+                    background: 'transparent',
                     fontFamily: config.terminal.font_family,
                     fontSize: `${config.terminal.font_size}px`,
                     lineHeight: '1.5',

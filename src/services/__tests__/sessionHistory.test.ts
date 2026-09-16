@@ -100,4 +100,27 @@ describe('sessionHistory', () => {
     // After quota recovery, older records pruned to half
     expect(sessionHistory.getRecords().length).toBeLessThanOrEqual(50);
   });
+
+  it('automatically masks sensitive tokens in command and output snippet before storing', async () => {
+    const { sessionHistory } = await import('../sessionHistory');
+    sessionHistory.clearRecords();
+
+    const sensitiveToken = 'ghp_AbCdEfGhIjKlMnOpQrStUvWxYz0123456789';
+    const awsKey = 'AKIAIOSFODNN7EXAMPLE';
+
+    const rec = sessionHistory.addRecord({
+      command: `export GITHUB_TOKEN=${sensitiveToken}`,
+      cwd: '~',
+      outputSnippet: `Authenticated as AWS user with key: ${awsKey}`,
+    });
+
+    expect(rec.command).not.toContain(sensitiveToken);
+    expect(rec.command).toContain('[REDACTED_GH_TOKEN]');
+    expect(rec.outputSnippet).not.toContain(awsKey);
+    expect(rec.outputSnippet).toContain('AKIA••••••••••••••••');
+
+    const stored = sessionHistory.getRecords()[0];
+    expect(stored.command).not.toContain(sensitiveToken);
+    expect(stored.outputSnippet).not.toContain(awsKey);
+  });
 });

@@ -1,4 +1,5 @@
 import { SessionCommandRecord } from '../types';
+import { maskSecrets } from './secretMasker';
 
 const STORAGE_KEY = 'waddle_session_history_records';
 const MAX_RECORDS = 100;
@@ -17,10 +18,13 @@ class SessionHistoryManager {
       if (raw) {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) {
-          // Clamp records count and sanitize snippet length for existing legacy data
+          // Clamp records count and sanitize snippet length and credentials for existing legacy data
           this.records = parsed.slice(0, MAX_RECORDS).map((rec: SessionCommandRecord) => ({
             ...rec,
-            outputSnippet: rec.outputSnippet ? rec.outputSnippet.slice(0, MAX_SNIPPET_LEN) : undefined,
+            command: rec.command ? maskSecrets(rec.command).maskedText : '',
+            outputSnippet: rec.outputSnippet
+              ? maskSecrets(rec.outputSnippet.slice(0, MAX_SNIPPET_LEN)).maskedText
+              : undefined,
           }));
         }
       }
@@ -65,12 +69,14 @@ class SessionHistoryManager {
 
     const record: SessionCommandRecord = {
       id: `cmd_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-      command: cmd,
+      command: maskSecrets(cmd).maskedText,
       cwd: item.cwd || '~',
       timestamp: Date.now(),
       exitCode: item.exitCode,
       durationMs: item.durationMs,
-      outputSnippet: item.outputSnippet ? item.outputSnippet.slice(0, MAX_SNIPPET_LEN) : undefined,
+      outputSnippet: item.outputSnippet
+        ? maskSecrets(item.outputSnippet.slice(0, MAX_SNIPPET_LEN)).maskedText
+        : undefined,
       paneId: item.paneId,
     };
 

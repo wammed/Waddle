@@ -137,6 +137,10 @@ Welcome to the comprehensive feature guide for **Waddle**, the AI-integrated, pr
     - `Ctrl + H`: Opens/closes Replace mini-bar (suppresses timeline modal).
     - `Ctrl + S`: Atomically saves active tab (disabled when Read-Only).
     - `Esc`: Closes Find/Replace mini-bar if open; otherwise closes editor (with unsaved confirmation).
+- **Visual Secret Protection (Zero-Mutation Guarantee)**:
+  - Real-time scanning for API keys, tokens, and credentials via `findSecretRanges()`.
+  - Header displays `[🛡️ N Secrets Detected]` with an interactive Eye / Eye-Off toggle button.
+  - An opaque monospace overlay renders `•` bullets with `#181e2e` background and red dashed outline over detected credentials, while preserving raw file content untouched so `Ctrl + S` never corrupts real keys or `.env` files.
 - **Run in Terminal & AI Code Edit**:
   - `Play` button runs script in active terminal (with `DangerousCommandModal` interception).
   - `Ctrl + Shift + K`: Prompts local Ollama AI to refactor code or add error handling.
@@ -489,15 +493,18 @@ Welcome to the comprehensive feature guide for **Waddle**, the AI-integrated, pr
 ### 17. 🛡️ Real-Time Secret Masking (`SecretMasker`)
 
 - **Automated Credential Detection**:
-  - Intercepts live terminal PTY streams and runs high-speed regex evaluation against common credential formats:
-    - GitHub Personal Access Tokens (`ghp_...`, `gho_...`, `ghu_...`, `ghs_...`, `ghr_...`)
-    - AWS Access Key IDs (`AKIA...`, `ASIA...`) & Secret Access Keys
-    - OpenAI API Keys (`sk-...`, `sk-proj-...`)
-    - Slack Tokens (`xoxb-...`, `xoxp-...`)
-    - JSON Web Tokens (JWT)
-    - Private key blocks (`-----BEGIN OPENSSH PRIVATE KEY-----`, etc.)
-- **Redaction**:
-  - Matches are instantly replaced in the terminal display buffer with `***MASKED_KEY***` or asterisks.
+  - Intercepts live terminal PTY streams and runs high-speed regex evaluation against modern credential formats:
+    - GitHub Personal Access Tokens (Classic `ghp_...`, `gho_...`, `ghu_...`, `ghs_...`, `ghr_...` & Fine-Grained `github_pat_...`)
+    - AWS Access Key IDs (`AKIA...`) & Secret Access Keys (`AWS_SECRET_ACCESS_KEY` assignments and 40-char Base64 values)
+    - AI Model API Keys: OpenAI Classic (`sk-...`), Project (`sk-proj-...`), Admin (`sk-admin-...`), Anthropic Claude (`sk-ant-...`), Google Cloud / Gemini (`AIza...`)
+    - Slack Tokens (`xoxb-...`, `xoxp-...`, `xoxa-...`, `xoxr-...`, `xoxs-...`)
+    - HTTP Bearer Tokens (`Authorization: Bearer <token>`) & JSON Web Tokens (JWT `eyJ...`)
+    - Cryptographic Private Key Blocks (`-----BEGIN ... PRIVATE KEY-----` to `-----END ... PRIVATE KEY-----`)
+    - Prefixed environment variables (`OPENAI_API_KEY`, `SLACK_BOT_TOKEN`, `DATABASE_PASSWORD`, etc.) & standalone `token=`, `base_key=`
+- **Redaction & Protection**:
+  - Terminal matches are instantly replaced in the display buffer with bullet masks or specific redaction tags (e.g. `[REDACTED_GH_TOKEN]`, `[REDACTED_AI_KEY]`, `[REDACTED_AWS_SECRET]`).
+  - **Embedded Editor Visual Masking**: Monospace overlay with opaque bullets `•` and red dashed outlines protects secrets in the code editor without modifying file data.
+  - **Storage & AI Boundaries**: Commands and output snippets are sanitized before `localStorage` persistence, and prior terminal context is sanitized before dispatching to Ollama.
   - Can be toggled on/off in the Settings modal under "Terminal Secret Masking".
   - Neutralizes credential leakage during screen sharing, live streams, and video recordings.
 

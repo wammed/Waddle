@@ -900,6 +900,31 @@ npm run tauri dev
       - **Rust 静的解析**: `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets` -> 警告・エラー 0 件。
       - **本番リリースビルド & 配備**: `cargo build --manifest-path src-tauri/Cargo.toml --release` 完了、`install -m 755 target/release/waddle ~/.local/bin/waddle` により本番バイナリ配備完了。
 
+42. **SecretMasker 包括的強化 & 内蔵エディタ非破壊視覚的マスキング & 履歴・AIコンテキスト保護**:
+    - **背景と目的**:
+      - `test_masker.py` の検証で浮き彫りになった「ターミナルでの 60% シークレット漏洩（GitHub Fine-grained PAT, AWS Secret Key, OpenAI/Anthropic Key, Slack Token, プレフィックス付き環境変数等）」および「内蔵エディタでの 100% 平文露出」を包括的に解決。
+    - **改修内容と解決アプローチ**:
+      1. **`secretMasker.ts` の検知ルール全面拡充**:
+         - GitHub Fine-Grained PAT (`github_pat_[A-Za-z0-9_]{22,255}`)、OpenAI Classic/Project/Admin (`sk-`, `sk-proj-`, `sk-admin-`)、Anthropic Claude (`sk-ant-`)、Google Cloud / Gemini (`AIza...`)、Slack Token (`xoxb-`, `xoxp-` 等)、AWS Secret Access Key (`AWS_SECRET_ACCESS_KEY` & 40文字Base64)、プレフィックス付き環境変数（`OPENAI_API_KEY`, `SLACK_BOT_TOKEN`, `DATABASE_PASSWORD` 等）および単独 `token=`, `base_key=` を完全網羅。
+         - 二重置換・誤判定を防ぐ負の先読みガード (`(?![^\s"']*\[REDACTED)(?![^\s"']*•)`) を導入。
+      2. **内蔵エディタの非破壊・視覚的マスキング (Zero-Mutation Visual Masking)**:
+         - エディタで文字列自体を不可逆置換すると `Ctrl+S` 保存時に本物の API キーや `.env` が破壊されるため、ファイル生データは 100% 保持。
+         - `findSecretRanges(activeTab.content)` でシークレット位置を非破壊・高速特定。
+         - Prism 着色レイヤーと透明 `<textarea>` の間に、モノスペース完全一致のマスクオーバーレイ `<pre>` を重畳。シークレット区間のみ不透明 `#181e2e` 背景と赤破線枠線（`outline: 1px dashed rgba(239, 68, 68, 0.7)`）を伴う黒丸 `•` で覆い、非シークレット文字をスペースに変換することで、カーソル位置・文字幅・構文着色を 1 ピクセルもズラさずに機密箇所のみを隠蔽。
+         - エディタヘッダーに `[🛡️ N 件のシークレットを検知]` バッジと👁️トグルボタンを新設。
+      3. **セッション履歴 (`sessionHistory.ts`) & AI Copilot (`AiSidebar.tsx`) 境界防護**:
+         - `localStorage` 保存前および直前コンテキスト送信前・チャットエクスポート時に `maskSecrets()` を適用し、生トークンのストレージ残留や外部 LLM 漏洩を根絶。
+      4. **自動テスト拡充 & 全件合格**:
+         - `secretMasker.test.ts` に `test_masker.py` の全 10 ログ行検証および `findSecretRanges` テストを追加（13 テスト全パス）。
+         - `sessionHistory.test.ts` にクレデンシャル自動マスキングテストを追加（4 テスト全パス）。
+         - `translations.test.ts` に全言語の新規キー完全一致テストを更新（5 テスト全パス）。
+    - **検証エビデンス**:
+      - **フロントエンド自動テスト**: `npm test` -> 7 ファイル全 53 テスト 100% PASS (182ms)。
+      - **フロントエンドビルド**: `npm run build` -> TypeScript 型検査 0 エラー、Vite バンドル正常完了 (2.27s)。
+      - **Rust バックエンド単体テスト**: `cargo test --manifest-path src-tauri/Cargo.toml` -> 全 53 テスト 100% PASS。
+      - **Rust 静的解析**: `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets` -> 警告・エラー 0 件。
+      - **本番リリースビルド & 配備**: `cargo build --manifest-path src-tauri/Cargo.toml --release`（27.68s）完了、`install -m 755 target/release/waddle ~/.local/bin/waddle` により本番バイナリ配備完了。
+
 ---
 
 ## 6. 次回再開時の検討・作業候補（Next Steps）

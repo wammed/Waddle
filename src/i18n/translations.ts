@@ -141,6 +141,9 @@ export interface Translations {
     discardBackup: string;
     newTab: string;
     closeTab: string;
+    secretsDetected: (count: number) => string;
+    maskSecretsTooltip: string;
+    unmaskSecretsTooltip: string;
   };
   aiCommand: {
     title: string;
@@ -459,6 +462,9 @@ export const translations: Record<Language, Translations> = {
       discardBackup: 'Discard',
       newTab: 'New File',
       closeTab: 'Close Tab',
+      secretsDetected: (count: number) => `${count} secret${count > 1 ? 's' : ''} detected`,
+      maskSecretsTooltip: 'Mask secrets with bullet overlay',
+      unmaskSecretsTooltip: 'Reveal plain-text secrets',
     },
     aiCommand: {
       title: 'AI Command Assistant',
@@ -778,6 +784,9 @@ export const translations: Record<Language, Translations> = {
       discardBackup: 'Discard',
       newTab: 'New File',
       closeTab: 'Close Tab',
+      secretsDetected: (count: number) => `${count} secret${count > 1 ? 's' : ''} detected`,
+      maskSecretsTooltip: 'Mask secrets with bullet overlay',
+      unmaskSecretsTooltip: 'Reveal plain-text secrets',
     },
     aiCommand: {
       title: 'AI Command Assistant',
@@ -1097,6 +1106,9 @@ export const translations: Record<Language, Translations> = {
       discardBackup: '破棄する',
       newTab: '新規ファイル',
       closeTab: 'タブを閉じる',
+      secretsDetected: (count: number) => `${count} 件のシークレットを検知`,
+      maskSecretsTooltip: 'シークレットを伏字マスク',
+      unmaskSecretsTooltip: 'シークレットを平文表示',
     },
     aiCommand: {
       title: 'AI Command Assistant',

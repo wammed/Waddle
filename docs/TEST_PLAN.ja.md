@@ -182,6 +182,9 @@
 | **TC-SEC-16** | 仮想・機密ディレクトリ走査遮断 & 秘密鍵アクセス拒否 | `read_file_content` または `list_directory` で `/proc`, `/sys`, `/dev`, `~/.gnupg/private-keys-v1.d`, `~/.local/share/keyrings` や `~/.ssh` 内の秘密鍵 (`id_rsa`, `id_ed25519` 等) へのアクセスを試行。 | バックエンドで即座に拒否され、403 Access denied エラーまたは空結果が返され、カーネル仮想構造や秘密鍵が絶対に外部・UIへ露呈しない。 | Automated |
 | **TC-SEC-17** | Ollama SSRF・クラウドメタデータ防御 (`169.254.169.254` & `[fd00:ec2::254]`) | AI 設定の Ollama URL にクラウドメタデータアドレス (`169.254.169.254` / `[fd00:ec2::254]`) を指定し、プロンプト生成を実行。 | バックエンドの `validate_ollama_endpoint` が即座に拒否し、AWS/GCP/Azure などのインスタンス認証情報盗取を未然に遮断する。 | Automated |
 | **TC-SEC-18** | Git Branch Ref 厳格検証 (先頭ハイフン・特殊文字拒否) | Git パネルで `-D`, `--help`, `feature;rm -rf /`, または `..` や空白を含むブランチ名の作成・切り替えを試行。 | バックエンドの `validate_branch_ref` によりコマンドオプション混入やインジェクションが即時拒否され、実行が防止される。 | Automated |
+| **TC-SEC-19** | 最新クレデンシャル検知・マスク検証 (`SecretMasker`) | `test_masker.py` の生成ログ（GitHub Fine-Grained/Classic PAT, AWS Access/Secret Key, OpenAI/Anthropic/Google キー, Slack トークン, JWT, Bearer, 秘密鍵）を出力。 | 100% のシークレットが検知され、黒丸マスクまたは固有タグへ置換される。ターミナル PTY 出力ストリームからの平文漏洩がゼロ件となる。 | Automated / Manual |
+| **TC-SEC-20** | 内蔵エディタ非破壊・視覚的シークレット保護 | API キーを含む設定ファイルをエディタ（`Ctrl+E`）で開き、バッジ表示、👁️トグル切り替え、および `Ctrl+S` 保存を実行。 | ヘッダーに `[🛡️ N 件のシークレットを検知]` が表示され、オーバーレイにより該当箇所のみ `•` で覆われる。`Ctrl+S` 保存を行っても原本データが破壊されず維持される。 | Automated / Manual |
+| **TC-SEC-21** | セッション履歴 & AI Copilot 送信前サニタイズ | 機密文字列を含むコマンド（`export GITHUB_TOKEN=ghp_...` 等）を実行し、`localStorage` 保存内容およびエラー修正プロンプトを確認。 | 履歴データ保存前および AI プロンプト送信前に `maskSecrets` が適用され、ストレージへの平文残存や外部 LLM への漏洩が防止される。 | Automated / Manual |
 
 ---
 

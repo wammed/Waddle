@@ -296,6 +296,13 @@ Waddle is built on a hybrid architecture combining a high-performance **Rust bac
   - Clean saves atomically update real files (`.tmp` write -> mode restore -> `rename`) and remove the cache file.
 - **Focus-Exclusive Shortcut Isolation**:
   - Container element (`tabIndex={-1}`) intercepts keystrokes via `onKeyDownCapture` and `e.stopPropagation()`, isolating editor-specific shortcuts (`Ctrl+F`, `Ctrl+H`, `Ctrl+S`, `Esc`, `Ctrl+Z`, `Ctrl+Y`) from global terminal bindings.
+- **Zero-Mutation Visual Secret Masking Architecture**:
+  - `findSecretRanges(activeTab.content)` runs high-speed credential analysis across 10 security rules without modifying the buffer string.
+  - Three-tier render stack ensures zero data corruption on save:
+    1. **Base Highlighting**: Prism.js `<pre>` (`zIndex: 0`) renders complete syntax colors.
+    2. **Mask Overlay**: Dedicated `<pre>` (`zIndex: 0`) maps secret ranges to bullet characters (`•`) with opaque `#181e2e` background and `outline: 1px dashed rgba(239, 68, 68, 0.7)`. Non-secret text is converted to whitespace spaces, preserving exact monospace column/row alignments with 0-pixel displacement.
+    3. **Transparent Input**: `<textarea>` (`zIndex: 1`, `-webkit-text-fill-color: transparent !important;`) handles all user keystrokes, selections, and cursors.
+  - Interactive toolbar badge `[🛡️ N Secrets Detected]` allows one-click Eye / Eye-Off toggling for intentional plain-text inspection.
 
 ---
 

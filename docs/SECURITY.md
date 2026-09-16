@@ -56,6 +56,24 @@ Browsing massive directories (such as `node_modules` or system libraries with te
 - **File Pre-Validation**: Files larger than 5MB are refused with guidance to use terminal `less`, and binary files (containing null bytes `\0` in the first 1KB) are blocked from editor mounting.
 - **Dedicated AutoSave Sandbox**: AutoSave caches uncommitted changes to `~/.cache/waddle/autosave/` (directory permission `0700`, file permission `0600`), replacing path separators with `%` (e.g., `%home%user%.config%fish%config.fish`). This isolates recovery buffers completely from project git trees.
 
+### 6. Real-Time Secret Masking & Non-Destructive Visual Redaction (`SecretMasker`)
+Waddle incorporates a multi-layer credential defense engine (`src/services/secretMasker.ts`) guarding against accidental secret leakage across live terminal streams, embedded editor views, session history persistence, and AI copilot context exchanges.
+- **Modern Credential Signature Matrix**:
+  - **GitHub Personal Access Tokens**: Classic (`gh[pousr]_[A-Za-z0-9_]{36,255}`) and Fine-Grained PATs (`github_pat_[A-Za-z0-9_]{22,255}`).
+  - **AI Model & LLM API Keys**: OpenAI Classic (`sk-[A-Za-z0-9]{32,50}`), OpenAI Project (`sk-proj-[A-Za-z0-9_-]{40,160}`), OpenAI Admin (`sk-admin-`), Anthropic Claude (`sk-ant-[A-Za-z0-9_-]{40,120}`), and Google Cloud / Gemini (`AIza[0-9A-Za-z_-]{30,40}`).
+  - **Cloud Infrastructure**: AWS Access Key IDs (`AKIA[0-9A-Z]{16}`) and AWS Secret Access Keys (`AWS_SECRET_ACCESS_KEY` assignments and 40-character Base64 values).
+  - **Team Collaboration Tokens**: Slack Bot (`xoxb-`), User (`xoxp-`), App (`xoxa-`), Refresh (`xoxr-`), and Workspace (`xoxs-`) tokens.
+  - **HTTP Authorization & Web Tokens**: Bearer Tokens (`Authorization: Bearer <token>`) and bare JSON Web Tokens (`eyJ...`).
+  - **Cryptographic Private Keys**: Multi-line private key blocks (`-----BEGIN ... PRIVATE KEY-----` to `-----END ... PRIVATE KEY-----`).
+  - **Prefixed Environment Variable Key-Value Pairs**: Any assignment with keys matching `[A-Za-z0-9_]*(?:SECRET|API_?KEY|AUTH_?TOKEN|ACCESS_?TOKEN|PASSWORD|PASSWD)[A-Za-z0-9_]*` or standalone `token=`, `base_key=`.
+- **Embedded Editor Zero-Mutation Visual Masking**:
+  - **Zero-Mutation Guarantee**: Replacing raw strings with `[REDACTED]` in an active text editor would corrupt real configuration and `.env` files upon saving (`Ctrl+S`). Waddle preserves 100% of raw content in memory and on disk.
+  - **Dual-Layer Monospace Overlay**: An overlay `<pre>` sits immediately above the Prism syntax highlight layer and below the transparent `<textarea>`. It renders bullets `•` with `#181e2e` background and `outline: 1px dashed rgba(239, 68, 68, 0.7)` strictly over secret ranges, while replacing non-secret text with whitespace spaces. Monospace cursor alignment and syntax coloring are preserved with zero pixel drift.
+  - **Toolbar Detection Badge & Toggle**: Displays `[🛡️ N Secrets Detected]` in the editor header with an interactive Eye / Eye-Off toggle button, allowing safe inspection when necessary.
+- **Session Command History & AI Context Sanitization**:
+  - **Storage Sanitization**: Commands and output snippets are automatically processed through `maskSecrets()` before serialization to browser `localStorage`.
+  - **AI Copilot Boundaries**: Prior command context (`recent_command`) and output (`recent_output`) are sanitized before dispatching prompt streams to local Ollama endpoints. Chat export files (Markdown/JSON) are also redacted.
+
 ---
 
 ## ⚡ PTY Flow Control & Memory Exhaustion Defense

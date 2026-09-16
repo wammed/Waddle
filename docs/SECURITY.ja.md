@@ -56,6 +56,24 @@ Waddle は正規化パスの前方一致検証（`canonical.starts_with(sys_dir)
 - **ファイル事前検証**: 5MB 超過ファイルはターミナル `less` の利用を促してオープン拒否。先頭 1KB 走査でヌルバイト（`\0`）が検出されたバイナリファイルもエディタオープンを遮断。
 - **専用キャッシュ集約 AutoSave**: 未保存バッファはプロジェクトのリポジトリ内ではなく、専用ディレクトリ `~/.cache/waddle/autosave/`（パーミッション `0700`）へ退避。パス区切り文字を `%` にエスケープ（例: `%home%user%.config%fish%config.fish`）することで、Git ツリーを一切汚さずに安全なリカバリ機構を提供。
 
+### 6. リアルタイム・シークレットマスキング & 非破壊視覚保護 (`SecretMasker`)
+Waddle は多層防御シークレット保護エンジン（`src/services/secretMasker.ts`）を搭載し、ライブターミナルストリーム、内蔵エディタ、セッション履歴永続化、AI Copilot コンテキスト送信における意図しない機密情報の漏洩を物理遮断します。
+- **最新クレデンシャル・シグネチャマトリクス**:
+  - **GitHub パーソナルアクセストークン**: クラシック PAT（`gh[pousr]_[A-Za-z0-9_]{36,255}`）および新世代 Fine-Grained PAT（`github_pat_[A-Za-z0-9_]{22,255}`）。
+  - **AI モデル & LLM API キー**: OpenAI Classic（`sk-[A-Za-z0-9]{32,50}`）、OpenAI Project（`sk-proj-[A-Za-z0-9_-]{40,160}`）、OpenAI Admin（`sk-admin-`）、Anthropic Claude（`sk-ant-[A-Za-z0-9_-]{40,120}`）、Google Cloud / Gemini（`AIza[0-9A-Za-z_-]{30,40}`）。
+  - **クラウドインフラ**: AWS Access Key ID（`AKIA[0-9A-Z]{16}`）および AWS Secret Access Key（`AWS_SECRET_ACCESS_KEY` 環境変数代入および 40 文字 Base64 値）。
+  - **チームコラボレーション**: Slack Bot（`xoxb-`）、User（`xoxp-`）、App（`xoxa-`）、Refresh（`xoxr-`）、Workspace（`xoxs-`）トークン。
+  - **HTTP 認可 & Web トークン**: Bearer トークン（`Authorization: Bearer <token>`）および単独 JSON Web Token（`eyJ...`）。
+  - **暗号化秘密鍵ブロック**: 複数行にわたる秘密鍵ブロック（`-----BEGIN ... PRIVATE KEY-----` 〜 `-----END ... PRIVATE KEY-----`）。
+  - **プレフィックス付き環境変数 Key-Value**: 変数名に `SECRET`, `API_KEY`, `AUTH_TOKEN`, `ACCESS_TOKEN`, `PASSWORD`, `PASSWD` を含む代入式全般、および単独 `token=`, `base_key=`。
+- **内蔵エディタの非破壊・視覚的マスキング (Zero-Mutation Guarantee)**:
+  - **原本データ保護の絶対保証**: エディタ内で文字列自体を `[REDACTED]` で置換すると、`Ctrl + S` 保存時に実際の設定ファイルや `.env` 内の鍵が破壊されてしまいます。Waddle ではメモリ上およびディスク上の生データを 100% 保持します。
+  - **完全モノスペース追従オーバーレイ**: Prism 着色レイヤーの直上、透明 `<textarea>` の直下に専用オーバーレイ `<pre>` を配置。シークレット区間のみ不透明背景（`#181e2e`）と破線枠線（`outline: 1px dashed rgba(239, 68, 68, 0.7)`）を伴う黒丸 `•` で覆い、非シークレット文字は透過スペースで描画。カーソル位置や構文着色を 1 ピクセルもズラさずに機密箇所のみを隠蔽します。
+  - **ツールバー検知バッジ & トグル**: エディタヘッダーに `[🛡️ N 件のシークレットを検知]` バッジを表示。👁️ アイコンのクリックで、必要に応じて一時的な平文表示/マスクを瞬時に切り替え可能です。
+- **セッション履歴 & AI コンテキストサニタイズ**:
+  - **ストレージ保存前サニタイズ**: 実行コマンドおよび出力スニペットを `localStorage` に保存する直前に `maskSecrets()` を通過させ、生トークンがブラウザストレージに平文残留するのを防護。
+  - **AI Copilot 境界防護**: ローカル Ollama 等の AI エンドポイントへコンテキスト（直前コマンド・出力）を送信する前にシークレットを自動マスキング。チャット履歴エクスポート時（Markdown/JSON）も機密情報を保護。
+
 ---
 
 ## ⚡ PTY 流量制御 & メモリ枯渇防御 (PTY Flow Control)

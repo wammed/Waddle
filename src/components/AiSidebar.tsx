@@ -21,6 +21,7 @@ import { ChatMessage, TerminalContext } from '../types';
 import { TauriApi } from '../services/tauriApi';
 import { useI18n } from '../i18n';
 import { DangerousCommandModal, isDangerousCommand } from './DangerousCommandModal';
+import { maskSecrets } from '../services/secretMasker';
 
 interface AiSidebarProps {
   isOpen: boolean;
@@ -75,7 +76,7 @@ export const AiSidebar: React.FC<AiSidebarProps> = ({
         return `### ${roleName}\n\n${msg.content}\n`;
       })
       .join('\n---\n\n');
-    downloadFile(`waddle-ai-chat-${timestamp}.md`, 'text/markdown;charset=utf-8', header + body);
+    downloadFile(`waddle-ai-chat-${timestamp}.md`, 'text/markdown;charset=utf-8', maskSecrets(header + body).maskedText);
     setIsExportMenuOpen(false);
   };
 
@@ -88,7 +89,7 @@ export const AiSidebar: React.FC<AiSidebarProps> = ({
       messages,
     };
     const jsonStr = JSON.stringify(exportData, null, 2);
-    downloadFile(`waddle-ai-chat-${timestamp}.json`, 'application/json;charset=utf-8', jsonStr);
+    downloadFile(`waddle-ai-chat-${timestamp}.json`, 'application/json;charset=utf-8', maskSecrets(jsonStr).maskedText);
     setIsExportMenuOpen(false);
   };
 
@@ -155,10 +156,20 @@ export const AiSidebar: React.FC<AiSidebarProps> = ({
 
     const chatId = 'chat-' + Date.now();
 
+    const sanitizedContext: TerminalContext = {
+      ...context,
+      recent_command: context.recent_command
+        ? maskSecrets(context.recent_command).maskedText
+        : undefined,
+      recent_output: context.recent_output
+        ? maskSecrets(context.recent_output).maskedText
+        : undefined,
+    };
+
     const cleanup = await TauriApi.streamAiChat(
       chatId,
       newMessages,
-      context,
+      sanitizedContext,
       (chunk) => {
         setMessages((prev) =>
           prev.map((msg) =>
@@ -403,8 +414,13 @@ export const AiSidebar: React.FC<AiSidebarProps> = ({
                 whiteSpace: 'nowrap',
               }}
               onClick={() => {
-                const errSnippet = context.recent_output ? context.recent_output.slice(-500).trim() : '';
-                setInput(t.copilot.askFixPrompt(context.recent_command || '', errSnippet));
+                const cleanCmd = context.recent_command
+                  ? maskSecrets(context.recent_command).maskedText
+                  : '';
+                const errSnippet = context.recent_output
+                  ? maskSecrets(context.recent_output.slice(-500).trim()).maskedText
+                  : '';
+                setInput(t.copilot.askFixPrompt(cleanCmd, errSnippet));
               }}
             >
               <Sparkles size={10} color="#38bdf8" style={{ marginRight: 3 }} />

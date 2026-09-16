@@ -135,6 +135,10 @@
     - `Ctrl + H`: 置換ミニバー開閉（タイムラインモーダルを抑止）
     - `Ctrl + S`: 実ファイルアトミック保存（Read-Only 時は無効）
     - `Esc`: 検索バー表示中はバーのみ閉鎖、通常時はエディタ全体を閉鎖
+- **非破壊・視覚的シークレット保護 (Zero-Mutation Guarantee)**:
+  - `findSecretRanges()` によるファイル内シークレットのリアルタイム自動検知。
+  - ヘッダーツールバーに `[🛡️ N 件のシークレットを検知]` バッジと👁️トグルボタンを常時表示。
+  - シークレット区間のみ不透明背景（`#181e2e`）と赤破線枠線（`outline`）を伴う黒丸 `•` で覆う専用オーバーレイを重畳。生ファイルデータは 100% 保持されるため、`Ctrl + S` 保存による本物の API キーや `.env` の破損を完全防止。
 - **Run in Terminal & AI コード編集**:
   - `Play` ボタンでアクティブ端末にてスクリプト実行（破壊的コマンド検知機能付き）。
   - `Ctrl + Shift + K`: ローカル Ollama AI にリファクタリングや型追加、エラーハンドリング生成を指示。
@@ -482,15 +486,18 @@
 ### 17. 🛡️ リアルタイム機密情報マスク (`SecretMasker`)
 
 - **自動パターン検知**:
-  - ターミナル出力ストリームをリアルタイム監視し、以下の機密パターンを正規表現エンジンで瞬時に検知：
-    - GitHub Personal Access Token (`ghp_...`, `gho_...`, `ghu_...`, `ghs_...`, `ghr_...`)
-    - AWS Access Key ID (`AKIA...`, `ASIA...`) & Secret Access Key
-    - OpenAI API Key (`sk-...`, `sk-proj-...`)
-    - Slack Token (`xoxb-...`, `xoxp-...`)
-    - JSON Web Token (JWT)
-    - 各種秘密鍵ヘッダー (`-----BEGIN OPENSSH PRIVATE KEY-----` 等)
-- **マスク処理**:
-  - 検知された機密文字列を即座に `***MASKED_KEY***` や `***MASKED***` へ自動置換。
+  - ターミナル出力ストリームをリアルタイム監視し、以下の機密パターンを高速正規表現エンジンで瞬時に検知：
+    - GitHub Personal Access Token（クラシック `ghp_...`, `gho_...` および新世代 Fine-Grained `github_pat_...`）
+    - AWS Access Key ID（`AKIA...`）& Secret Access Key（`AWS_SECRET_ACCESS_KEY` 代入式および 40 文字 Base64 値）
+    - AI モデル API キー: OpenAI Classic（`sk-...`）、Project（`sk-proj-...`）、Admin（`sk-admin-...`）、Anthropic Claude（`sk-ant-...`）、Google Cloud / Gemini（`AIza...`）
+    - Slack Token（`xoxb-...`, `xoxp-...`, `xoxa-...`, `xoxr-...`, `xoxs-...`）
+    - HTTP Bearer トークン（`Authorization: Bearer <token>`）& JSON Web Token（JWT `eyJ...`）
+    - 暗号化秘密鍵ブロック（`-----BEGIN ... PRIVATE KEY-----` 〜 `-----END ... PRIVATE KEY-----`）
+    - プレフィックス付き環境変数代入（`OPENAI_API_KEY`, `SLACK_BOT_TOKEN`, `DATABASE_PASSWORD` 等）および単独 `token=`, `base_key=`
+- **マスク処理 & 多層防護**:
+  - ターミナル上の検知文字列を即座に黒丸マスクや固有の秘匿タグ（`[REDACTED_GH_TOKEN]`, `[REDACTED_AI_KEY]`, `[REDACTED_AWS_SECRET]` 等）へ自動置換。
+  - **内蔵エディタの非破壊視覚マスク**: モノスペース完全追従オーバーレイにより、ファイル生データを破壊することなくエディタ上で機密情報のみを `•` で覆い隠します。
+  - **履歴・AI 送信境界サニタイズ**: `localStorage` へのコマンド履歴保存前、およびローカル Ollama への直前実行コンテキスト送信前に自動マスキングを適用。
   - 設定画面の「リアルタイム機密情報マスク」トグルで有効/無効の切り替えが可能。
   - 画面録画、ライブ配信、ペアプログラミング時の意図しない認証情報露出を根絶。
 
