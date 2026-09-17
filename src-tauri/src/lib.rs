@@ -221,6 +221,9 @@ pub fn run() {
     let config_manager = ConfigManager::new();
     let ai_client = AiClient::new();
 
+    // Clean up stale autosaves (> 7 days) on startup
+    let _ = clean_stale_autosaves(AUTOSAVE_STALE_SECS);
+
     let state = AppState {
         pty_manager,
         config_manager,
@@ -277,6 +280,9 @@ pub fn run() {
             editor_open_file,
             editor_save_file,
             editor_save_autosave,
+            editor_save_autosave_snapshot,
+            editor_get_autosave_history,
+            editor_load_autosave_content,
             editor_remove_autosave,
         ])
         .run(tauri::generate_context!())

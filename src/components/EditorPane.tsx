@@ -18,8 +18,9 @@ import {
   Lock,
   ShieldAlert,
   EyeOff,
+  RotateCcw,
 } from 'lucide-react';
-import { AppConfig, TerminalContext, EditorTab } from '../types';
+import { AppConfig, TerminalContext, EditorTab, AutosaveEntry } from '../types';
 import { TauriApi } from '../services/tauriApi';
 import { useI18n } from '../i18n';
 import { DangerousCommandModal, isDangerousCommand } from './DangerousCommandModal';
@@ -53,6 +54,34 @@ const DEBOUNCE_TYPING_MS = 400; // 400ms debounce merge for undo stack
 
 function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  return `${(bytes / 1024).toFixed(1)} KB`;
+}
+
+function formatRelativeTime(timestampMs: number, lang: string): string {
+  const diffSec = Math.max(0, Math.floor((Date.now() - timestampMs) / 1000));
+  if (diffSec < 60) {
+    return lang === 'ja' ? `${diffSec}秒前` : `${diffSec}s ago`;
+  }
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) {
+    return lang === 'ja' ? `${diffMin}分前` : `${diffMin}m ago`;
+  }
+  const diffHours = Math.floor(diffMin / 60);
+  if (diffHours < 24) {
+    return lang === 'ja' ? `${diffHours}時間前` : `${diffHours}h ago`;
+  }
+  const diffDays = Math.floor(diffHours / 24);
+  return lang === 'ja' ? `${diffDays}日前` : `${diffDays}d ago`;
+}
+
+function formatDateTime(timestampMs: number): string {
+  const d = new Date(timestampMs);
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  return `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
 function getGrammarForFile(filename: string): { grammar: Prism.Grammar; lang: string } {
@@ -144,7 +173,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
   targetFilePath,
   onRichPreview,
 }) => {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
 
   // Tabs management
   const [tabs, setTabs] = useState<EditorTab[]>([]);
@@ -165,6 +194,11 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
 
   // Secret Masking state
   const [isSecretMaskingActive, setIsSecretMaskingActive] = useState(true);
+
+  // AutoSave restore history state
+  const [autosaveHistory, setAutosaveHistory] = useState<AutosaveEntry[]>([]);
+  const [isRestorePopoverOpen, setIsRestorePopoverOpen] = useState(false);
+  const restorePopoverRef = useRef<HTMLDivElement>(null);
 
   // Dialogs & Toasts
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -382,15 +416,95 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
     setRecoveryData(null);
   };
 
-  // Recovery confirmation: Discard
-  const handleDiscardRecovery = async () => {
-    if (!recoveryData) return;
-    try {
-      await TauriApi.editorRemoveAutosave(recoveryData.path);
-    } catch (err) {
-      console.warn('Failed to remove autosave cache:', err);
-    }
+  // Recovery confirmation: Discard (retain history snapshots for manual restore)
+  const handleDiscardRecovery = () => {
     setRecoveryData(null);
+  };
+
+  // Fetch autosave history for a given canonical path
+  const fetchAutosaveHistory = useCallback(async (canonicalPath?: string) => {
+    const targetPath = canonicalPath || activeTab?.canonicalPath;
+    if (!targetPath) {
+      setAutosaveHistory([]);
+      return;
+    }
+    try {
+      const history = await TauriApi.editorGetAutosaveHistory(targetPath);
+      setAutosaveHistory(history);
+    } catch (err) {
+      console.warn('Failed to fetch autosave history:', err);
+      setAutosaveHistory([]);
+    }
+  }, [activeTab?.canonicalPath]);
+
+  // Sync autosave history when activeTab changes
+  useEffect(() => {
+    if (activeTab?.canonicalPath) {
+      fetchAutosaveHistory(activeTab.canonicalPath);
+    } else {
+      setAutosaveHistory([]);
+      setIsRestorePopoverOpen(false);
+    }
+  }, [activeTab?.canonicalPath, fetchAutosaveHistory]);
+
+  // Close restore popover when clicking outside or pressing Escape
+  useEffect(() => {
+    if (!isRestorePopoverOpen) return;
+
+    const handleClickOutside = (e: MouseEvent) => {
+      if (restorePopoverRef.current && !restorePopoverRef.current.contains(e.target as Node)) {
+        setIsRestorePopoverOpen(false);
+      }
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsRestorePopoverOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isRestorePopoverOpen]);
+
+  // Restore a historical autosave snapshot
+  const handleRestoreSnapshot = async (entry: AutosaveEntry) => {
+    if (!activeTab || activeTab.isReadOnly) return;
+
+    try {
+      const content = await TauriApi.editorLoadAutosaveContent(entry.id);
+
+      // Save current content to undo stack so user can Ctrl+Z if needed
+      let hist = historyManagersRef.current.get(activeTab.id);
+      if (!hist) {
+        hist = new EditorHistoryManager();
+        historyManagersRef.current.set(activeTab.id, hist);
+      }
+      hist.push(activeTab.content);
+
+      // Apply snapshot to tab and mark dirty
+      setTabs((prev) =>
+        prev.map((t) =>
+          t.id === activeTab.id
+            ? {
+                ...t,
+                content,
+                isDirty: true,
+              }
+            : t
+        )
+      );
+
+      setIsRestorePopoverOpen(false);
+      showToast(t.editor.restoreSuccessToast(formatDateTime(entry.timestamp)), 'info');
+    } catch (err: any) {
+      const msg = typeof err === 'string' ? err : err?.message || String(err);
+      showToast(msg, 'error');
+    }
   };
 
   // AutoSave scheduling (120s timer on dirty buffer)
@@ -406,13 +520,17 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
     const timer = setTimeout(async () => {
       try {
         await TauriApi.editorSaveAutosave(canonicalPath, contentToSave);
+        // Refresh history if current active tab matches
+        if (canonicalPath) {
+          fetchAutosaveHistory(canonicalPath);
+        }
       } catch (err) {
         console.warn('AutoSave cache write failed:', err);
       }
     }, AUTOSAVE_INTERVAL_MS);
 
     autosaveTimersRef.current.set(tabId, timer);
-  }, [config.editor?.autosave]);
+  }, [config.editor?.autosave, fetchAutosaveHistory]);
 
   // Update content of active tab with debounced history push
   const updateActiveTabContent = useCallback((newContent: string) => {
@@ -517,19 +635,14 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
   };
 
   // Execute tab closing after confirmation or if clean
-  const executeCloseTab = async (tabId: string) => {
+  const executeCloseTab = (tabId: string) => {
     const tabToClose = tabs.find((t) => t.id === tabId);
     if (tabToClose) {
-      // Clear timers and remove autosave cache
+      // Clear timers
       const timer = autosaveTimersRef.current.get(tabId);
       if (timer) {
         clearTimeout(timer);
         autosaveTimersRef.current.delete(tabId);
-      }
-      try {
-        await TauriApi.editorRemoveAutosave(tabToClose.canonicalPath);
-      } catch {
-        // ignore
       }
       historyManagersRef.current.delete(tabId);
     }
@@ -559,13 +672,14 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
   };
 
   // Confirm close all dirty tabs & editor
-  const handleConfirmCloseAll = async () => {
+  const handleConfirmCloseAll = () => {
     for (const tab of tabs) {
-      try {
-        await TauriApi.editorRemoveAutosave(tab.canonicalPath);
-      } catch {
-        // ignore
+      const timer = autosaveTimersRef.current.get(tab.id);
+      if (timer) {
+        clearTimeout(timer);
+        autosaveTimersRef.current.delete(tab.id);
       }
+      historyManagersRef.current.delete(tab.id);
     }
     setConfirmCloseAllDirty(false);
     onClose();
@@ -1170,6 +1284,170 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
               <Eye size={13} color="#a6e3a1" />
               <span>プレビュー</span>
             </button>
+          )}
+
+          {/* AutoSave Restore Button & Popover */}
+          {activeTab && autosaveHistory.length > 0 && (
+            <div style={{ position: 'relative' }} ref={restorePopoverRef}>
+              <button
+                className="action-btn"
+                style={{
+                  padding: '3px 8px',
+                  fontSize: '11px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  color: isRestorePopoverOpen ? '#38bdf8' : 'var(--fg-main)',
+                  borderColor: isRestorePopoverOpen ? 'rgba(56, 189, 248, 0.5)' : undefined,
+                  backgroundColor: isRestorePopoverOpen ? 'rgba(56, 189, 248, 0.1)' : undefined,
+                }}
+                onClick={() => setIsRestorePopoverOpen((prev) => !prev)}
+                title={t.editor.restoreBtn(autosaveHistory.length)}
+              >
+                <RotateCcw size={12} color="#38bdf8" />
+                <span>
+                  {t.editor.restoreBtn(autosaveHistory.length)}
+                </span>
+              </button>
+
+              {isRestorePopoverOpen && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 'calc(100% + 6px)',
+                    right: 0,
+                    width: '320px',
+                    backgroundColor: '#181e2e',
+                    border: '1px solid rgba(56, 189, 248, 0.35)',
+                    borderRadius: '6px',
+                    boxShadow: '0 8px 24px rgba(0, 0, 0, 0.6)',
+                    zIndex: 60,
+                    overflow: 'hidden',
+                    display: 'flex',
+                    flexDirection: 'column',
+                  }}
+                >
+                  {/* Popover Header */}
+                  <div
+                    style={{
+                      padding: '8px 12px',
+                      borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      background: 'rgba(56, 189, 248, 0.06)',
+                    }}
+                  >
+                    <div>
+                      <div
+                        style={{
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          color: '#f8fafc',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                        }}
+                      >
+                        <RotateCcw size={12} color="#38bdf8" />
+                        <span>{t.editor.backupHistoryTitle}</span>
+                      </div>
+                      <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '2px' }}>
+                        {t.editor.backupHistorySubtitle}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setIsRestorePopoverOpen(false)}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: '#94a3b8',
+                        cursor: 'pointer',
+                        padding: '2px',
+                        borderRadius: '4px',
+                        display: 'flex',
+                      }}
+                      title={t.common?.close || '閉じる'}
+                    >
+                      <X size={13} />
+                    </button>
+                  </div>
+
+                  {/* Popover List */}
+                  <div style={{ maxHeight: '260px', overflowY: 'auto', padding: '4px 0' }}>
+                    {autosaveHistory.map((entry, index) => {
+                      const isLatest = index === 0;
+                      return (
+                        <div
+                          key={entry.id}
+                          style={{
+                            padding: '8px 12px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            borderBottom:
+                              index < autosaveHistory.length - 1 ? '1px solid rgba(255, 255, 255, 0.05)' : 'none',
+                            backgroundColor: isLatest ? 'rgba(56, 189, 248, 0.04)' : 'transparent',
+                          }}
+                        >
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', overflow: 'hidden' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              {isLatest && (
+                                <span
+                                  style={{
+                                    fontSize: '9px',
+                                    padding: '1px 5px',
+                                    background: 'rgba(56, 189, 248, 0.2)',
+                                    color: '#38bdf8',
+                                    borderRadius: '3px',
+                                    fontWeight: 600,
+                                  }}
+                                >
+                                  {t.editor.latestBadge}
+                                </span>
+                              )}
+                              <span style={{ fontSize: '11px', color: '#e2e8f0', fontFamily: 'monospace' }}>
+                                {formatDateTime(entry.timestamp)}
+                              </span>
+                            </div>
+                            <div
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                fontSize: '10px',
+                                color: '#94a3b8',
+                              }}
+                            >
+                              <span>{formatRelativeTime(entry.timestamp, language)}</span>
+                              <span>•</span>
+                              <span>{formatBytes(entry.size_bytes)}</span>
+                            </div>
+                          </div>
+
+                          <button
+                            className="btn-secondary"
+                            style={{
+                              padding: '2px 8px',
+                              fontSize: '11px',
+                              height: '24px',
+                              marginLeft: '8px',
+                              flexShrink: 0,
+                              cursor: activeTab.isReadOnly ? 'not-allowed' : 'pointer',
+                              opacity: activeTab.isReadOnly ? 0.5 : 1,
+                            }}
+                            disabled={activeTab.isReadOnly}
+                            onClick={() => handleRestoreSnapshot(entry)}
+                          >
+                            {t.editor.restoreAction}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
           )}
 
           <button

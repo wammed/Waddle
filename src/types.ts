@@ -84,6 +84,12 @@ export interface EditorSaveResult {
   message?: string | null;
 }
 
+export interface AutosaveEntry {
+  id: string;
+  timestamp: number;
+  size_bytes: number;
+}
+
 export interface EditorTab {
   id: string;
   filePath: string;

@@ -127,10 +127,16 @@ Welcome to the comprehensive feature guide for **Waddle**, the AI-integrated, pr
 - **State Protection, Undo/Redo & Plain-Text Search/Replace**:
   - **Self-Contained Undo/Redo**: `Ctrl + Z` (Undo) and `Ctrl + Shift + Z` / `Ctrl + Y` (Redo) with 400ms debounce merge during typing.
   - **ReDoS-Free Exact Match Search/Replace**: Strictly forbids regular expressions, using exact substring matching. Mini-bar opened with `Ctrl + F` (Search) or `Ctrl + H` (Replace), featuring match count indicator (`1 / 5`), jump to match, single replace, and replace all.
-- **Automated Backup Cache (AutoSave / Dedicated Cache Aggregation)**:
+- **Automated Backup Cache (AutoSave / Dedicated Cache Aggregation & 6-Generation Rotation)**:
   - **Settings Toggle**: Configurable in Settings (`Ctrl + ,`).
-  - **Dedicated Cache Directory**: Saves to `~/.cache/waddle/autosave/` (enforcing `0700` permissions), mapping canonical paths by escaping separators (e.g., `%home%user%.config%fish%config.fish`).
-  - **Lifecycle**: Dirty buffers automatically write to cache after 120 seconds. Explicit save (`Ctrl + S`) atomically saves the real file (`.tmp` -> permissions restore -> `rename`) and deletes the cache. On file open, recovery dialog prompts if an uncommitted backup is detected: `[リカバリ検知] 前回の未保存バックアップデータが見つかりました。復元しますか？`
+  - **Dedicated Cache Directory & Safe Sandboxing**: Saves to `~/.cache/waddle/autosave/` (enforcing `0700` directory and `0600` file permissions), escaping canonical paths with `%` and appending millisecond timestamps (e.g., `%home%user%.config%fish%config.fish.1726500000000`).
+  - **Up to 6-Generation Snapshot Rotation**: Retains up to 6 historical snapshots per file, automatically pruning the oldest when the 7th is written.
+  - **Safe Snapshot Retention Policy**: Snapshots are preserved even on explicit save (`Ctrl + S`), editor close, or tab discard. Stale snapshots older than 7 days (604,800s) are automatically cleaned up via startup/background garbage collection.
+  - **Header Restore UI & Popover Modal (`Restore (N)`)**:
+    - Editor header toolbar includes a permanent `Restore (N)` button (with `RotateCcw` icon and active snapshot count badge) visible whenever snapshots exist.
+    - Clicking toggles a dropdown popover displaying up to 6 snapshots sorted newest-first with `[Latest]` badge, monospace timestamps (`YYYY/MM/DD HH:mm:ss`), relative times (`2m ago`), and human-readable file sizes (`1.2 KB`).
+    - **One-Click Safe Restoration**: Clicking `Restore` loads the snapshot content and marks the tab dirty (`isDirty = true`, uncommitted dot `●` on). The pre-restore buffer is automatically pushed to the undo history stack, guaranteeing instant non-destructive rollback via `Ctrl + Z`.
+  - **Crash Recovery Dialog**: On file open, if uncommitted backup data is detected, prompts with a recovery modal (`[リカバリ検知] 前回の未保存バックアップデータが見つかりました。復元しますか？`).
 - **Focus-Exclusive Shortcut Handling**:
   - Container (`tabIndex={-1}`) intercepts keystrokes via `onKeyDownCapture` and `e.stopPropagation()`:
     - `Ctrl + F`: Opens/closes Find mini-bar (suppresses terminal log search).

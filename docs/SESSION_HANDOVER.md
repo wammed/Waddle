@@ -925,6 +925,41 @@ npm run tauri dev
       - **Rust 静的解析**: `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets` -> 警告・エラー 0 件。
       - **本番リリースビルド & 配備**: `cargo build --manifest-path src-tauri/Cargo.toml --release`（27.68s）完了、`install -m 755 target/release/waddle ~/.local/bin/waddle` により本番バイナリ配備完了。
 
+43. **Waddle 内蔵エディタ：AutoSave 復元 UI（ヘッダー常設）および最大 6 世代バックアップ管理の実装**:
+    - **背景と目的**:
+      - 既存の単一キャッシュ型 AutoSave に対し、過去のスナップショットから任意の時点へ安全に巻き戻せる復元導線をエディタヘッダーに追加。
+      - 1 ファイルにつき最大 6 世代のスナップショットをローテーション保持し、保存（`Ctrl+S`）やタブ終了時もキャッシュを破棄せず安全に保持。
+      - 誤操作で過去データを復元してしまった場合でも、直前のエディタ内容を Undo スタックへ退避することで `Ctrl+Z` による即時巻き戻し（非破壊復元）を保証。
+    - **改修内容と解決アプローチ**:
+      1. **Rust バックエンド (`src-tauri/src/editor_ops.rs` & `src-tauri/src/lib.rs`)**:
+         - `AutosaveEntry { id, timestamp, size_bytes }` 構造体を定義。
+         - `save_autosave_snapshot`: キャッシュファイル名にミリ秒タイムスタンプ（`.<timestamp_ms>`）を付与。同一ファイルのスナップショットが 6 件を超えた場合、最古のファイルを自動削除（ローテーション）。
+         - `get_autosave_history`: 同一ファイルの過去スナップショットをタイムスタンプ降順（新しい順）で最大 6 件返却。
+         - `load_autosave_content`: `cache_id` に対しパストラバーサル（`..`, `/`, `\`）の混入を厳格拒否し、正規化パスが `~/.cache/waddle/autosave/` 内部に完全に存在することを検証した上で安全に内容を返却。
+         - `clean_stale_autosaves`: 7 日間（604,800秒）以上経過した古いスナップショットを起動時または定期的に自動削除（GC）。
+         - `editor_open_file` を最新スナップショット検査に更新、`editor_save_file` でのキャッシュ強制削除を廃止（世代履歴の保持）。
+         - `src-tauri/src/lib.rs` に `editor_get_autosave_history`, `editor_save_autosave_snapshot`, `editor_load_autosave_content` コマンドを登録し、起動時に `clean_stale_autosaves` を実行。
+      2. **フロントエンド API & 型定義 (`src/types.ts`, `src/services/tauriApi.ts`)**:
+         - `AutosaveEntry` インターフェースを追加。
+         - `TauriApi.editorGetAutosaveHistory`, `TauriApi.editorSaveAutosaveSnapshot`, `TauriApi.editorLoadAutosaveContent` を実装。
+      3. **多言語対応 (`src/i18n/translations.ts`, `src/i18n/__tests__/translations.test.ts`)**:
+         - `restoreBtn`, `backupHistoryTitle`, `backupHistorySubtitle`, `latestBadge`, `restoreAction`, `restoreSuccessToast`, `noBackups` を `en-US`, `en-GB`, `ja` 全言語に完全同期。
+      4. **エディタヘッダー復元 UI & ポップオーバー (`src/components/EditorPane.tsx`)**:
+         - ヘッダーツールバーに件数バッジ付き「復元 (N)」ボタン（`RotateCcw` アイコン）を常設（履歴存在時のみ表示）。
+         - クリックでポップオーバーモーダルが展開。最大 6 件のスナップショットを新しい順に一覧表示（直近は `[最新]` バッジ、日時 `YYYY/MM/DD HH:mm:ss`、相対時間、ファイルサイズ）。
+         - 「復元」ボタン押下時、現在のバッファ内容を `EditorHistoryManager` Undo スタックへプッシュ退避した上でスナップショットを展開し、`isDirty = true` を付与。誤って復元しても `Ctrl + Z` で瞬時に復元前へロールバック可能。
+         - 外側クリックおよび Escape キー押下による自動クローズ処理を完備。
+         - 保存（`Ctrl+S`）やタブ終了時・破棄時もキャッシュを即座に削除せず保持。
+      5. **自動テスト拡充 & 全件合格**:
+         - `editor_ops.rs` に `test_autosave_lifecycle`, `test_autosave_rotation_max_6`, `test_autosave_path_traversal_protection`, `test_autosave_stale_gc` を追加（Rust 単体テスト全 56 件 100% PASS）。
+         - フロントエンド Vitest テスト 54 件 100% PASS。
+    - **検証エビデンス**:
+      - **フロントエンド自動テスト**: `npm test` -> 7 ファイル全 54 テスト 100% PASS (171ms)。
+      - **フロントエンドビルド**: `npm run build` -> TypeScript 型検査 0 エラー、Vite バンドル正常完了 (2.19s)。
+      - **Rust バックエンド単体テスト**: `cargo test --manifest-path src-tauri/Cargo.toml` -> 全 56 テスト 100% PASS。
+      - **Rust 静的解析**: `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets` -> 警告・エラー 0 件。
+      - **本番リリースビルド & 配備**: `cargo build --manifest-path src-tauri/Cargo.toml --release`（25.00s）完了、`install -m 755 src-tauri/target/release/waddle ~/.local/bin/waddle` により本番バイナリ配備完了。
+
 ---
 
 ## 6. 次回再開時の検討・作業候補（Next Steps）

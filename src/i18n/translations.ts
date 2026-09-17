@@ -148,6 +148,13 @@ export interface Translations {
     secretMaskOff: string;
     secretMaskProtected: string;
     secretMaskExposed: string;
+    restoreBtn: (count: number) => string;
+    backupHistoryTitle: string;
+    backupHistorySubtitle: string;
+    latestBadge: string;
+    restoreAction: string;
+    restoreSuccessToast: (timeStr: string) => string;
+    noBackups: string;
   };
   aiCommand: {
     title: string;
@@ -473,6 +480,14 @@ export const translations: Record<Language, Translations> = {
       secretMaskOff: 'Mask OFF',
       secretMaskProtected: 'Protected with visual mask',
       secretMaskExposed: 'Plain-text exposed',
+      restoreBtn: (count: number) => `Restore (${count})`,
+      backupHistoryTitle: 'Backup History',
+      backupHistorySubtitle: 'Up to 6 auto-save snapshots',
+      latestBadge: 'Latest',
+      restoreAction: 'Restore',
+      restoreSuccessToast: (timeStr: string) =>
+        `[Restored] Restored from backup at ${timeStr}. Press Ctrl+S to save.`,
+      noBackups: 'No backups available',
     },
     aiCommand: {
       title: 'AI Command Assistant',
@@ -799,6 +814,14 @@ export const translations: Record<Language, Translations> = {
       secretMaskOff: 'Mask OFF',
       secretMaskProtected: 'Protected with visual mask',
       secretMaskExposed: 'Plain-text exposed',
+      restoreBtn: (count: number) => `Restore (${count})`,
+      backupHistoryTitle: 'Backup History',
+      backupHistorySubtitle: 'Up to 6 auto-save snapshots',
+      latestBadge: 'Latest',
+      restoreAction: 'Restore',
+      restoreSuccessToast: (timeStr: string) =>
+        `[Restored] Restored from backup at ${timeStr}. Press Ctrl+S to save.`,
+      noBackups: 'No backups available',
     },
     aiCommand: {
       title: 'AI Command Assistant',
@@ -1125,6 +1148,14 @@ export const translations: Record<Language, Translations> = {
       secretMaskOff: 'マスク OFF',
       secretMaskProtected: '伏字で保護中',
       secretMaskExposed: '平文表示中・漏洩注意',
+      restoreBtn: (count: number) => `復元 (${count})`,
+      backupHistoryTitle: 'バックアップ履歴',
+      backupHistorySubtitle: '最大6世代の自動保存スナップショット',
+      latestBadge: '最新',
+      restoreAction: '復元',
+      restoreSuccessToast: (timeStr: string) =>
+        `[復元完了] ${timeStr} の自動バックアップから復元しました。保存するには Ctrl+S を押してください。`,
+      noBackups: '利用可能なバックアップはありません',
     },
     aiCommand: {
       title: 'AI Command Assistant',

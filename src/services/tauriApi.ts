@@ -15,6 +15,7 @@ import {
   ProjectRulesInfo,
   EditorOpenResult,
   EditorSaveResult,
+  AutosaveEntry,
 } from '../types';
 
 export const isTauri = () => {
@@ -258,6 +259,21 @@ export const TauriApi = {
   async editorSaveAutosave(path: string, content: string): Promise<void> {
     if (!isTauri()) return;
     return await invoke('editor_save_autosave', { path, content });
+  },
+
+  async editorSaveAutosaveSnapshot(path: string, content: string): Promise<void> {
+    if (!isTauri()) return;
+    return await invoke('editor_save_autosave_snapshot', { path, content });
+  },
+
+  async editorGetAutosaveHistory(path: string): Promise<AutosaveEntry[]> {
+    if (!isTauri()) return [];
+    return await invoke<AutosaveEntry[]>('editor_get_autosave_history', { path });
+  },
+
+  async editorLoadAutosaveContent(cacheId: string): Promise<string> {
+    if (!isTauri()) return '';
+    return await invoke<string>('editor_load_autosave_content', { cacheId });
   },
 
   async editorRemoveAutosave(path: string): Promise<void> {

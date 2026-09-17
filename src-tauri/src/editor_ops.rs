@@ -22,6 +22,16 @@ pub struct EditorOpenResult {
     pub autosave_timestamp: Option<u64>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct AutosaveEntry {
+    pub id: String,
+    pub timestamp: u64,
+    pub size_bytes: u64,
+}
+
+pub const MAX_AUTOSAVE_GENERATIONS: usize = 6;
+pub const AUTOSAVE_STALE_SECS: u64 = 7 * 24 * 3600; // 7 days
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EditorSaveResult {
     pub saved_path: String,
@@ -56,11 +66,181 @@ pub fn get_autosave_dir() -> Result<PathBuf, String> {
     Ok(autosave_dir)
 }
 
-/// Get the autosave file path for a canonical target path.
+/// Get the autosave file path for a canonical target path (legacy single file).
 pub fn get_autosave_file_path(canonical_path: &Path) -> Result<PathBuf, String> {
     let dir = get_autosave_dir()?;
     let name = path_to_autosave_filename(canonical_path);
     Ok(dir.join(name))
+}
+
+/// Save a timestamped autosave snapshot and rotate to keep at most MAX_AUTOSAVE_GENERATIONS (6).
+pub fn save_autosave_snapshot(canonical_path: &Path, content: &str) -> Result<(), String> {
+    let dir = get_autosave_dir()?;
+    let base_name = path_to_autosave_filename(canonical_path);
+    let now_millis = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64;
+
+    let new_filename = format!("{}.{}", base_name, now_millis);
+    let new_file_path = dir.join(&new_filename);
+
+    fs::write(&new_file_path, content)
+        .map_err(|e| format!("自動バックアップスナップショットの保存に失敗しました: {}", e))?;
+
+    #[cfg(unix)]
+    {
+        let _ = fs::set_permissions(&new_file_path, fs::Permissions::from_mode(0o600));
+    }
+
+    // Scan for all snapshots belonging to this base_name
+    let prefix = format!("{}.", base_name);
+    if let Ok(entries) = fs::read_dir(&dir) {
+        let mut snapshots: Vec<(PathBuf, u64)> = Vec::new();
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().to_string();
+            if name.starts_with(&prefix) {
+                let ts_str = &name[prefix.len()..];
+                let ts = ts_str.parse::<u64>().unwrap_or_else(|_| {
+                    entry
+                        .metadata()
+                        .ok()
+                        .and_then(|m| m.modified().ok())
+                        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                        .map(|d| d.as_millis() as u64)
+                        .unwrap_or(0)
+                });
+                snapshots.push((entry.path(), ts));
+            } else if name == base_name {
+                let ts = entry
+                    .metadata()
+                    .ok()
+                    .and_then(|m| m.modified().ok())
+                    .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                    .map(|d| d.as_millis() as u64)
+                    .unwrap_or(0);
+                snapshots.push((entry.path(), ts));
+            }
+        }
+
+        // Sort descending (newest first)
+        snapshots.sort_by_key(|a| std::cmp::Reverse(a.1));
+
+        // Delete excess snapshots older than MAX_AUTOSAVE_GENERATIONS
+        if snapshots.len() > MAX_AUTOSAVE_GENERATIONS {
+            for (old_path, _) in &snapshots[MAX_AUTOSAVE_GENERATIONS..] {
+                let _ = fs::remove_file(old_path);
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// Retrieve list of autosave snapshots for a canonical path, sorted descending (newest first), up to 6.
+pub fn get_autosave_history(canonical_path: &Path) -> Result<Vec<AutosaveEntry>, String> {
+    let dir = get_autosave_dir()?;
+    let base_name = path_to_autosave_filename(canonical_path);
+    let prefix = format!("{}.", base_name);
+
+    let mut list: Vec<AutosaveEntry> = Vec::new();
+    if let Ok(entries) = fs::read_dir(&dir) {
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().to_string();
+            if name.starts_with(&prefix) {
+                let ts_str = &name[prefix.len()..];
+                let timestamp = ts_str.parse::<u64>().unwrap_or_else(|_| {
+                    entry
+                        .metadata()
+                        .ok()
+                        .and_then(|m| m.modified().ok())
+                        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                        .map(|d| d.as_millis() as u64)
+                        .unwrap_or(0)
+                });
+                let size_bytes = entry.metadata().map(|m| m.len()).unwrap_or(0);
+                list.push(AutosaveEntry {
+                    id: name,
+                    timestamp,
+                    size_bytes,
+                });
+            } else if name == base_name {
+                let meta = entry.metadata().ok();
+                let timestamp = meta
+                    .as_ref()
+                    .and_then(|m| m.modified().ok())
+                    .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                    .map(|d| d.as_millis() as u64)
+                    .unwrap_or(0);
+                let size_bytes = meta.map(|m| m.len()).unwrap_or(0);
+                list.push(AutosaveEntry {
+                    id: name,
+                    timestamp,
+                    size_bytes,
+                });
+            }
+        }
+    }
+
+    list.sort_by_key(|a| std::cmp::Reverse(a.timestamp));
+    list.truncate(MAX_AUTOSAVE_GENERATIONS);
+    Ok(list)
+}
+
+/// Safely load content of an autosave snapshot by ID with path traversal and canonicalization checks.
+pub fn load_autosave_content(cache_id: &str) -> Result<String, String> {
+    if cache_id.is_empty()
+        || cache_id.contains('/')
+        || cache_id.contains('\\')
+        || cache_id.contains("..")
+    {
+        return Err("不正なキャッシュファイル名です（パストラバーサル防止）".to_string());
+    }
+
+    let dir = get_autosave_dir()?;
+    let target = dir.join(cache_id);
+
+    if !target.exists() {
+        return Err("指定されたバックアップキャッシュファイルが存在しません".to_string());
+    }
+
+    let canon_dir = dir.canonicalize().unwrap_or(dir);
+    let canon_target = target
+        .canonicalize()
+        .map_err(|e| format!("キャッシュパスの解決に失敗しました: {}", e))?;
+
+    if !canon_target.starts_with(&canon_dir) {
+        return Err("不正なキャッシュパスへのアクセスが拒否されました".to_string());
+    }
+
+    fs::read_to_string(&canon_target)
+        .map_err(|e| format!("バックアップキャッシュの読み込みに失敗しました: {}", e))
+}
+
+/// Remove autosave files in the given directory that are older than max_age_secs.
+pub fn clean_stale_autosaves_in_dir(dir: &Path, max_age_secs: u64) -> usize {
+    let Ok(entries) = fs::read_dir(dir) else { return 0 };
+    let now = std::time::SystemTime::now();
+    let mut removed = 0;
+
+    for entry in entries.flatten() {
+        if let Ok(meta) = entry.metadata() {
+            if let Ok(mtime) = meta.modified() {
+                if let Ok(age) = now.duration_since(mtime) {
+                    if age.as_secs() >= max_age_secs && fs::remove_file(entry.path()).is_ok() {
+                        removed += 1;
+                    }
+                }
+            }
+        }
+    }
+    removed
+}
+
+/// Remove autosave files that are older than max_age_secs (e.g. 7 days).
+pub fn clean_stale_autosaves(max_age_secs: u64) -> usize {
+    let Ok(dir) = get_autosave_dir() else { return 0 };
+    clean_stale_autosaves_in_dir(&dir, max_age_secs)
 }
 
 /// Check if a path is within the user's home directory.
@@ -231,28 +411,18 @@ pub fn editor_open_file(path: String) -> Result<EditorOpenResult, String> {
     let content = fs::read_to_string(&canonical_path)
         .map_err(|e| format!("ファイル内容の読み出しに失敗しました: {}", e))?;
 
-    // Check for existing autosave cache
+    // Check for existing autosave history (up to 6 generations)
     let mut has_autosave = false;
     let mut autosave_content: Option<String> = None;
     let mut autosave_timestamp: Option<u64> = None;
 
-    if let Ok(cache_file) = get_autosave_file_path(&canonical_path) {
-        if cache_file.exists() {
-            if let Ok(cache_text) = fs::read_to_string(&cache_file) {
+    if let Ok(history) = get_autosave_history(&canonical_path) {
+        if let Some(newest) = history.first() {
+            if let Ok(cache_text) = load_autosave_content(&newest.id) {
                 if cache_text != content {
                     has_autosave = true;
                     autosave_content = Some(cache_text);
-                    if let Ok(m) = cache_file.metadata() {
-                        if let Ok(time) = m.modified() {
-                            autosave_timestamp = time
-                                .duration_since(std::time::UNIX_EPOCH)
-                                .ok()
-                                .map(|d| d.as_secs());
-                        }
-                    }
-                } else {
-                    // Cache is identical to file on disk, clean it up
-                    let _ = fs::remove_file(&cache_file);
+                    autosave_timestamp = Some(newest.timestamp);
                 }
             }
         }
@@ -371,12 +541,7 @@ pub fn editor_save_file(path: String, content: String) -> Result<EditorSaveResul
         return Err(format!("アトミック保存（名前変更）に失敗しました: {}", e));
     }
 
-    // Remove any leftover autosave cache file for this target
-    if let Ok(cache_file) = get_autosave_file_path(&canonical_path) {
-        if cache_file.exists() {
-            let _ = fs::remove_file(cache_file);
-        }
-    }
+    // Retain 6-generation autosave history even after explicit save (preserves rewind capability)
 
     let message = if is_symlink {
         Some(format!(
@@ -394,9 +559,15 @@ pub fn editor_save_file(path: String, content: String) -> Result<EditorSaveResul
     })
 }
 
-/// Write current buffer to autosave cache directory (~/.cache/waddle/autosave/).
+/// Write current buffer to autosave cache directory (~/.cache/waddle/autosave/) as a snapshot.
 #[tauri::command]
 pub fn editor_save_autosave(path: String, content: String) -> Result<(), String> {
+    editor_save_autosave_snapshot(path, content)
+}
+
+/// Save a timestamped autosave snapshot and rotate to keep at most 6 generations.
+#[tauri::command]
+pub fn editor_save_autosave_snapshot(path: String, content: String) -> Result<(), String> {
     let orig_p = Path::new(&path);
     let canonical_path = if orig_p.exists() {
         orig_p.canonicalize().unwrap_or_else(|_| orig_p.to_path_buf())
@@ -404,16 +575,26 @@ pub fn editor_save_autosave(path: String, content: String) -> Result<(), String>
         orig_p.to_path_buf()
     };
 
-    let cache_file = get_autosave_file_path(&canonical_path)?;
-    fs::write(&cache_file, content)
-        .map_err(|e| format!("自動バックアップキャッシュの保存に失敗しました: {}", e))?;
+    save_autosave_snapshot(&canonical_path, &content)
+}
 
-    #[cfg(unix)]
-    {
-        let _ = fs::set_permissions(&cache_file, fs::Permissions::from_mode(0o600));
-    }
+/// Get autosave snapshot history (up to 6 newest, sorted descending).
+#[tauri::command]
+pub fn editor_get_autosave_history(path: String) -> Result<Vec<AutosaveEntry>, String> {
+    let orig_p = Path::new(&path);
+    let canonical_path = if orig_p.exists() {
+        orig_p.canonicalize().unwrap_or_else(|_| orig_p.to_path_buf())
+    } else {
+        orig_p.to_path_buf()
+    };
 
-    Ok(())
+    get_autosave_history(&canonical_path)
+}
+
+/// Load the text content of a specific autosave cache snapshot.
+#[tauri::command]
+pub fn editor_load_autosave_content(cache_id: String) -> Result<String, String> {
+    load_autosave_content(&cache_id)
 }
 
 /// Remove autosave cache file when buffer is cleanly saved or discarded.
@@ -513,16 +694,80 @@ mod tests {
 
         let target_str = target.to_string_lossy().to_string();
 
-        // 1. Save autosave cache
+        // 1. Save autosave snapshot
         assert!(editor_save_autosave(target_str.clone(), "key = new_value\n".to_string()).is_ok());
 
-        let cache_file = get_autosave_file_path(&target.canonicalize().unwrap()).unwrap();
-        assert!(cache_file.exists());
-        assert_eq!(fs::read_to_string(&cache_file).unwrap(), "key = new_value\n");
+        let history = editor_get_autosave_history(target_str.clone()).unwrap();
+        assert_eq!(history.len(), 1);
+        let content = editor_load_autosave_content(history[0].id.clone()).unwrap();
+        assert_eq!(content, "key = new_value\n");
 
-        // 2. Remove autosave cache
-        assert!(editor_remove_autosave(target_str).is_ok());
-        assert!(!cache_file.exists());
+        // Clean up test cache
+        let dir = get_autosave_dir().unwrap();
+        for entry in history {
+            let _ = fs::remove_file(dir.join(entry.id));
+        }
+
+        let _ = fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_autosave_rotation_max_6() {
+        let temp_dir = std::env::temp_dir().join(format!("waddle_test_rot_{}", uuid::Uuid::new_v4()));
+        let _ = fs::create_dir_all(&temp_dir);
+
+        let target = temp_dir.join("rotated.conf");
+        fs::write(&target, "initial\n").unwrap();
+        let target_str = target.to_string_lossy().to_string();
+
+        // Save 8 snapshots with slight delay to ensure distinct timestamps
+        for i in 1..=8 {
+            assert!(editor_save_autosave(target_str.clone(), format!("version {}\n", i)).is_ok());
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+
+        let history = editor_get_autosave_history(target_str.clone()).unwrap();
+        // Should keep at most MAX_AUTOSAVE_GENERATIONS (6)
+        assert_eq!(history.len(), 6);
+
+        // First item should be the newest snapshot ("version 8")
+        let newest_content = editor_load_autosave_content(history[0].id.clone()).unwrap();
+        assert_eq!(newest_content, "version 8\n");
+
+        // Last item should be "version 3" ("version 1" and "version 2" were rotated out)
+        let oldest_content = editor_load_autosave_content(history[5].id.clone()).unwrap();
+        assert_eq!(oldest_content, "version 3\n");
+
+        // Clean up test snapshots
+        let dir = get_autosave_dir().unwrap();
+        for entry in history {
+            let _ = fs::remove_file(dir.join(entry.id));
+        }
+
+        let _ = fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_autosave_path_traversal_protection() {
+        assert!(editor_load_autosave_content("../etc/passwd".to_string()).is_err());
+        assert!(editor_load_autosave_content("..".to_string()).is_err());
+        assert!(editor_load_autosave_content("/etc/shadow".to_string()).is_err());
+        assert!(editor_load_autosave_content("sub/path".to_string()).is_err());
+        assert!(editor_load_autosave_content("".to_string()).is_err());
+    }
+
+    #[test]
+    fn test_autosave_stale_gc() {
+        let temp_dir = std::env::temp_dir().join(format!("waddle_test_gc_{}", uuid::Uuid::new_v4()));
+        let _ = fs::create_dir_all(&temp_dir);
+
+        let old_file = temp_dir.join("test_stale_gc_file.1000");
+        fs::write(&old_file, "stale").unwrap();
+
+        // Stale GC with 0 secs threshold in isolated temp_dir should clean up the file
+        let removed = clean_stale_autosaves_in_dir(&temp_dir, 0);
+        assert_eq!(removed, 1);
+        assert!(!old_file.exists());
 
         let _ = fs::remove_dir_all(&temp_dir);
     }
