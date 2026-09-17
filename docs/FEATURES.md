@@ -130,6 +130,7 @@ Welcome to the comprehensive feature guide for **Waddle**, the AI-integrated, pr
 - **Automated Backup Cache (AutoSave / Dedicated Cache Aggregation & 6-Generation Rotation)**:
   - **Settings Toggle**: Configurable in Settings (`Ctrl + ,`).
   - **Dedicated Cache Directory & Safe Sandboxing**: Saves to `~/.cache/waddle/autosave/` (enforcing `0700` directory and `0600` file permissions), escaping canonical paths with `%` and appending millisecond timestamps (e.g., `%home%user%.config%fish%config.fish.1726500000000`).
+  - **First-Input Timer Anchor & 120s Periodic AutoSave (`AutosaveScheduler`)**: The 120-second autosave timer starts on the *first input* of an editing session. Subsequent keystrokes do not reset or push the timer forward (unlike classic debounce), guaranteeing that uncommitted edits are written to cache every 120 seconds even during continuous typing. Manual save (`Ctrl + S`), buffer restoration, or tab closing resets the timer, allowing the next edit to initiate a new 120s cycle from that first input.
   - **Up to 6-Generation Snapshot Rotation**: Retains up to 6 historical snapshots per file, automatically pruning the oldest when the 7th is written.
   - **Safe Snapshot Retention Policy**: Snapshots are preserved even on explicit save (`Ctrl + S`), editor close, or tab discard. Stale snapshots older than 7 days (604,800s) are automatically cleaned up via startup/background garbage collection.
   - **Header Restore UI & Popover Modal (`Restore (N)`)**:

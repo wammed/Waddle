@@ -281,3 +281,76 @@ export class EditorHistoryManager {
     this.redoStack = [];
   }
 }
+
+/**
+ * AutosaveScheduler manages per-tab autosave timers with first-input start semantics:
+ * - When an edit occurs, if no timer is running for the tab, a 120s timer starts (start = first input).
+ * - Subsequent edits within that 120s window do NOT reset or extend the timer (unlike debounce).
+ * - When the timer fires, the onSave callback is executed with the latest content.
+ * - Once saved (or on manual Ctrl+S / tab close), the timer clears,
+ *   so the next edit will start a new 120s countdown from that next first input.
+ */
+export class AutosaveScheduler {
+  private timers: Map<string, ReturnType<typeof setTimeout>> = new Map();
+  private lastSavedContents: Map<string, string> = new Map();
+  private intervalMs: number;
+
+  constructor(intervalMs: number = 120 * 1000) {
+    this.intervalMs = intervalMs;
+  }
+
+  /**
+   * Schedule autosave starting from the FIRST input.
+   * If a timer is already running for tabId, this call is a no-op (does NOT reset timer).
+   * Returns true if a new timer was started, false if an existing timer is already running.
+   */
+  schedule(tabId: string, onSave: () => void | Promise<void>): boolean {
+    if (this.timers.has(tabId)) {
+      return false;
+    }
+
+    const timer = setTimeout(async () => {
+      this.timers.delete(tabId);
+      try {
+        await onSave();
+      } catch (err) {
+        console.warn('Autosave callback execution failed:', err);
+      }
+    }, this.intervalMs);
+
+    this.timers.set(tabId, timer);
+    return true;
+  }
+
+  hasTimer(tabId: string): boolean {
+    return this.timers.has(tabId);
+  }
+
+  cancel(tabId: string): void {
+    const timer = this.timers.get(tabId);
+    if (timer) {
+      clearTimeout(timer);
+      this.timers.delete(tabId);
+    }
+  }
+
+  clearAll(): void {
+    this.timers.forEach((timer) => clearTimeout(timer));
+    this.timers.clear();
+    this.lastSavedContents.clear();
+  }
+
+  setLastSavedContent(tabId: string, content: string): void {
+    this.lastSavedContents.set(tabId, content);
+  }
+
+  getLastSavedContent(tabId: string): string | undefined {
+    return this.lastSavedContents.get(tabId);
+  }
+
+  removeTab(tabId: string): void {
+    this.cancel(tabId);
+    this.lastSavedContents.delete(tabId);
+  }
+}
+

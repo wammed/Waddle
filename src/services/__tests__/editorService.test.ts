@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   pathToAutosaveFilename,
   handleTabIndentation,
@@ -7,6 +7,7 @@ import {
   replaceSingleMatch,
   replaceAllExactMatches,
   EditorHistoryManager,
+  AutosaveScheduler,
 } from '../editorService';
 
 describe('editorService', () => {
@@ -172,4 +173,112 @@ describe('editorService', () => {
       expect(history.canRedo()).toBe(false);
     });
   });
+
+  describe('AutosaveScheduler', () => {
+    it('starts timer on first input and fires after 120s', () => {
+      vi.useFakeTimers();
+      const scheduler = new AutosaveScheduler(120 * 1000);
+      const onSave = vi.fn();
+
+      const started = scheduler.schedule('tab-1', onSave);
+      expect(started).toBe(true);
+      expect(scheduler.hasTimer('tab-1')).toBe(true);
+
+      vi.advanceTimersByTime(119 * 1000);
+      expect(onSave).not.toHaveBeenCalled();
+
+      vi.advanceTimersByTime(1000);
+      expect(onSave).toHaveBeenCalledTimes(1);
+      expect(scheduler.hasTimer('tab-1')).toBe(false);
+
+      vi.useRealTimers();
+    });
+
+    it('does NOT reset or delay timer on subsequent inputs within the 120s window (first-input anchor)', () => {
+      vi.useFakeTimers();
+      const scheduler = new AutosaveScheduler(120 * 1000);
+      const onSave = vi.fn();
+
+      // First input at t=0s
+      expect(scheduler.schedule('tab-1', onSave)).toBe(true);
+
+      // Subsequent inputs at t=30s, 60s, 90s, 110s must NOT reset timer
+      vi.advanceTimersByTime(30 * 1000);
+      expect(scheduler.schedule('tab-1', onSave)).toBe(false);
+
+      vi.advanceTimersByTime(30 * 1000);
+      expect(scheduler.schedule('tab-1', onSave)).toBe(false);
+
+      vi.advanceTimersByTime(30 * 1000);
+      expect(scheduler.schedule('tab-1', onSave)).toBe(false);
+
+      vi.advanceTimersByTime(20 * 1000);
+      expect(scheduler.schedule('tab-1', onSave)).toBe(false);
+
+      // Total time elapsed: 110s. onSave must not have fired yet.
+      expect(onSave).not.toHaveBeenCalled();
+
+      // Advance remaining 10s (total 120s from FIRST input at t=0s)
+      vi.advanceTimersByTime(10 * 1000);
+      expect(onSave).toHaveBeenCalledTimes(1);
+      expect(scheduler.hasTimer('tab-1')).toBe(false);
+
+      vi.useRealTimers();
+    });
+
+    it('starts a new 120s cycle from the first input of the next session', () => {
+      vi.useFakeTimers();
+      const scheduler = new AutosaveScheduler(120 * 1000);
+      const onSave1 = vi.fn();
+      const onSave2 = vi.fn();
+
+      // Cycle 1
+      scheduler.schedule('tab-1', onSave1);
+      vi.advanceTimersByTime(120 * 1000);
+      expect(onSave1).toHaveBeenCalledTimes(1);
+
+      // User pauses, then types again at t=150s (this is the new first input)
+      vi.advanceTimersByTime(30 * 1000);
+      expect(scheduler.schedule('tab-1', onSave2)).toBe(true);
+
+      // 60s later (t=210s)
+      vi.advanceTimersByTime(60 * 1000);
+      expect(onSave2).not.toHaveBeenCalled();
+
+      // 60s later (total 120s from second first input)
+      vi.advanceTimersByTime(60 * 1000);
+      expect(onSave2).toHaveBeenCalledTimes(1);
+
+      vi.useRealTimers();
+    });
+
+    it('cancels timer on manual save or tab close', () => {
+      vi.useFakeTimers();
+      const scheduler = new AutosaveScheduler(120 * 1000);
+      const onSave = vi.fn();
+
+      scheduler.schedule('tab-1', onSave);
+      expect(scheduler.hasTimer('tab-1')).toBe(true);
+
+      scheduler.cancel('tab-1');
+      expect(scheduler.hasTimer('tab-1')).toBe(false);
+
+      vi.advanceTimersByTime(120 * 1000);
+      expect(onSave).not.toHaveBeenCalled();
+
+      vi.useRealTimers();
+    });
+
+    it('tracks and manages last saved content per tab', () => {
+      const scheduler = new AutosaveScheduler();
+      expect(scheduler.getLastSavedContent('tab-1')).toBeUndefined();
+
+      scheduler.setLastSavedContent('tab-1', 'hello world');
+      expect(scheduler.getLastSavedContent('tab-1')).toBe('hello world');
+
+      scheduler.removeTab('tab-1');
+      expect(scheduler.getLastSavedContent('tab-1')).toBeUndefined();
+    });
+  });
 });
+

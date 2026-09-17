@@ -32,6 +32,7 @@ import {
   replaceSingleMatch,
   replaceAllExactMatches,
   EditorHistoryManager,
+  AutosaveScheduler,
   TextMatch,
 } from '../services/editorService';
 
@@ -231,7 +232,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
   // Undo/Redo managers per tab
   const historyManagersRef = useRef<Map<string, EditorHistoryManager>>(new Map());
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const autosaveTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const autosaveSchedulerRef = useRef<AutosaveScheduler>(new AutosaveScheduler(AUTOSAVE_INTERVAL_MS));
 
   // Show a toast message with auto-dismiss
   const showToast = useCallback((text: string, type: 'info' | 'warning' | 'error' | 'success' = 'info') => {
@@ -244,6 +245,18 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
 
   // Active tab helper
   const activeTab = tabs.find((t) => t.id === activeTabId);
+  const tabsRef = useRef(tabs);
+  tabsRef.current = tabs;
+
+  // Cleanup timers on unmount
+  useEffect(() => {
+    return () => {
+      autosaveSchedulerRef.current.clearAll();
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
 
   // Load directory files for selector
   const loadDirectoryFiles = useCallback(async () => {
@@ -507,29 +520,30 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
     }
   };
 
-  // AutoSave scheduling (120s timer on dirty buffer)
-  const scheduleAutoSave = useCallback((tabId: string, canonicalPath: string, contentToSave: string) => {
+  // AutoSave scheduling (120s timer from the FIRST input, recurring every 120s while dirty)
+  const scheduleAutoSave = useCallback((tabId: string, canonicalPath: string) => {
     if (config.editor?.autosave === false) return;
+    if (!canonicalPath) return;
 
-    // Clear existing timer for this tab
-    const existingTimer = autosaveTimersRef.current.get(tabId);
-    if (existingTimer) {
-      clearTimeout(existingTimer);
-    }
+    // If a 120s timer is already ticking for this tab from its first input, do NOT reset it!
+    autosaveSchedulerRef.current.schedule(tabId, async () => {
+      const targetTab = tabsRef.current.find((t) => t.id === tabId);
+      if (!targetTab || !targetTab.isDirty) return;
 
-    const timer = setTimeout(async () => {
+      // Skip saving if buffer content has not changed since last autosave
+      const lastSaved = autosaveSchedulerRef.current.getLastSavedContent(tabId);
+      if (lastSaved !== undefined && lastSaved === targetTab.content) return;
+
       try {
-        await TauriApi.editorSaveAutosave(canonicalPath, contentToSave);
-        // Refresh history if current active tab matches
-        if (canonicalPath) {
-          fetchAutosaveHistory(canonicalPath);
+        await TauriApi.editorSaveAutosave(targetTab.canonicalPath, targetTab.content);
+        autosaveSchedulerRef.current.setLastSavedContent(tabId, targetTab.content);
+        if (targetTab.canonicalPath) {
+          fetchAutosaveHistory(targetTab.canonicalPath);
         }
       } catch (err) {
         console.warn('AutoSave cache write failed:', err);
       }
-    }, AUTOSAVE_INTERVAL_MS);
-
-    autosaveTimersRef.current.set(tabId, timer);
+    });
   }, [config.editor?.autosave, fetchAutosaveHistory]);
 
   // Update content of active tab with debounced history push
@@ -538,6 +552,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
 
     const tabId = activeTab.id;
     const canonicalPath = activeTab.canonicalPath;
+    const isNowDirty = newContent !== activeTab.savedContent;
 
     setTabs((prev) =>
       prev.map((t) =>
@@ -545,14 +560,18 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
           ? {
               ...t,
               content: newContent,
-              isDirty: newContent !== t.savedContent,
+              isDirty: isNowDirty,
             }
           : t
       )
     );
 
-    // Schedule 120s AutoSave cache
-    scheduleAutoSave(tabId, canonicalPath, newContent);
+    // Schedule 120s AutoSave from the first input if dirty; cancel if clean
+    if (isNowDirty) {
+      scheduleAutoSave(tabId, canonicalPath);
+    } else {
+      autosaveSchedulerRef.current.cancel(tabId);
+    }
 
     // Debounce undo history push
     if (debounceTimerRef.current) {
@@ -585,12 +604,9 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
     try {
       const res = await TauriApi.editorSaveFile(activeTab.filePath, activeTab.content);
 
-      // Clear autosave timer and cache
-      const timer = autosaveTimersRef.current.get(activeTab.id);
-      if (timer) {
-        clearTimeout(timer);
-        autosaveTimersRef.current.delete(activeTab.id);
-      }
+      // Clear autosave timer and update last saved content
+      autosaveSchedulerRef.current.cancel(activeTab.id);
+      autosaveSchedulerRef.current.setLastSavedContent(activeTab.id, activeTab.content);
 
       setTabs((prev) =>
         prev.map((t) =>
@@ -639,11 +655,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
     const tabToClose = tabs.find((t) => t.id === tabId);
     if (tabToClose) {
       // Clear timers
-      const timer = autosaveTimersRef.current.get(tabId);
-      if (timer) {
-        clearTimeout(timer);
-        autosaveTimersRef.current.delete(tabId);
-      }
+      autosaveSchedulerRef.current.removeTab(tabId);
       historyManagersRef.current.delete(tabId);
     }
 
@@ -673,12 +685,8 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
 
   // Confirm close all dirty tabs & editor
   const handleConfirmCloseAll = () => {
+    autosaveSchedulerRef.current.clearAll();
     for (const tab of tabs) {
-      const timer = autosaveTimersRef.current.get(tab.id);
-      if (timer) {
-        clearTimeout(timer);
-        autosaveTimersRef.current.delete(tab.id);
-      }
       historyManagersRef.current.delete(tab.id);
     }
     setConfirmCloseAllDirty(false);

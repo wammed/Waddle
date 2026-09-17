@@ -950,15 +950,19 @@ npm run tauri dev
          - 「復元」ボタン押下時、現在のバッファ内容を `EditorHistoryManager` Undo スタックへプッシュ退避した上でスナップショットを展開し、`isDirty = true` を付与。誤って復元しても `Ctrl + Z` で瞬時に復元前へロールバック可能。
          - 外側クリックおよび Escape キー押下による自動クローズ処理を完備。
          - 保存（`Ctrl+S`）やタブ終了時・破棄時もキャッシュを即座に削除せず保持。
-      5. **自動テスト拡充 & 全件合格**:
+      5. **最初の入力起点 120 秒周期 AutoSave スケジューラ (`AutosaveScheduler`)**:
+         - 従来の「最後の入力（デバウンス）」によるタイマー再設定を廃止し、セッションの「最初の入力」を起点として 120 秒のカウントダウンを開始する `AutosaveScheduler`（`src/services/editorService.ts`）を新規導入。
+         - 入力途中の連続打鍵でタイマーが延長・遅延されることなく、連続作業中であっても 120 秒ごとに確実にスナップショットがキャッシュへ書き出される仕様に改善。
+         - 手動保存（`Ctrl + S`）、タブクローズ、またはバッファのクリーン復帰時にタイマーを安全にキャンセル・リセット。
+      6. **自動テスト拡充 & 全件合格**:
          - `editor_ops.rs` に `test_autosave_lifecycle`, `test_autosave_rotation_max_6`, `test_autosave_path_traversal_protection`, `test_autosave_stale_gc` を追加（Rust 単体テスト全 56 件 100% PASS）。
-         - フロントエンド Vitest テスト 54 件 100% PASS。
+         - `editorService.test.ts` に `AutosaveScheduler` のタイマー起点、非デバウンス動作、次回セッションサイクル、キャンセル、タブ毎のキャッシュ管理を検証する 5 件の単体テストを追加（フロントエンド Vitest テスト全 59 件 100% PASS）。
     - **検証エビデンス**:
-      - **フロントエンド自動テスト**: `npm test` -> 7 ファイル全 54 テスト 100% PASS (171ms)。
+      - **フロントエンド自動テスト**: `npm test` -> 7 ファイル全 59 テスト 100% PASS (173ms)。
       - **フロントエンドビルド**: `npm run build` -> TypeScript 型検査 0 エラー、Vite バンドル正常完了 (2.19s)。
       - **Rust バックエンド単体テスト**: `cargo test --manifest-path src-tauri/Cargo.toml` -> 全 56 テスト 100% PASS。
       - **Rust 静的解析**: `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets` -> 警告・エラー 0 件。
-      - **本番リリースビルド & 配備**: `cargo build --manifest-path src-tauri/Cargo.toml --release`（25.00s）完了、`install -m 755 src-tauri/target/release/waddle ~/.local/bin/waddle` により本番バイナリ配備完了。
+      - **本番リリースビルド & 配備**: `cargo build --manifest-path src-tauri/Cargo.toml --release`（23.99s）完了、`install -m 755 src-tauri/target/release/waddle ~/.local/bin/waddle` により本番バイナリ配備完了。
 
 ---
 
