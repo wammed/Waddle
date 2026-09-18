@@ -306,6 +306,55 @@ Waddle is built on a hybrid architecture combining a high-performance **Rust bac
 
 ---
 
+### 7. Integrated Quality & Security Pipeline Architecture
+
+Waddle employs an automated four-tier quality and security assurance pipeline orchestrated from local development to pre-push Git verification.
+
+```mermaid
+flowchart TD
+    subgraph Orchestration["⚡ Git Hooks & Orchestration"]
+        LF[Lefthook]
+        CL[Commitlint]
+        TA["npm run test:all"]
+    end
+
+    subgraph Layer1["🛡️ 1. Security & Static Audit (npm run test:security)"]
+        GL[Gitleaks]
+        SL[Secretlint]
+        CA[cargo-audit]
+        CD[cargo-deny]
+    end
+
+    subgraph Layer2["🧪 2. Unit & Coverage (npm run test:unit)"]
+        VT["Vitest + @vitest/coverage-v8\n(coverage/index.html)"]
+        CT["cargo test (58 tests)"]
+    end
+
+    subgraph Layer3["👁️ 3. Visual Regression (npm run test:visual)"]
+        PW["Playwright (toHaveScreenshot)"]
+        UP["Kitty Unicode Placeholder (U+10EEEE)\nTofu Suppression"]
+        YZ["TUI Preview Box & Alignment"]
+        NT["Neon Themes Stability"]
+    end
+
+    subgraph Layer4["🧠 4. Memory & Resource Audit (npm run test:memory)"]
+        CDP["Chrome DevTools Protocol (CDP)"]
+        HEAP["JSHeap < 300MB Assertion"]
+        LEAK["DOM Nodes & Zero Leak Post-Tab Disposal"]
+    end
+
+    LF -->|pre-commit| GL
+    LF -->|pre-commit| VT
+    LF -->|commit-msg| CL
+    LF -->|pre-push| TA
+    TA --> Layer1
+    TA --> Layer2
+    TA --> Layer3
+    TA --> Layer4
+```
+
+---
+
 ## 💻 Tech Stack Reference Table
 
 | Layer | Technologies / Crates / Libraries | Purpose |
@@ -318,11 +367,15 @@ Waddle is built on a hybrid architecture combining a high-performance **Rust bac
 | **POSIX Interop** | `libc` | Process group signaling (`SIGHUP`, `SIGTERM`, `SIGKILL`) |
 | **Serialization** | `serde`, `serde_json` | Configuration and JSON stream serialization |
 | **Frontend Framework** | [React 19](https://react.dev/) + [TypeScript](https://www.typescriptlang.org/) | User interface and component state management |
-| **Build Tool** | [Vite 7](https://vitejs.dev/) | High-speed frontend development and bundler |
-| **Terminal Core** | `@xterm/xterm` (v5) | Hardware-accelerated terminal emulation |
-| **Terminal Addons** | `@xterm/addon-canvas` | 2D Canvas rendering over transparent background |
-| | `@xterm/addon-search` | Scrollback buffer search engine |
-| | `@xterm/addon-fit` | Automatic dimension fitting to DOM container |
-| | `@xterm/addon-web-links` | Clickable hyperlink navigation |
-| **Icons & Markdown** | `lucide-react`, `react-markdown`, `remark-gfm` | Clean UI icons and Markdown formatting |
-| **Packaging** | Arch Linux PKGBUILD, `pacman` bundle | Native Linux binary package distribution |
+| **Build Tooling** | [Vite 7](https://vitejs.dev/) | Frontend bundler and hot-module-replacement server |
+| **Terminal Core** | `@xterm/xterm` (v5) | Fast, hardware-accelerated terminal emulation |
+| **Terminal Addons** | `@xterm/addon-canvas` | Hardware 2D Canvas rendering |
+| | `@xterm/addon-search` | Full-buffer scrollback search |
+| | `@xterm/addon-fit` | Automatic geometry fitting to pane DOM |
+| | `@xterm/addon-web-links` | URL link detection and external browser launching |
+| **Testing & Coverage** | `vitest`, `@vitest/coverage-v8`, `cargo test` | Frontend/backend unit tests & V8 HTML coverage reporting |
+| **Visual Regression & CDP** | `@playwright/test` (Chromium CDP) | Canvas snapshot assertions & 300MB memory ceiling validation |
+| **Security Auditing** | `gitleaks`, `secretlint`, `cargo-audit`, `cargo-deny` | Secret leak scanning, dependency vulnerability and license auditing |
+| **Git Hooks & CI** | `lefthook`, `@commitlint/cli` | Conventional Commits enforcement and pre-commit orchestration |
+| **Styling & Assets** | `lucide-react`, `react-markdown`, `remark-gfm` | Vector iconography and GitHub Flavored Markdown rendering |
+| **Packaging** | Arch Linux PKGBUILD, `pacman` bundle | Native Linux distribution packages (.pkg.tar.zst) |

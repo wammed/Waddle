@@ -128,6 +128,28 @@ sudo pacman -U src-tauri/target/release/bundle/pacman/waddle-0.1.0-1-x86_64.pkg.
 
 ---
 
+## 🧪 Integrated Testing & Quality Assurance Suite
+
+Waddle features a multi-tiered test and audit pipeline orchestrated via a single command and Git hooks (Lefthook):
+
+```bash
+# Run full automated test pipeline (Security + Unit/Coverage + Visual + Memory)
+npm run test:all
+
+# Individual audit layers
+npm run test:unit      # Vitest (V8 coverage HTML report) + Cargo test
+npm run test:security  # Gitleaks + Secretlint + cargo-audit + cargo-deny
+npm run test:visual    # Playwright visual regression (Kitty graphics, Unicode placeholder, Neon themes)
+npm run test:memory    # CDP streaming stress (300MB memory ceiling & zero lingering DOM leaks)
+
+# Run Git hooks manually (Lefthook)
+npx lefthook run pre-commit
+```
+
+*For comprehensive test suites and evidence logs, see the [Test Plan (TEST_PLAN.md)](TEST_PLAN.md).*
+
+---
+
 ## 🔒 Security & Architecture (Overview)
 
 Waddle operates under a strict **100% offline, local-first** model:

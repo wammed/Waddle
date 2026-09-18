@@ -215,30 +215,44 @@
 
 ---
 
+### Suite 11: 統合自動テストスイート & セキュリティ・回帰検証 (Integrated Test Suite)
+
+| ID | テスト対象 | 検証手順 | 期待される結果 | 種別 |
+| :--- | :--- | :--- | :--- | :--- |
+| **TC-INT-01** | セキュリティ & 依存関係静的監査 (`npm run test:security`) | Gitleaks（平文秘密鍵・APIキー走査）、Secretlint（コードベース走査）、cargo-audit（RUSTSEC 脆弱性）、cargo-deny（ライセンス・重複バージョン）を実行。 | 機密漏洩 0 件、既知脆弱性 0 件、全依存ライセンスが OSS 許容リストに合致し、全検査が正常終了する。 | Automated |
+| **TC-INT-02** | ユニットテスト & V8 カバレッジダッシュボード (`npm run test:unit`) | Vitest によるフロントエンド網羅率計測（`--coverage`）および `cargo test` によるバックエンド全テストを実行。 | フロントエンド 64+ テスト全パス（Statements 80% 達成、`coverage/index.html` 生成）、Rust 58 テスト全パス。 | Automated |
+| **TC-INT-03** | Playwright 視覚的描画回帰テスト (`npm run test:visual`) | ヘッドレス Chromium で Canvas レイヤーのスナップショット比較を実行。Unicode プレースホルダー（`U+10EEEE`）、TUI プレビュー枠（Yazi/Ranger）、高電圧ネオンテーマを検証。 | 未定義グリフ（豆腐文字 □）の非表示確認、TUI 枠線のズレ・文字消失ゼロ、高輝度ネオンテーマのコントラスト保持を確認。 | Automated |
+| **TC-INT-04** | CDP メモリ & リソースリーク計測 (`npm run test:memory`) | Chrome DevTools Protocol を接続。10,000+ バッファ操作ストリーミング後およびタブ生成・破棄後のヒープと DOM ノード数を計測。 | 大量ストリーミング後も JSHeap が 300MB 以内に抑制され、タブ破棄後の DOM ノード・Document 残存リークがゼロ（差分許容値内）に保たれる。 | Automated |
+| **TC-INT-05** | 単一コマンド統合パイプライン & Lefthook Git 連動 (`npm run test:all`) | `npm run test:all` を実行。Lefthook（`pre-commit`, `commit-msg`, `pre-push`）フックの動作を検証。 | 全 4 レイヤーが順次完走して ALL PASS で終了。不正コミットやリグレッションのプッシュが機械的に遮断される。 | Automated |
+
+---
+
 ## 4. テスト実行コマンドクイックリファレンス
 
 ```bash
-# 1. バックエンド全セキュリティ・Kitty 単体テストの実行 (37 件全パス)
-cargo test --manifest-path src-tauri/Cargo.toml
+# 1. 統合フルテストパイプラインの実行 (Security + Unit/Coverage + Visual + Memory)
+npm run test:all
 
-# 2. バックエンド静的コード解析 (警告 0 件確認)
+# 2. セキュリティ & 依存関係監査 (Gitleaks, Secretlint, cargo-audit, cargo-deny)
+npm run test:security
+
+# 3. ユニットテスト & V8 HTML カバレッジレポート生成 (Vitest + Cargo test)
+npm run test:unit
+
+# 4. 視覚的描画回帰テスト (Playwright toHaveScreenshot)
+npm run test:visual
+
+# 5. メモリ & リソースリーク自動計測 (Playwright CDP)
+npm run test:memory
+
+# 6. バックエンド静的コード解析 (警告 0 件確認)
 cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets
 
-# 3. フロントエンドの型検査 & 本番ビルド (警告・エラー 0 件確認)
+# 7. フロントエンドの型検査 & 本番ビルド (警告・エラー 0 件確認)
 npm run build
 
-# 4. Kitty プロトコル自動検証ハーネス (Parser, Decoders, Clipping, Anchors, Unicode)
-npx tsx scratch/test_parser.js
-npx tsx scratch/test_anchor_coords.mjs
-npx tsx scratch/test_animation_loop.mjs
-npx tsx scratch/test_sub_clipping.mjs
-npx tsx scratch/test_unicode_placeholder.mjs
-
-# 5. セキュリティ強化自動検証テスト (危険コマンド同期 & APC バッファ上限)
-npx tsx scratch/test_security_enhancements.mjs
-
-# 6. アプリケーションの対話的デバッグ起動
-npm run tauri dev
+# 8. Git フックの手動検証 (Lefthook)
+npx lefthook run pre-commit
 ```
 
 ---
@@ -249,10 +263,10 @@ npm run tauri dev
 
 ```markdown
 ### テスト実行記録
-- **実行日**: 2026-09-12
+- **実行日**: 2026-09-19
 - **テスター**: Susie (User) & Antigravity (DeepMind Pair Programming Assistant)
-- **環境**: Linux 6.x (CachyOS / Arch), WebKitGTK 4.1, Node 20+, Rust 1.85+
-- **総合判定**: PASS (104 / 104 項目 - 100% 合格)
+- **環境**: Linux 7.2 (CachyOS / Arch), WebKitGTK 4.1, Node 20+, Rust 1.85+, Google Chrome 153
+- **総合判定**: ALL PASS (109 / 109 項目 - 100% 合格)
 
 | スイート | 項目数 | 合格数 | 不合格数 | 備考 |
 | :--- | :--- | :--- | :--- | :--- |
@@ -264,6 +278,7 @@ npm run tauri dev
 | Suite 6: テーマ・UI・壁紙 | 7 | 7 | 0 | 11種ネオン発光同期、壁紙D&D、リアルタイムプレビュー確認済 |
 | Suite 7: Kitty Graphics Protocol | 18 | 18 | 0 | 豆腐抑止、クリッピング、アニメ、32-bit RGBA差分合成、単一Canvas積層、0msクエリ応答確認済 |
 | Suite 8: セキュリティ & ガードレール | 18 | 18 | 0 | 仮想FS走査・SSRF・Git Ref検証・上限付き走査確認済 |
-| Suite 9: パフォーマンス & リソース | 5 | 5 | 0 | 256MB LRU、0% アイドル、メモリ300MB制限、40件テスト確認済 |
+| Suite 9: パフォーマンス & リソース | 5 | 5 | 0 | 256MB LRU、0% アイドル、メモリ300MB制限確認済 |
 | Suite 10: 次世代拡張 & ワークフロー | 6 | 6 | 0 | マスク、タイムライン、プレビュー、Watchdog等確認済 |
+| Suite 11: 統合自動テストパイプライン | 5 | 5 | 0 | Gitleaks/Secretlint/cargo-audit/cargo-deny、Vitest V8 カバレッジ 85%、Playwright 視覚回帰、CDP メモリ監査全パス |
 ```

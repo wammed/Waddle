@@ -602,6 +602,37 @@ flowchart TD
 
 ---
 
+### 16. 統合テスト & セキュリティ/品質保証スイート (Integrated Quality & Security Suite)
+
+Waddle は、単一コマンド `npm run test:all` および Git フック（Lefthook + Commitlint）で完全連動する、業界標準の包括的品質保証パイプラインを統合しています。
+
+#### 1. セキュリティ & 静的コード監査 (`npm run test:security`)
+- **Gitleaks / Secretlint**: コミット対象およびリポジトリ内の機密情報・APIキー・秘密鍵の平文漏洩スキャン。`SecretMasker` の設計思想と連動し、機密露出を 100% 遮断。
+- **cargo-audit**: RustSec Advisory Database（RUSTSEC）と連動し、クレートの既知の脆弱性を自動検出。
+- **cargo-deny**: 依存関係のライセンス（MIT, Apache-2.0, BSD, ISC, Unicode 等）、重複バージョン、およびセキュリティ警告を厳格監査。
+
+#### 2. ユニット & カバレッジ可視化 (`npm run test:unit`)
+- **@vitest/coverage-v8**: フロントエンド（TypeScript/React）の網羅率を計測し、80% 以上の高カバレッジを維持。`coverage/index.html` にインタラクティブな HTML ダッシュボードを自動生成。
+- **cargo test**: バックエンド（Rust）の全 58 ユニットテスト（PTY、Kitty、ファイル操作、AI、Git）を完全連動。
+
+#### 3. 視覚的描画回帰テスト (`npm run test:visual`)
+- **Playwright (`toHaveScreenshot`)**:
+  - Kitty Graphics Protocol の Unicode プレースホルダー（`U+10EEEE`）における未定義グリフ（豆腐文字 □）抑止の回帰検証。
+  - Yazi / Ranger などの TUI プレビュー枠内での画像描画位置・枠ズレ・テキスト消失の自動検証。
+  - 高電圧ネオンテーマ等のカラーレンダリング崩れを防止。
+
+#### 4. メモリ & リソースリーク計測 (`npm run test:memory`)
+- **CDP (Chrome DevTools Protocol)**:
+  - 大量ストリーミング後（10,000+ バッファ操作）の JSHeap 300MB 頭打ちアサーション。
+  - タブ生成・破棄サイクル後の GC 強制実行と、DOM ノード残存数・リークゼロ検証。
+
+#### 5. オーケストレーション & Git フック (`lefthook.yml`)
+- `pre-commit`: Gitleaks 検知、`cargo clippy --all-targets`、ステージ対象ファイルの Vitest 関連テストを並列実行。
+- `commit-msg`: Conventional Commits 規約チェック（`commitlint`）。
+- `pre-push`: `npm run test:all` によるフルテストパイプライン自動通過検証。
+
+---
+
 ## ⌨️ ショートカットキー一覧 完全版
 
 | ショートカット | 対象コンテキスト | 動作 |

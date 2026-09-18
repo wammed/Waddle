@@ -905,8 +905,8 @@ mod tests {
         assert!(!is_shell_config(&home.join("notes.txt"), home));
         assert!(!is_shell_config(&home.join(".config/nvim/init.lua"), home));
         assert!(!is_shell_config(&home.join(".config/git/config"), home));
-        assert!(!is_shell_config(&Path::new("/etc/bash.bashrc"), home));
-        assert!(!is_shell_config(&Path::new("/etc/profile"), home));
+        assert!(!is_shell_config(Path::new("/etc/bash.bashrc"), home));
+        assert!(!is_shell_config(Path::new("/etc/profile"), home));
     }
 
     #[test]

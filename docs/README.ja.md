@@ -128,6 +128,28 @@ sudo pacman -U src-tauri/target/release/bundle/pacman/waddle-0.1.0-1-x86_64.pkg.
 
 ---
 
+## 🧪 統合テスト & セキュリティ/品質保証スイート
+
+Waddle は、単一コマンドおよび Git フック（Lefthook）で連動する多層品質テストパイプラインを備えています：
+
+```bash
+# 全自動テストパイプラインの実行 (Security + Unit/Coverage + Visual + Memory)
+npm run test:all
+
+# 各個別レイヤーの検証
+npm run test:unit      # Vitest (V8 カバレッジダッシュボード生成) + Cargo test
+npm run test:security  # Gitleaks + Secretlint + cargo-audit + cargo-deny
+npm run test:visual    # Playwright による Kitty 画像・Unicode プレースホルダー・ネオンテーマ描画回帰検証
+npm run test:memory    # CDP による大量ストリーミング後 300MB メモリ上限 & タブ破棄後リークゼロ検証
+
+# Git フック (Lefthook) によるコミット前検証
+npx lefthook run pre-commit
+```
+
+*詳細な検証項目と手順は [テスト計画書 (TEST_PLAN.ja.md)](TEST_PLAN.ja.md) をご覧ください。*
+
+---
+
 ## 🔒 セキュリティ & アーキテクチャ (概要)
 
 Waddle は **100% 完全オフライン・ローカルファースト** で動作します：

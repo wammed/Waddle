@@ -964,6 +964,40 @@ npm run tauri dev
       - **Rust 静的解析**: `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets` -> 警告・エラー 0 件。
       - **本番リリースビルド & 配備**: `cargo build --manifest-path src-tauri/Cargo.toml --release`（23.99s）完了、`install -m 755 src-tauri/target/release/waddle ~/.local/bin/waddle` により本番バイナリ配備完了。
 
+44. **統合テストスイート（総合品質・セキュリティ・視覚回帰・メモリ監査）の導入と統合**:
+    - **概要**: 現行テスト資産（Rust 58テスト、Vitest 64テスト）をベースに、提案された各種外部テストツールを統合し、単一コマンド `npm run test:all` および Git フック（Lefthook + Commitlint）で連動する「統合テストスイート」を構築。
+    - **実施内容**:
+      1. **セキュリティ & 静的コード監査 (`npm run test:security`)**:
+         - **Gitleaks**: コミット対象およびリポジトリ全体の平文機密漏洩スキャン。テストベクター用 Allowlist を配備した `.gitleaks.toml` を作成し、意図的テストデータ以外での漏洩ゼロを担保。
+         - **Secretlint**: `@secretlint/secretlint-rule-preset-recommend` を導入し、静的コード監査を配備（`.secretlintrc.json`, `.secretlintignore`）。
+         - **cargo-audit**: `rustls 0.23.43 -> 0.23.45` へのアップデートにより RUSTSEC-2026-0285 脆弱性を完全解消（脆弱性 0 件）。
+         - **cargo-deny**: `src-tauri/deny.toml` を配備。MIT, Apache-2.0, BSD, ISC, Unicode 等のライセンスポリシーに準拠し、Advisories, Bans, Licenses, Sources 全チェック合格。
+      2. **ユニット & カバレッジ可視化 (`npm run test:unit`)**:
+         - `@vitest/coverage-v8` を導入。`vitest.config.ts` に V8 プロバイダー、HTML ダッシュボード出力（`coverage/index.html`）、および Statements 80% 閾値を設定。
+         - `scripts/test-unit.sh` により Vitest カバレッジと `cargo test` をワンストップ実行。
+      3. **視覚的描画回帰テスト (`npm run test:visual`)**:
+         - Playwright（`toHaveScreenshot`）を導入し、`tests/visual/` に隔離 Canvas テストハーネス（`harness.html`, `harness.ts`）を配備。
+         - Kitty Graphics Protocol Unicode プレースホルダー（`U+10EEEE`）における未定義グリフ（豆腐文字 □）抑止の回帰検証。
+         - Yazi / Ranger TUI プレビュー枠内での画像描画位置・枠ズレ・テキスト消失の自動検証。
+         - 高電圧ネオンテーマ等のカラーレンダリング崩れ抑止を自動検証。
+      4. **メモリ & リソースリーク計測 (`npm run test:memory`)**:
+         - Playwright CDP（Chrome DevTools Protocol）による自動計測スクリプト（`tests/memory/memory_audit.spec.ts`）を配備。
+         - 10,000+ バッファ操作ストリーミング後の JSHeap 300MB 頭打ちアサーション（実測約 12.8MB で完全クリア）。
+         - タブ生成・破棄サイクル後の GC 強制実行と、DOM ノード残存数・リークゼロ検証。
+      5. **オーケストレーション & Git フック (`lefthook.yml`)**:
+         - `package.json` に階層化スクリプト（`test:unit`, `test:security`, `test:visual`, `test:memory`, `test:all`, `prepare`）を配備。
+         - `lefthook.yml`: `pre-commit`（Gitleaks, cargo clippy, Vitest 関連テスト並列実行）、`commit-msg`（commitlint Conventional Commits）、`pre-push`（`npm run test:all`）。
+         - `commitlint.config.mjs`: Conventional Commits 規約準拠。
+         - `src-tauri/src/editor_ops.rs` の Clippy 警告（needless_borrow）を修正し、`cargo clippy --all-targets` 警告 0 件化。
+    - **検証エビデンス**:
+      - `npm run test:all` -> 全 4 レイヤーが単一コマンドで 20 秒で完走し、ALL PASS（Exit 0）。
+      - `npm run test:unit` -> Vitest 64 テスト全 PASS（Statements 85.88%、Lines 90.3%）、Cargo 58 テスト全 PASS。
+      - `npm run test:security` -> Gitleaks 0 leaks、Secretlint 0 errors、cargo-audit 0 vulnerabilities、cargo-deny all ok。
+      - `npm run test:visual` -> 4 テスト全 PASS（スナップショット完全一致）。
+      - `npm run test:memory` -> 2 テスト全 PASS（Heap 12.85MB < 300MB、DOM リークゼロ）。
+      - `cargo clippy --all-targets` -> 警告 0 件。
+      - `npm run build` -> Vite & TypeScript エラー 0 件。
+
 ---
 
 ## 6. 次回再開時の検討・作業候補（Next Steps）

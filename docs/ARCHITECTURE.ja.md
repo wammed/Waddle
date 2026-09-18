@@ -287,6 +287,55 @@ Waddle は、高速・堅牢な **Rust バックエンド** と、最新の **Re
 
 ---
 
+### 7. 統合テスト & 品質/セキュリティ監査パイプライン アーキテクチャ
+
+Waddle は、開発者のローカル環境から Git リモートプッシュに至るまで、製品品質・安全性・視覚整合性・メモリ健全性を機械的に保証する 4 層パイプライン構造を採用しています。
+
+```mermaid
+flowchart TD
+    subgraph Orchestration["⚡ Git フック & オーケストレーション"]
+        LF[Lefthook]
+        CL[Commitlint]
+        TA["npm run test:all"]
+    end
+
+    subgraph Layer1["🛡️ 1. セキュリティ & 静的監査 (npm run test:security)"]
+        GL[Gitleaks]
+        SL[Secretlint]
+        CA[cargo-audit]
+        CD[cargo-deny]
+    end
+
+    subgraph Layer2["🧪 2. ユニット & カバレッジ (npm run test:unit)"]
+        VT["Vitest + @vitest/coverage-v8\n(coverage/index.html)"]
+        CT["cargo test (58 tests)"]
+    end
+
+    subgraph Layer3["👁️ 3. 視覚回帰テスト (npm run test:visual)"]
+        PW["Playwright (toHaveScreenshot)"]
+        UP["Kitty Unicode Placeholder (U+10EEEE)\n豆腐文字 □ 抑止検証"]
+        YZ["TUI プレビュー枠 & 画像配置整合"]
+        NT["ネオンテーマ描画保持"]
+    end
+
+    subgraph Layer4["🧠 4. メモリ & リソース監査 (npm run test:memory)"]
+        CDP["Chrome DevTools Protocol (CDP)"]
+        HEAP["JSHeap 300MB 頭打ちアサーション"]
+        LEAK["DOM ノード & Tab 破棄後リークゼロ検証"]
+    end
+
+    LF -->|pre-commit| GL
+    LF -->|pre-commit| VT
+    LF -->|commit-msg| CL
+    LF -->|pre-push| TA
+    TA --> Layer1
+    TA --> Layer2
+    TA --> Layer3
+    TA --> Layer4
+```
+
+---
+
 ## 💻 技術スタック一覧
 
 | レイヤー | 使用技術 / クレート / ライブラリ | 役割・用途 |
@@ -305,5 +354,10 @@ Waddle は、高速・堅牢な **Rust バックエンド** と、最新の **Re
 | | `@xterm/addon-search` | スクロールバックバッファ検索 |
 | | `@xterm/addon-fit` | DOM サイズへの自動フィッティング |
 | | `@xterm/addon-web-links` | ハイパーリンクの自動検出 |
+| **テスト & カバレッジ** | `vitest`, `@vitest/coverage-v8`, `cargo test` | フロント/バックエンドユニットテスト & V8 HTML カバレッジ計測 |
+| **視覚回帰 & CDP** | `@playwright/test` (Chromium CDP) | Canvas スナップショット比較 & 300MB メモリ/DOM リーク計測 |
+| **セキュリティ監査** | `gitleaks`, `secretlint`, `cargo-audit`, `cargo-deny` | 機密漏洩スキャン・脆弱性・ライセンス監査 |
+| **Git フック & CI** | `lefthook`, `@commitlint/cli` | コミット規約・事前自動テストオーケストレーション |
 | **UI・装飾** | `lucide-react`, `react-markdown`, `remark-gfm` | アイコン表示、Markdown 描画 |
 | **パッケージング** | Arch Linux PKGBUILD, `pacman` bundle | ネイティブ Linux パッケージ配布 |
+

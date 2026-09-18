@@ -9,6 +9,12 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:unit": "bash scripts/test-unit.sh",
+    "test:security": "bash scripts/test-security.sh",
+    "test:visual": "playwright test tests/visual",
+    "test:memory": "playwright test tests/memory",
+    "test:all": "bash scripts/test-all.sh",
+    "prepare": "lefthook install",
     "tauri": "tauri",
     "build:pacman": "bash scripts/build-pacman.sh",
     "package": "npm run build:pacman"
@@ -32,10 +38,17 @@
     "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
+    "@commitlint/cli": "^19.8.1",
+    "@commitlint/config-conventional": "^19.8.1",
+    "@playwright/test": "^1.63.0",
+    "@secretlint/secretlint-rule-preset-recommend": "^13.0.5",
     "@tauri-apps/cli": "^2",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^4.6.0",
+    "@vitest/coverage-v8": "^5.0.0",
+    "lefthook": "^2.1.14",
+    "secretlint": "^13.0.5",
     "typescript": "~5.8.3",
     "vite": "^7.0.4",
     "vitest": "^5.0.0"

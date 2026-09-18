@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Waddle Visual Regression Harness</title>
+  <link rel="stylesheet" href="/node_modules/@xterm/xterm/css/xterm.css" />
+  <link rel="stylesheet" href="/src/index.css" />
+  <style>
+    body {
+      background-color: #0b0d13;
+      color: #f0f6fc;
+      font-family: system-ui, sans-serif;
+      margin: 0;
+      padding: 20px;
+    }
+    .test-card {
+      margin-bottom: 30px;
+      padding: 16px;
+      background: #151922;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+    }
+    .term-box {
+      width: 700px;
+      height: 280px;
+      position: relative;
+      background: #0d1117;
+      border: 1px solid #21262d;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+  </style>
+</head>
+<body>
+  <h1>Waddle Visual Regression Test Harness</h1>
+
+  <!-- Scenario 1: Unicode Placeholder (U+10EEEE) Glyph Suppression -->
+  <div class="test-card">
+    <h2>1. Kitty Unicode Placeholder (U+10EEEE) - Tofu Free Verification</h2>
+    <div id="term-unicode" class="term-box"></div>
+  </div>
+
+  <!-- Scenario 2: Yazi / Ranger TUI Preview Frame Alignment -->
+  <div class="test-card">
+    <h2>2. TUI Preview Frame & Image Alignment (Yazi / Ranger)</h2>
+    <div id="term-tui" class="term-box"></div>
+  </div>
+
+  <!-- Scenario 3: High-Voltage Neon Themes Rendering -->
+  <div class="test-card">
+    <h2>3. High-Voltage Neon Theme (Cyberpunk / Neon Cyan & Magenta)</h2>
+    <div id="term-neon" class="term-box"></div>
+  </div>
+
+  <script type="module" src="./harness.ts"></script>
+</body>
+</html>

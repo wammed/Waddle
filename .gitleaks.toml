@@ -1,0 +1,15 @@
+# Gitleaks configuration for Waddle
+
+[allowlist]
+description = "Allowlist for test fixtures and false positives"
+paths = [
+    '''node_modules''',
+    '''target''',
+    '''dist''',
+    '''src/services/__tests__/secretMasker\.test\.ts''',
+    '''scratch/test_secret_masker\.mjs''',
+]
+regexes = [
+    '''STORAGE_KEY\s*=\s*['"]waddle_test_plan_results_v1['"]''',
+    '''waddle_test_plan_results_v1''',
+]

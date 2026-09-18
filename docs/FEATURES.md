@@ -609,6 +609,37 @@ flowchart TD
 
 ---
 
+### 23. 🛡️ Integrated Quality & Security Suite (`npm run test:all`)
+
+Waddle incorporates an industry-standard, multi-layered quality assurance and security pipeline orchestrated via single-command workflows and Git lifecycle hooks (Lefthook + Commitlint).
+
+#### 1. Security & Static Vulnerability Audits (`npm run test:security`)
+- **Gitleaks / Secretlint**: Scans staged commits and entire repository history for plaintext API keys, tokens, and private keys. Directly reinforces `SecretMasker` principles by ensuring zero credential leaks.
+- **cargo-audit**: Queries the RustSec Advisory Database (RUSTSEC) to detect vulnerabilities in dependencies.
+- **cargo-deny**: Audits licenses (MIT, Apache-2.0, BSD, ISC, Unicode, etc.), detects banned crates/features, and prevents unauthorized transitive sources.
+
+#### 2. Unit Testing & V8 Coverage Visualization (`npm run test:unit`)
+- **@vitest/coverage-v8**: Measures code coverage for TypeScript/React services and components with statements threshold >= 80%. Automatically outputs an interactive HTML dashboard to `coverage/index.html`.
+- **cargo test**: Executes all 58 backend Rust unit tests covering PTY, Kitty Graphics, filesystem boundaries, AI guardrails, and Git sandboxing.
+
+#### 3. Visual Regression Testing (`npm run test:visual`)
+- **Playwright (`toHaveScreenshot`)**:
+  - Kitty Graphics Protocol Unicode placeholder (`U+10EEEE`) verification: rigorously prevents missing-glyph undefined boxes (□ tofu).
+  - TUI (Yazi / Ranger) preview box alignment: verifies border integrity, image clipping boundaries, and text stability.
+  - High-Voltage Neon themes: ensures visual fidelity and high-contrast styling across cyberpunk palettes.
+
+#### 4. Memory & Resource Leak Auditing (`npm run test:memory`)
+- **CDP (Chrome DevTools Protocol)**:
+  - Asserts that JSHeapUsedSize remains strictly capped under 300MB following massive 10,000+ line streaming bursts.
+  - Verifies zero lingering DOM node or detached document leaks following terminal tab creation and disposal cycles.
+
+#### 5. Orchestration & Git Hooks (`lefthook.yml`)
+- `pre-commit`: Runs Gitleaks, `cargo clippy --all-targets`, and staged file Vitest tests in parallel.
+- `commit-msg`: Validates Conventional Commits format with `@commitlint/cli`.
+- `pre-push`: Executes `npm run test:all` to ensure zero regressions reach the remote repository.
+
+---
+
 ## ⌨️ Complete Keybindings Reference
 
 | Shortcut | Context | Action |

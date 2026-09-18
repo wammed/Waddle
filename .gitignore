@@ -5,3 +5,7 @@ src-tauri/target/
 *.log
 .env
 .env.*
+coverage/
+test-results/
+playwright-report/
+

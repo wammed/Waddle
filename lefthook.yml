@@ -1,0 +1,23 @@
+# Lefthook Git Hooks Configuration for Waddle
+# Documentation: https://github.com/evilmartians/lefthook
+
+pre-commit:
+  parallel: true
+  commands:
+    gitleaks:
+      run: gitleaks protect --staged --verbose --config .gitleaks.toml
+    clippy:
+      run: cargo clippy --all-targets --manifest-path src-tauri/Cargo.toml
+    vitest-staged:
+      glob: "*.{ts,tsx,js,jsx}"
+      run: npx vitest related --run {staged_files}
+
+commit-msg:
+  commands:
+    commitlint:
+      run: npx --no -- commitlint --edit {1}
+
+pre-push:
+  commands:
+    full-suite:
+      run: npm run test:all
