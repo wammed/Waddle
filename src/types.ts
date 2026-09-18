@@ -73,6 +73,7 @@ export interface EditorOpenResult {
   is_symlink: boolean;
   is_readonly: boolean;
   readonly_reason?: string | null;
+  warning_message?: string | null;
   has_autosave: boolean;
   autosave_content?: string | null;
   autosave_timestamp?: number | null;
@@ -100,6 +101,7 @@ export interface EditorTab {
   isDirty: boolean;
   isReadOnly: boolean;
   readOnlyReason?: string | null;
+  warningMessage?: string | null;
   isSymlink: boolean;
   undoStack: string[];
   redoStack: string[];

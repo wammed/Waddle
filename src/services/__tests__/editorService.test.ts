@@ -280,5 +280,92 @@ describe('editorService', () => {
       expect(scheduler.getLastSavedContent('tab-1')).toBeUndefined();
     });
   });
+
+  describe('shell configuration files warning and editability', () => {
+    it('propagates warning_message and maintains isReadOnly = false for shell config files', () => {
+      // Simulated EditorOpenResult from Rust backend
+      const shellOpenResult = {
+        content: 'export PATH="$HOME/.local/bin:$PATH"\n',
+        original_path: '/home/user/.bashrc',
+        canonical_path: '/home/user/.bashrc',
+        is_symlink: false,
+        is_readonly: false,
+        readonly_reason: null,
+        warning_message: '⚠️ シェル設定ファイルです。構文ミスによりシェル起動に影響が出る恐れがあります（自動バックアップ有効）。',
+        has_autosave: false,
+        autosave_content: null,
+        autosave_timestamp: null,
+      };
+
+      // Tab mapping as performed in EditorPane handleOpenFile
+      const tab = {
+        id: 'tab-shell-1',
+        filePath: shellOpenResult.original_path,
+        canonicalPath: shellOpenResult.canonical_path,
+        fileName: '.bashrc',
+        content: shellOpenResult.content,
+        savedContent: shellOpenResult.content,
+        isDirty: false,
+        isReadOnly: shellOpenResult.is_readonly,
+        readOnlyReason: shellOpenResult.readonly_reason,
+        warningMessage: shellOpenResult.warning_message,
+        isSymlink: shellOpenResult.is_symlink,
+        undoStack: [shellOpenResult.content],
+        redoStack: [],
+        cursorPosition: 0,
+        scrollTop: 0,
+        scrollLeft: 0,
+      };
+
+      expect(tab.warningMessage).toBe(
+        '⚠️ シェル設定ファイルです。構文ミスによりシェル起動に影響が出る恐れがあります（自動バックアップ有効）。'
+      );
+      expect(tab.isReadOnly).toBe(false);
+
+      // Verify that save is NOT blocked for shell config files
+      const canSave = !tab.isReadOnly;
+      expect(canSave).toBe(true);
+    });
+
+    it('blocks save when file is genuinely read-only (outside $HOME or non-owner)', () => {
+      const readonlyResult = {
+        content: 'root:x:0:0:root:/root:/bin/bash\n',
+        original_path: '/etc/passwd',
+        canonical_path: '/etc/passwd',
+        is_symlink: false,
+        is_readonly: true,
+        readonly_reason: '[保存不可] このファイルは $HOME ディレクトリ外にあるため、閲覧専用（Read-Only）です。',
+        warning_message: null,
+        has_autosave: false,
+        autosave_content: null,
+        autosave_timestamp: null,
+      };
+
+      const tab = {
+        id: 'tab-readonly-1',
+        filePath: readonlyResult.original_path,
+        canonicalPath: readonlyResult.canonical_path,
+        fileName: 'passwd',
+        content: readonlyResult.content,
+        savedContent: readonlyResult.content,
+        isDirty: false,
+        isReadOnly: readonlyResult.is_readonly,
+        readOnlyReason: readonlyResult.readonly_reason,
+        warningMessage: readonlyResult.warning_message,
+        isSymlink: readonlyResult.is_symlink,
+        undoStack: [readonlyResult.content],
+        redoStack: [],
+        cursorPosition: 0,
+        scrollTop: 0,
+        scrollLeft: 0,
+      };
+
+      expect(tab.warningMessage).toBeNull();
+      expect(tab.isReadOnly).toBe(true);
+
+      const canSave = !tab.isReadOnly;
+      expect(canSave).toBe(false);
+    });
+  });
 });
 

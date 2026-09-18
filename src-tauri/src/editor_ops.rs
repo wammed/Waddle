@@ -17,6 +17,7 @@ pub struct EditorOpenResult {
     pub is_symlink: bool,
     pub is_readonly: bool,
     pub readonly_reason: Option<String>,
+    pub warning_message: Option<String>,
     pub has_autosave: bool,
     pub autosave_content: Option<String>,
     pub autosave_timestamp: Option<u64>,
@@ -255,6 +256,49 @@ pub fn is_under_home(path: &Path) -> bool {
     false
 }
 
+/// Check if a canonical path corresponds to a shell configuration file within the user's home directory.
+pub fn is_shell_config(canonical_path: &Path, home_dir: &Path) -> bool {
+    let Ok(rel_path) = canonical_path.strip_prefix(home_dir) else {
+        return false;
+    };
+
+    let file_name = match canonical_path.file_name().and_then(|n| n.to_str()) {
+        Some(name) => name,
+        None => return false,
+    };
+
+    // 1. ~/.config/ standard shell config directories
+    let config_prefix = Path::new(".config");
+    if let Ok(config_rel) = rel_path.strip_prefix(config_prefix) {
+        if config_rel.starts_with("fish")
+            || config_rel.starts_with("zsh")
+            || config_rel.starts_with("bash")
+            || config_rel.starts_with("nushell")
+        {
+            return true;
+        }
+    }
+
+    // 2. $HOME direct children (known shell files)
+    if rel_path.parent() == Some(Path::new("")) || rel_path == Path::new(file_name) {
+        let known_home_shell_files = [
+            ".bashrc", ".bash_profile", ".bash_login", ".bash_logout", ".profile", ".shrc",
+            ".zshrc", ".zprofile", ".zshenv", ".zlogin", ".zlogout",
+            ".cshrc", ".tcshrc", ".kshrc",
+        ];
+        if known_home_shell_files.contains(&file_name) {
+            return true;
+        }
+    }
+
+    // 3. Dotfile naming convention (.bash_* or .zsh_*)
+    if file_name.starts_with(".bash_") || file_name.starts_with(".zsh_") {
+        return true;
+    }
+
+    false
+}
+
 /// Validate if the current process is running as root (prohibited inside editor).
 pub fn validate_not_root() -> Result<(), String> {
     #[cfg(unix)]
@@ -428,6 +472,17 @@ pub fn editor_open_file(path: String) -> Result<EditorOpenResult, String> {
         }
     }
 
+    // Warning banner check for shell configuration files (editable, but with persistent caution banner)
+    let mut warning_message: Option<String> = None;
+    if !is_readonly {
+        if let Some(home) = dirs::home_dir() {
+            let home_canon = home.canonicalize().unwrap_or(home);
+            if is_shell_config(&canonical_path, &home_canon) {
+                warning_message = Some("⚠️ シェル設定ファイルです。構文ミスによりシェル起動に影響が出る恐れがあります（自動バックアップ有効）。".to_string());
+            }
+        }
+    }
+
     Ok(EditorOpenResult {
         content,
         original_path: path,
@@ -435,6 +490,7 @@ pub fn editor_open_file(path: String) -> Result<EditorOpenResult, String> {
         is_symlink,
         is_readonly,
         readonly_reason,
+        warning_message,
         has_autosave,
         autosave_content,
         autosave_timestamp,
@@ -809,6 +865,83 @@ mod tests {
             }
 
             let _ = fs::remove_dir_all(&test_dir);
+        }
+    }
+
+    #[test]
+    fn test_is_shell_config() {
+        let home = Path::new("/home/testuser");
+
+        // 1. $HOME direct shell files
+        let direct_files = [
+            ".bashrc", ".bash_profile", ".bash_login", ".bash_logout", ".profile", ".shrc",
+            ".zshrc", ".zprofile", ".zshenv", ".zlogin", ".zlogout",
+            ".cshrc", ".tcshrc", ".kshrc",
+        ];
+        for f in &direct_files {
+            assert!(
+                is_shell_config(&home.join(f), home),
+                "Should match shell config: {}",
+                f
+            );
+        }
+
+        // 2. Dotfile naming conventions (.bash_* or .zsh_*)
+        assert!(is_shell_config(&home.join(".bash_aliases"), home));
+        assert!(is_shell_config(&home.join(".bash_history"), home));
+        assert!(is_shell_config(&home.join(".zsh_custom"), home));
+
+        // 3. ~/.config/ standard shell config directories
+        assert!(is_shell_config(&home.join(".config/fish/config.fish"), home));
+        assert!(is_shell_config(&home.join(".config/fish/conf.d/alias.fish"), home));
+        assert!(is_shell_config(&home.join(".config/fish/functions/fish_prompt.fish"), home));
+        assert!(is_shell_config(&home.join(".config/zsh/.zshrc"), home));
+        assert!(is_shell_config(&home.join(".config/bash/bashrc"), home));
+        assert!(is_shell_config(&home.join(".config/nushell/config.nu"), home));
+
+        // 4. Negative cases (normal files and configs that should NOT match)
+        assert!(!is_shell_config(&home.join("main.rs"), home));
+        assert!(!is_shell_config(&home.join("src/main.rs"), home));
+        assert!(!is_shell_config(&home.join("notes.txt"), home));
+        assert!(!is_shell_config(&home.join(".config/nvim/init.lua"), home));
+        assert!(!is_shell_config(&home.join(".config/git/config"), home));
+        assert!(!is_shell_config(&Path::new("/etc/bash.bashrc"), home));
+        assert!(!is_shell_config(&Path::new("/etc/profile"), home));
+    }
+
+    #[test]
+    fn test_editor_open_shell_config_warning_and_save() {
+        if let Some(home) = dirs::home_dir() {
+            let test_shell_file = home.join(".bash_test_waddle_tmp");
+            let _ = fs::write(&test_shell_file, "# test shell config\nexport FOO=bar\n");
+
+            let open_res = editor_open_file(test_shell_file.to_string_lossy().to_string());
+            assert!(open_res.is_ok(), "Failed to open shell config: {:?}", open_res.err());
+
+            let res = open_res.unwrap();
+            assert!(!res.is_readonly, "Shell config should NOT be read-only");
+            assert!(
+                res.warning_message.is_some(),
+                "warning_message should be set for shell config"
+            );
+            assert!(
+                res.warning_message
+                    .unwrap()
+                    .contains("シェル設定ファイルです"),
+                "warning_message should contain shell caution"
+            );
+
+            // Verify saving is permitted and not blocked
+            let save_res = editor_save_file(
+                test_shell_file.to_string_lossy().to_string(),
+                "# test shell config updated\nexport FOO=baz\n".to_string(),
+            );
+            assert!(save_res.is_ok(), "Failed to save shell config: {:?}", save_res.err());
+
+            let updated = fs::read_to_string(&test_shell_file).unwrap();
+            assert_eq!(updated, "# test shell config updated\nexport FOO=baz\n");
+
+            let _ = fs::remove_file(&test_shell_file);
         }
     }
 }

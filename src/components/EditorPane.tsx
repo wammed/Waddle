@@ -24,6 +24,7 @@ import { AppConfig, TerminalContext, EditorTab, AutosaveEntry } from '../types';
 import { TauriApi } from '../services/tauriApi';
 import { useI18n } from '../i18n';
 import { DangerousCommandModal, isDangerousCommand } from './DangerousCommandModal';
+import { EditorWarningBanner } from './EditorWarningBanner';
 import { findSecretRanges, type SecretRange } from '../services/secretMasker';
 import {
   handleTabIndentation,
@@ -372,6 +373,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
         isDirty: false,
         isReadOnly: res.is_readonly,
         readOnlyReason: res.readonly_reason,
+        warningMessage: res.warning_message,
         isSymlink: res.is_symlink,
         undoStack: [res.content],
         redoStack: [],
@@ -1838,6 +1840,11 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
             </div>
           )}
         </div>
+      )}
+
+      {/* Shell Configuration Caution Banner */}
+      {activeTab?.warningMessage && (
+        <EditorWarningBanner message={activeTab.warningMessage} />
       )}
 
       {/* Main Editor Text Area with Line Numbers (Lazy Rendered for Active Tab) */}
