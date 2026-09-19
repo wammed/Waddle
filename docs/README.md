@@ -10,8 +10,8 @@
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
 [![Ollama](https://img.shields.io/badge/Ollama-Local_AI-white?style=for-the-badge&logo=ollama&logoColor=black)](https://ollama.com/)
 [![Platform](https://img.shields.io/badge/Platform-Linux_(Wayland_/_X11)-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://www.kernel.org/)
-[![Tested On](https://img.shields.io/badge/Tested_On-CachyOS_(COSMIC)-00C49F?style=for-the-badge&logo=archlinux&logoColor=white)](#-important-notice-on-supported-environments)
-[![Vibe Coding](https://img.shields.io/badge/Built_with-AI_Vibe_Coding-8A2BE2?style=for-the-badge&logo=sparkles&logoColor=white)](#-about-this-project-ai-vibe-coding)
+[![Tested On](https://img.shields.io/badge/Tested_On-CachyOS_(COSMIC)-00C49F?style=for-the-badge&logo=archlinux&logoColor=white)](#environment-notice)
+[![Vibe Coding](https://img.shields.io/badge/Built_with-AI_Vibe_Coding-8A2BE2?style=for-the-badge&logo=sparkles&logoColor=white)](#vibe-coding)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](../LICENSE)
 
 <p align="center">
@@ -20,13 +20,14 @@
 </p>
 
 <p align="center">
-  <a href="README.md">English</a> | <a href="README.ja.md">日本語</a>
+  <strong>English</strong> | <a href="README.ja.md">日本語</a>
 </p>
 
 </div>
 
 ---
 
+<a id="environment-notice"></a>
 > [!WARNING]
 > ### Important Notice on Supported Environments
 > All development, validation, and automated/manual testing for Waddle are conducted exclusively on **CachyOS with the COSMIC Desktop Environment**.  
@@ -173,6 +174,7 @@ Waddle operates under a strict **100% offline, local-first** model:
 
 ---
 
+<a id="vibe-coding"></a>
 ## 🤖 About This Project (AI Vibe Coding)
 
 > [!IMPORTANT]

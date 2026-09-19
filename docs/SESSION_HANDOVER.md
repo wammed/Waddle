@@ -1029,6 +1029,26 @@ npm run tauri dev
       - **[`docs/TEST_PLAN.ja.md`](file:///home/susie/GitHUB/wammed/Waddle/docs/TEST_PLAN.ja.md) & [`docs/TEST_PLAN.md`](file:///home/susie/GitHUB/wammed/Waddle/docs/TEST_PLAN.md)**:
         - Section 5 の環境表記を `Linux 7.2 (CachyOS / Arch Linux, COSMIC Desktop Environment)` に更新。
 
+47. **GitHub 上での README 表示崩れ・画像リンク切れ・内部リンク全滅の根本解消**:
+    - **ユーザー指摘**: 「githubでのREADMEの表示が壊れている リンク切れでスクリーンショットが表示されない、日本語ページに飛べない、その他リンクが全滅」
+    - **根本原因の特定**:
+      - リポジトリルートの `README.md` と `README.ja.md` が `docs/README.md` への**シンボリックリンク**として配置されていた。
+      - GitHub の Web UI レンダリングでは、ルートでシンボリックリンクを表示する際、カレントディレクトリはルート `/` として解釈される。
+      - しかしリンク先のファイル内には `../images/...`（リポジトリの親ディレクトリを参照して 404）、`../LICENSE`（404）、`FEATURES.ja.md`（ルート直下を参照して 404）、`<a href="README.ja.md">`（シンボリックリンクのテキストビューア画面が開いてしまう）などの `docs/` 基準の相対パスが記述されていたため、画像やリンクが全滅していた。
+    - **実施内容**:
+      - **シンボリックリンクの完全廃止**: リポジトリルートのシンボリックリンク（`README.md -> docs/README.md`）を削除し、独立した正規の実体ファイル（Regular Files）として再構築。
+      - **リポジトリルート実体ファイル配備**:
+        - [`README.md`](file:///home/susie/GitHUB/wammed/Waddle/README.md) & [`README.ja.md`](file:///home/susie/GitHUB/wammed/Waddle/README.ja.md):
+          - 画像パスを `images/waddle-banner.svg`, `images/screenshots/waddle-ss01.png` 等のリポジトリルート基準パスに修正。
+          - ライセンスリンクを `LICENSE` に修正。
+          - ドキュメントリンクを `docs/FEATURES.md`, `docs/ARCHITECTURE.md`, `docs/SECURITY.md`, `docs/TEST_PLAN.md` に修正。
+          - 言語切替を `<a href="README.md">English</a> | <strong>日本語</strong>` に修正。
+          - アンカー `<a id="environment-notice"></a>` を設置しバッジジャンプを確実に動作。
+      - **`docs/` 配下実体ファイル保守**:
+        - [`docs/README.md`](file:///home/susie/GitHUB/wammed/Waddle/docs/README.md) & [`docs/README.ja.md`](file:///home/susie/GitHUB/wammed/Waddle/docs/README.ja.md): `docs/` 内部でのブラウズ時にもリンク切れが発生しないよう、`docs/` 基準の相対パス（`../images/`, `../LICENSE`, `FEATURES.md`）を正確に保持。
+    - **全リンク自動検証**:
+      - Node.js 検証スクリプトにより、4 つのファイル（`README.md`, `README.ja.md`, `docs/README.md`, `docs/README.ja.md`）に含まれる全画像・Markdownリンク・HTMLタグリンク（計 100+ リンク）を走査。全件 `100% OK`（エラー 0 件）を確認。
+
 ---
 
 ## 6. 次回再開時の検討・作業候補（Next Steps）
@@ -1047,9 +1067,9 @@ npm run tauri dev
 ユーザー指示に基づき、今後**機能追加（Feature）**、**バグ修正（Bug Fix）**、**セキュリティ強化（Security Fix）**を実施した際は、以下の 8 ドキュメント構成に従って**英語版・日本語版を必ずセットで同期更新**します：
 
 1. **ルート概要ドキュメント（スリム・Scannable構成を維持）**:
-   - [`docs/README.md`](file:///home/susie/GitHUB/wammed/Waddle/docs/README.md) & [`docs/README.ja.md`](file:///home/susie/GitHUB/wammed/Waddle/docs/README.ja.md)
+   - リポジトリルートの実体ファイル [`README.md`](file:///home/susie/GitHUB/wammed/Waddle/README.md) & [`README.ja.md`](file:///home/susie/GitHUB/wammed/Waddle/README.ja.md) および [`docs/README.md`](file:///home/susie/GitHUB/wammed/Waddle/docs/README.md) & [`docs/README.ja.md`](file:///home/susie/GitHUB/wammed/Waddle/docs/README.ja.md)
    - 新機能や主要変更の 1〜2 行要約バレット（Highlights）の追加・更新。
-   - 変更に関連する詳細ドキュメントへのリンク付与。
+   - 変更に関連する詳細ドキュメントへのリンク付与（ルート用と `docs/` 配下用の相対パスに留意）。
    - 日常使用ショートカット一覧の同期。
 2. **機能詳細・内部仕様・全キーバインド**:
    - [`docs/FEATURES.md`](file:///home/susie/GitHUB/wammed/Waddle/docs/FEATURES.md) & [`docs/FEATURES.ja.md`](file:///home/susie/GitHUB/wammed/Waddle/docs/FEATURES.ja.md)
@@ -1063,7 +1083,8 @@ npm run tauri dev
    - パストラバーサル防止、保護対象パス、危険コマンド検知パターン、Webview CSP、ネットワーク境界ポリシーの更新。
 5. **包括的検証テスト計画書**:
    - [`docs/TEST_PLAN.md`](file:///home/susie/GitHUB/wammed/Waddle/docs/TEST_PLAN.md) & [`docs/TEST_PLAN.ja.md`](file:///home/susie/GitHUB/wammed/Waddle/docs/TEST_PLAN.ja.md)
-   - 全81テストケース（Suite 1〜9）の追跡、合否判定基準、自動テストコマンド群の整合性維持。
+   - 全108テストケース（Suite 1〜11）の追跡、合否判定基準、自動テストコマンド群の整合性維持。
+   - アプリ内フォーム（`testPlanData.ts`）およびスタンドアロン検証フォーム（`tools/test_form.html`）との項目同期。
 6. **開発履歴・引き継ぎ**:
    - [`docs/SESSION_HANDOVER.md`](file:///home/susie/GitHUB/wammed/Waddle/docs/SESSION_HANDOVER.md)
    - ユーザー要望、時系列開発履歴、変更重要ファイル、ビルド検証結果の追記。
