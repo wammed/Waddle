@@ -369,35 +369,6 @@
       4. `src/services/tauriApi.ts` & `src/services/kittyGraphics/manager.ts`:
          - `logKittyDebug` を配備し、配置・フレーム更新・描画のトレーサビリティを確保。
 
-39. **CommandPolicy 境界統一（資格情報・環境変数アクセスの Review 化・シェル難読化耐性） & GitHub Actions CI 正常化**:
-    - **ユーザー要望**: Waddle のセキュリティ評価をプロダクションレディ（9.8+/10）へ引き上げるため、CommandPolicy における「資格情報読み取りの Review 化」「シェル難読化バイパス耐性」の実装、および「GitHub Actions CI ワークフローの正常化」の完了。
-    - **改修内容**:
-      1. `src-tauri/src/command_policy.rs`:
-         - **資格情報・機密ファイル参照の検知と強制 Review 化**: `cat`, `head`, `tail`, `less`, `more`, `grep`, `awk`, `sed` などの表示・検索系コマンドであっても、引数に `~/.ssh/id_*`, `~/.aws/*`, `~/.config/gcloud/*`, `~/.azure/*`, `~/.gnupg/*`, `~/.local/share/keyrings/*`, `.env*`, `*secret*`, `*credential*`, `*token*` が含まれる場合は `Safe` を解除し、`PolicyAction::Review` を返すよう境界を統一。
-         - **環境変数平文ダンプコマンドの Review 化**: `printenv`, `env`, `export -p`, `declare -x`, `set` を単体・パイプなし問わず `PolicyAction::Review` へ変更し、平文での機密情報一括露出を防止。
-         - **シェル難読化・$IFS 偽装耐性**: `$IFS`, `${IFS}` を空白文字として自動正規化した評価と、難読化シグネチャ自体の検知（破壊的操作時は `Block`、一般操作時は `Review`）を実装。
-         - **マルチライン・ステートメント分割評価**: 改行コード（`\n`）やセミコロン（`;`）、論理演算子（`&&`, `||`）による複数コマンド連結において、後半に危険コマンドが含まれる場合（例: `true\nrm -rf /`）のすり抜けを防ぐ構文単位の分割・最悪リスク集約評価を導入。
-         - **コマンド名エスケープ・ラッパーの正規化**: `\rm`, `'r'm`, `"r"m`, `command rm`, `builtin rm` などのエスケープやラッパープレフィックスを解除・正規化して評価。
-      2. **テストスイート拡充**:
-         - `src-tauri/tests/command_policy_corpus.rs`: Category 12（機密ファイル参照・環境変数ダンプ）、Category 13（シェル難読化・改行連結・エスケープ）を追加し、100+ テストベクター全件 PASS。
-         - `src-tauri/tests/security_regression.rs`: Pillar 1 に機密アクセス・環境変数ダンプ・難読化バイパスのテストベクターを網羅追加し、6大防御の柱すべてで 100% PASS。
-         - `package.json`: `"test:coverage": "vitest run --coverage"` を追加（Statements, Branches, Functions, Lines いずれも 85%+ で基準 80%+ をクリア）。
-         - `test-security.sh`: リポジトリルートに実行可能ラッパーを配備（全ツール稼働、fail-closed 実証）。
-      3. **GitHub Actions CI ワークフローの刷新 (`.github/workflows/ci.yml`)**:
-         - 不要・異常なレガシー互換ジョブ（Node 10/16/18）や無関係なライブラリステップを完全撤廃。
-         - `ubuntu-latest`（Node 20, Rust stable）をランナーとし、以下の 4 つの fail-closed リリースゲートを確立：
-           1. `security-audit`: `./test-security.sh`（Gitleaks, Secretlint, cargo-audit, cargo-deny, security_regression）
-           2. `rust-backend`: `cargo test --all-targets` & `cargo clippy --all-targets -- -D warnings`
-           3. `frontend-coverage`: `npm run test:coverage` (Threshold: 80%+)
-           4. `build-verification`: `npm run build` & `cargo check --release`
-      4. **包括的ドキュメント同期**:
-         - `docs/SECURITY.ja.md`, `docs/FEATURES.ja.md`, `docs/TEST_PLAN.ja.md`, `docs/SESSION_HANDOVER.md` のセキュリティ記述と CI ゲート仕様を完全同期。
-    - **検証**:
-      - `cargo test --manifest-path src-tauri/Cargo.toml`: 全 40 件 PASS。
-      - `npm run build`: TypeScript 型検査 & Vite ビルド成功（0 エラー、2.36秒）。
-      - `cargo build --release --manifest-path src-tauri/Cargo.toml`: 最適化リリースバイナリ生成完了（24.92秒）。
-      - `install -m 755 src-tauri/target/release/waddle /home/susie/.local/bin/waddle`: 本番配備完了。
-
 39. **`kitty +kitten icat` アニメーション GIF 差分フレーム 32-bit RGBA デコード正常化（白黒ドット崩壊の根絶） & ゴースト重複描画の完全解決**:
     - **ユーザー報告**: `kitty +kitten icat bye-bye.gif` 実行時、最初の静止画は表示されるが、アニメーションの動きが入ると白黒のドット（ノイズ）で動くだけになり、画像がダブって表示される不具合を報告。
     - **根本原因の完全解明**:
@@ -482,8 +453,36 @@
       - `cargo test`: 46 件全 PASS（+2 件テスト追加）。
       - `cargo clippy -- -D warnings`: 警告 0 件。
       - `npm run build`: 0 エラー成功。
-      - 実機ハーネス（`scratch/test_ranger.py`）により、ranger の `draw()` がフリーズせず `DRAW FINISHED` で復帰することを実証。
       - 本番バイナリ配備: `~/.local/bin/waddle`（リリースビルド完了・配備済み）。
+
+43. **CommandPolicy 境界統一（資格情報・`env` 包括 Review 化・シェル難読化耐性） & GitHub Actions CI 正常化 (RC サインオフ)**:
+    - **ユーザー要望**: Waddle のセキュリティ評価をプロダクションレディ（9.8+/10）へ引き上げるため、CommandPolicy における「資格情報読み取りの Review 化」「`env` で始まる全コマンドの包括 Review 化」「シェル難読化バイパス耐性」の実装、および「GitHub Actions CI ワークフローの正常化」の完了。
+    - **改修内容**:
+      1. `src-tauri/src/command_policy.rs`:
+         - **資格情報・機密ファイル参照の検知と強制 Review 化**: `cat`, `head`, `tail`, `less`, `more`, `grep`, `awk`, `sed` などの表示・検索系コマンドであっても、引数に `~/.ssh/id_*`, `~/.aws/*`, `~/.config/gcloud/*`, `~/.azure/*`, `~/.gnupg/*`, `~/.local/share/keyrings/*`, `.env*`, `*secret*`, `*credential*`, `*token*` が含まれる場合は `Safe` を解除し、`PolicyAction::Review` を返すよう境界を統一。
+         - **環境変数平文ダンプ & インライン代入の包括的 Review 化**: `is_env_dump_command` を強化し、`printenv`, `export -p`, `declare -x`, `set` に加え、`env`（単体、`env -`, `env FOO=bar`, `env AWS_SECRET_ACCESS_KEY=xxxx`, `env -- FOO=bar`, `env bash -c ...` 等の `env` で始まる全コマンド）を包括的に `PolicyAction::Review` へ変更し、平文での機密情報一括露出や代入を確実に捕捉。
+         - **シェル難読化・$IFS 偽装耐性**: `$IFS`, `${IFS}` を空白文字として自動正規化した評価と、難読化シグネチャ自体の検知（破壊的操作時は `Block`、一般操作時は `Review`）を実装。
+         - **マルチライン・ステートメント分割評価**: 改行コード（`\n`）やセミコロン（`;`）、論理演算子（`&&`, `||`）による複数コマンド連結において、後半に危険コマンドが含まれる場合（例: `true\nrm -rf /`）のすり抜けを防ぐ構文単位の分割・最悪リスク集約評価を導入。
+         - **コマンド名エスケープ・ラッパーの正規化**: `\rm`, `'r'm`, `"r"m`, `command rm`, `builtin rm` などのエスケープやラッパープレフィックスを解除・正規化して評価。
+      2. **テストスイート拡充**:
+         - `src-tauri/tests/command_policy_corpus.rs`: Category 12（機密ファイル参照・`env` / `printenv` 包括テスト）、Category 13（シェル難読化・改行連結・エスケープ）を追加し、105+ テストベクター全件 PASS。
+         - `src-tauri/tests/security_regression.rs`: Pillar 1 に機密アクセス・環境変数ダンプ・難読化バイパスのテストベクターを網羅追加し、6大防御の柱すべてで 100% PASS。
+         - `package.json`: `"test:coverage": "vitest run --coverage"` を追加（Statements, Branches, Functions, Lines いずれも 85%+ で基準 80%+ をクリア）。
+         - `test-security.sh`: リポジトリルートに実行可能ラッパーを配備（全ツール稼働、fail-closed 実証）。
+      3. **GitHub Actions CI ワークフローの刷新 (`.github/workflows/ci.yml`)**:
+         - 不要・異常なレガシー互換ジョブ（Node 10/16/18）や無関係なライブラリステップを完全撤廃。
+         - `ubuntu-latest`（Node 20, Rust stable）をランナーとし、以下の 4 つの fail-closed リリースゲートを確立：
+           1. `security-audit`: `./test-security.sh`（Gitleaks, Secretlint, cargo-audit, cargo-deny, security_regression）
+           2. `rust-backend`: `cargo test --all-targets` & `cargo clippy --all-targets -- -D warnings`
+           3. `frontend-coverage`: `npm run test:coverage` (Threshold: 80%+)
+           4. `build-verification`: `npm run build` & `cargo check --release`
+      4. **包括的ドキュメント同期**:
+         - `docs/SECURITY.ja.md`, `docs/FEATURES.ja.md`, `docs/TEST_PLAN.ja.md`, `docs/SESSION_HANDOVER.md` のセキュリティ記述と CI ゲート仕様を完全同期。
+    - **検証**:
+      - `cargo test --all-targets`: 全 77 テスト（lib 69, corpus 1, pty_stress 1, security_regression 6）100% PASS。
+      - `cargo clippy --all-targets -- -D warnings`: 0 warnings / 0 errors。
+      - `npm run test:all`: 4大ステージ（Security, Unit & Coverage, Visual Regression, CDP Memory Leak）すべて 24 秒で完全 GREEN。
+      - `npm run build`: 0 エラー成功（2.45秒）。
 
 ---
 

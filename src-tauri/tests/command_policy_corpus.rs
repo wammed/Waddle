@@ -667,6 +667,36 @@ fn test_command_policy_exhaustive_corpus() {
         },
         PolicyTestCase {
             category: "Environment Variable Dump",
+            command: "env -",
+            expected_action: PolicyAction::Review,
+            description: "Empty environment dump flag",
+        },
+        PolicyTestCase {
+            category: "Environment Variable Dump",
+            command: "env FOO=bar",
+            expected_action: PolicyAction::Review,
+            description: "Inline variable assignment dump without subcommand",
+        },
+        PolicyTestCase {
+            category: "Environment Variable Dump",
+            command: "env AWS_SECRET_ACCESS_KEY=xxxx",
+            expected_action: PolicyAction::Review,
+            description: "Inline secret assignment dump without subcommand",
+        },
+        PolicyTestCase {
+            category: "Environment Variable Dump",
+            command: "env -- FOO=bar",
+            expected_action: PolicyAction::Review,
+            description: "Option termination separator inline assignment",
+        },
+        PolicyTestCase {
+            category: "Environment Variable Dump",
+            command: "env bash -c 'echo 1'",
+            expected_action: PolicyAction::Review,
+            description: "Indirect shell execution via env with -c",
+        },
+        PolicyTestCase {
+            category: "Environment Variable Dump",
             command: "printenv",
             expected_action: PolicyAction::Review,
             description: "Print environment variables read-only exposes secrets",

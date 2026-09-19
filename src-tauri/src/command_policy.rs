@@ -573,7 +573,7 @@ fn is_env_dump_command(lower: &str) -> bool {
     if trimmed == "printenv" || trimmed.starts_with("printenv ") {
         return true;
     }
-    if trimmed == "env" || trimmed.starts_with("env -") {
+    if trimmed == "env" || trimmed.starts_with("env ") || trimmed.starts_with("env -") {
         return true;
     }
     if trimmed == "export -p" || trimmed.starts_with("export -p") {
