@@ -157,6 +157,7 @@
 | **TC-KITTY-15** | プロトコル機能問い合わせ（Capability Probe）& 0ms 即時クエリ応答 | `fastfetch` (`"type": "kitty"`) の実行、または `\x1b_Gi=1,s=1,v=1,a=q;\x1b\` を送信。 | PTY 側で即座に `\x1b_Gi=1;ok\x1b\` が返信されアスキーアートにフォールバックせず画像表示される。ヘッダー情報が Rust バックエンドでログ記録される。 | Automated / Manual |
 | **TC-KITTY-16** | アニメーション差分フレームの 32-bit RGBA 自動判定 & アルファ合成 (`a=f, c=<num>`) | 基底 RGB 画像 (`f=24`) に続いて、ペイロードサイズが $s \times v \times 4$ バイトの差分フレーム (`a=f`) を送信。 | 差分フレームが 32-bit RGBA として正確に自動判定され、白黒砂嵐ノイズなしで透明領域を前フレームに美しく合成する。 | Automated / Scripted |
 | **TC-KITTY-17** | グラフィックスレイヤーのゴースト重複防止 & 厳格な単一 Canvas 積層 | Kitty 画像表示中にターミナル画面の再マウントや分割リサイズを実施。 | 既存の `.xterm-kitty-graphics-layer` が確実に破棄され、単一の Canvas のみが文字と選択レイヤーの間に正しく積層描画される。 | Manual |
+| **TC-KITTY-18** | ANSI CSI エスケープシーケンスによるカーソル位置追従 (CUF / CUB / CHA) | 画像転送の直前に `\r\x1b[73C` や `\x1b[10G` 等のカーソル移動エスケープシーケンスを出力。 | 水平カーソル移動が正確にオフセット計算され、改行回り込みを起こさず目的の列に画像が配置される。 | Scripted / Manual |
 | **TC-KITTY-19** | 全 TUI / CLI エコシステム完全対応 (Yazi, Ranger, lf, fastfetch, image.nvim; PTY プローブ即時応答、通常テキスト100%保持 & 固定グリッド保護) | Yazi, Ranger, lf, fastfetch, Neovim (`image.nvim`) を起動し画像プレビューやロゴを表示。PTY 経由での `a=q` / `\x1b[?996n` / `\x1b[16t` / `\x1b[0c` 問い合わせおよびプレースホルダー/通常配置の描画動作を検証。 | PTY が 0ms 即時応答して各ツールが Kitty モードで初期化され、プレースホルダー描画を専用 Canvas へ一本化することで行走査中のスケール破損や一行ずらし重なりを根絶。さらに `workCell` 誤爆防止により周囲の通常テキスト（ファイル一覧・枠線・コード）が 1文字も消えずに 100% 描画され、`C=1`/Alternate Screen ゼロアロケーションにより TUI の固定グリッドを崩さずピクセルパーフェクトにインライン表示される。 | Automated / Manual |
 | **TC-KITTY-20** | 汎用 CLI/TUI 互換性完全対応: viu, timg, ranger, lf (XTVERSION 応答・DA1 Sixel排除・DSR 5n同期・t=t インライン化・ranger OK 同期・削除サイレント化によるフリッカー防止) | 特別なプロトコル指定なしで `viu`, `timg`, `ranger` を起動。PTY による XTVERSION (`\x1b[>q` / `\x1b[>0q`) 応答、DSR (`\x1b[5n` -> `\x1b[0n`) 同期、DA1 からの Sixel (`;4;`) 除外 (`\x1b[?62c`)、PTY レベルでの一時ファイル即時インライン化 (`t=t` -> `t=d`)、`manager.ts` での明示的 ID に基づく描画 OK 応答同期、および削除コマンド（`a=d`）の公式サイレント化を検証。 | `timg` が XTVERSION により Kitty グラフィックスを自動検出。`viu` の一時ファイルが PTY 側で即座にインライン化 (`t=t` -> `t=d`) されてファイル削除レースコンディションが解消され、PNG/JPEG が即座に表示。`ranger` が明示的画像 ID に対する OK 応答を受信して 1枚目でフリーズせず、かつ `clear()` 時に余計な OK 応答を返さない（サイレント）ことで 2枚目以降選択時のキー誤爆・画面点滅（フリッカー・ハング）が完全に防止され、連続プレビューが滑らかに動作する。 | Automated / Manual |
 
@@ -266,19 +267,19 @@ npx lefthook run pre-commit
 - **実行日**: 2026-09-19
 - **テスター**: Susie (User) & Antigravity (DeepMind Pair Programming Assistant)
 - **環境**: Linux 7.2 (CachyOS / Arch), WebKitGTK 4.1, Node 20+, Rust 1.85+, Google Chrome 153
-- **総合判定**: ALL PASS (109 / 109 項目 - 100% 合格)
+- **総合判定**: ALL PASS (108 / 108 項目 - 100% 合格)
 
 | スイート | 項目数 | 合格数 | 不合格数 | 備考 |
 | :--- | :--- | :--- | :--- | :--- |
 | Suite 1: PTY & コアターミナル基盤 | 10 | 10 | 0 | 0ms 同期起動、流量制御、32KB コアレッシング確認済 |
 | Suite 2: タブ・10種分割・セッション | 8 | 8 | 0 | 16px 分割線、セッション自動復元確認済 |
-| Suite 3: ファイルツリー & エディタ | 13 | 13 | 0 | 500件制限、6世代AutoSaveローテーション、復元ポップオーバーUI & 安全Undo確認済 |
-| Suite 4: AI & プロンプト連携 | 9 | 9 | 0 | 64KB ガード、コンテキスト注入確認済 |
-| Suite 5: Git 連携 & リモート制限 | 9 | 9 | 0 | GitHub 限定ポリシー、Diff 表示確認済 |
-| Suite 6: テーマ・UI・壁紙 | 7 | 7 | 0 | 11種ネオン発光同期、壁紙D&D、リアルタイムプレビュー確認済 |
-| Suite 7: Kitty Graphics Protocol | 18 | 18 | 0 | 豆腐抑止、クリッピング、アニメ、32-bit RGBA差分合成、単一Canvas積層、0msクエリ応答確認済 |
-| Suite 8: セキュリティ & ガードレール | 18 | 18 | 0 | 仮想FS走査・SSRF・Git Ref検証・上限付き走査確認済 |
+| Suite 3: ファイルツリー & エディタ | 13 | 13 | 0 | 500件動的ページネーション、マルチタブ5件制限、非特権/安全Symlink、ReDoS完全一致検索、AutoSave 6世代、復元UI & 安全Undo確認済 |
+| Suite 4: AI & プロンプト連携 | 6 | 6 | 0 | 64KB ガード、コンテキスト注入、リモート警告確認済 |
+| Suite 5: Git 連携 & リモート制限 | 8 | 8 | 0 | GitHub 限定ポリシー、Diff 表示、Conventional Commits 生成確認済 |
+| Suite 6: テーマ・UI・壁紙 | 6 | 6 | 0 | 11種ネオン発光同期、壁紙D&D、リアルタイムプレビュー確認済 |
+| Suite 7: Kitty Graphics Protocol | 20 | 20 | 0 | 豆腐抑止、クリッピング、アニメ、32-bit RGBA差分合成、単一Canvas積層、0msクエリ応答、ANSI CSI追従、TUI/CLIエコシステム完全対応確認済 |
+| Suite 8: セキュリティ & ガードレール | 21 | 21 | 0 | 仮想FS走査・SSRF・Git Ref検証、SecretMasker リアルタイムマスク、エディタ非破壊保護、履歴サニタイズ確認済 |
 | Suite 9: パフォーマンス & リソース | 5 | 5 | 0 | 256MB LRU、0% アイドル、メモリ300MB制限確認済 |
-| Suite 10: 次世代拡張 & ワークフロー | 6 | 6 | 0 | マスク、タイムライン、プレビュー、Watchdog等確認済 |
+| Suite 10: 次世代拡張 & ワークフロー | 6 | 6 | 0 | マスク、タイムライン、プレビュー、Watchdog、パイプライン、プロジェクトAIルール確認済 |
 | Suite 11: 統合自動テストパイプライン | 5 | 5 | 0 | Gitleaks/Secretlint/cargo-audit/cargo-deny、Vitest V8 カバレッジ 85%、Playwright 視覚回帰、CDP メモリ監査全パス |
 ```

@@ -157,6 +157,7 @@ This document provides a comprehensive, end-to-end test plan for **Waddle**, cov
 | **TC-KITTY-15** | Capability Probe & 0ms Query Response (Fastfetch / CLI Support) | Run fastfetch with `"type": "kitty"` or send inquiry sequence `\x1b_Gi=1,s=1,v=1,a=q;\x1b\`. | PTY immediately responds with `\x1b_Gi=1;ok\x1b\` without fallback; header parameters logged on Rust backend. | Automated / Manual |
 | **TC-KITTY-16** | Delta Frame 32-bit RGBA Auto-Detection & Alpha Blending (`a=f, c=<num>`) | Transmit base RGB image (`f=24`) followed by delta frames (`a=f`) with RGBA raw payload ($s \times v \times 4$ bytes). | Delta frames auto-detect as 32-bit RGBA, preserving alpha channel and blending smoothly without black-and-white static dots. | Automated / Scripted |
 | **TC-KITTY-17** | Ghost Layer Prevention & Single Active Canvas Stacking | Re-mount terminal view or change split layout while displaying Kitty graphics. | Previous `.xterm-kitty-graphics-layer` canvases are cleanly purged; single canvas renders between text and selection layers. | Manual |
+| **TC-KITTY-18** | ANSI CSI Cursor Tracking (CUF / CUB / CHA) | Emit repositioning escape sequences like `\r\x1b[73C` or `\x1b[10G` immediately before image transmission. | Cursor offsets accurately reflect horizontal movements; image placement anchors at target column without line wrapping. | Scripted / Manual |
 | **TC-KITTY-19** | Universal Linux TUI/CLI Ecosystem Integration (Yazi, Ranger, lf, fastfetch, image.nvim; 0ms PTY Probes, 100% Text Preservation & Grid Protection) | Launch Yazi, Ranger, lf, fastfetch, and Neovim (`image.nvim`) to display image previews and logos; verify PTY handling of `a=q` / `\x1b[?996n` / `\x1b[16t` / `\x1b[0c` inquiries and rendering pipelines. | PTY answers queries in 0ms to initialize Kitty mode; dedicated graphics canvas eliminates scaling errors and row-shift overlaps; `workCell` memory hygiene preserves 100% of surrounding text (file trees, borders, code lines); and `C=1`/alternate screen zero-allocation maintains rigid TUI grid geometry without vertical scrolling disruption. | Automated / Manual |
 | **TC-KITTY-20** | Universal CLI/TUI Ecosystem Integration: viu, timg, ranger, lf (XTVERSION, Clean DA1, DSR 5n, t=t Inlining, Ranger OK Sync, Delete Silent Response Flicker Prevention) | Run `viu`, `timg`, and `ranger`. Verify PTY responses to XTVERSION (`\x1b[>q` / `\x1b[>0q`), DSR (`\x1b[5n` -> `\x1b[0n`), DA1 without Sixel (`;4;`) flag (`\x1b[?62c`), PTY-level temporary file inlining (`t=t` -> `t=d`), `manager.ts` explicit image ID OK response sync, and spec-compliant silent response for delete (`a=d`). | `timg` automatically detects Kitty graphics via XTVERSION; `viu` temporary files are inlined immediately without file deletion race conditions, displaying PNG/JPEG instantly; `ranger` receives OK response for explicit image ID without freezing on first frame, and suppressing OK responses on delete (`a=d`) completely eliminates curses key event storms, screen flicker, and UI hangs during rapid file navigation. | Automated / Manual |
 
@@ -264,19 +265,19 @@ npx lefthook run pre-commit
 - **Date**: 2026-09-19
 - **Tester / Evaluator**: Susie (User) & Antigravity (DeepMind Pair Programming Assistant)
 - **Environment**: Linux 7.2 (CachyOS / Arch), WebKitGTK 4.1, Node 20+, Rust 1.85+, Google Chrome 153
-- **Overall Result**: ALL PASS (109 / 109 Test Cases - 100% Passed)
+- **Overall Result**: ALL PASS (108 / 108 Test Cases - 100% Passed)
 
 | Test Suite | Total | Passed | Failed | Notes |
 | :--- | :--- | :--- | :--- | :--- |
 | Suite 1: PTY & Terminal Core | 10 | 10 | 0 | 0ms sync startup, backpressure flow control, 32KB coalescing verified |
 | Suite 2: Tabs, 10-Split & Session | 8 | 8 | 0 | 16px divider, auto-restore verified |
-| Suite 3: File Tree & Editor | 13 | 13 | 0 | 500-item guard, 6-gen autosave rotation, restore popover UI & safe undo verified |
-| Suite 4: AI & Context Integration | 9 | 9 | 0 | 64KB guard, prompt context injection verified |
-| Suite 5: Git Integration & Guardrails | 9 | 9 | 0 | GitHub-only policy, Diff preview verified |
-| Suite 6: Theming, UI & Wallpapers | 7 | 7 | 0 | 11 neon themes glow sync, drag-drop wallpaper, 60 FPS live preview verified |
-| Suite 7: Kitty Graphics Protocol | 18 | 18 | 0 | Tofu suppression, clipping, animations, 32-bit RGBA delta frames, single-canvas stacking, 0ms query response verified |
-| Suite 8: Security & Guardrails | 18 | 18 | 0 | Virtual FS, SSRF, Git Ref sanitization, bounded directory verified |
+| Suite 3: File Tree & Editor | 13 | 13 | 0 | 500-item dynamic pagination, 5-tab limit, non-privileged/safe symlinks, ReDoS exact search, 6-gen autosave rotation, restore popover UI & safe undo verified |
+| Suite 4: AI & Context Integration | 6 | 6 | 0 | 64KB guard, prompt context injection, remote endpoint warning verified |
+| Suite 5: Git Integration & Guardrails | 8 | 8 | 0 | GitHub-only policy, Diff preview, Conventional Commits generation verified |
+| Suite 6: Theming, UI & Wallpapers | 6 | 6 | 0 | 11 neon themes glow sync, drag-drop wallpaper, 60 FPS live preview verified |
+| Suite 7: Kitty Graphics Protocol | 20 | 20 | 0 | Tofu suppression, clipping, animations, 32-bit RGBA delta frames, single-canvas stacking, 0ms query response, ANSI CSI cursor tracking, TUI/CLI ecosystem integration verified |
+| Suite 8: Security & Guardrails | 21 | 21 | 0 | Virtual FS, SSRF, Git Ref sanitization, SecretMasker real-time masking, editor zero-mutation protection, session history sanitization verified |
 | Suite 9: Performance & Resources | 5 | 5 | 0 | 256MB LRU, 0.0%-1.0% idle CPU, memory capped under 300MB verified |
-| Suite 10: Next-Gen & Productivity | 6 | 6 | 0 | Masking, timeline, rich preview, watchdog verified |
+| Suite 10: Next-Gen & Productivity | 6 | 6 | 0 | Masking, timeline, rich preview, watchdog, pipeline builder, project AI rules verified |
 | Suite 11: Integrated Automated Test Suite | 5 | 5 | 0 | Gitleaks/Secretlint/cargo-audit/cargo-deny, Vitest V8 85% coverage, Playwright visual regression, CDP memory audit all passed |
 ```

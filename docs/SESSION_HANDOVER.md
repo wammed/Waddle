@@ -998,6 +998,27 @@ npm run tauri dev
       - `cargo clippy --all-targets` -> 警告 0 件。
       - `npm run build` -> Vite & TypeScript エラー 0 件。
 
+45. **テスト入力フォーム（アプリ内モーダル & スタンドアロン HTML）への全 108 項目・11 スイート完全反映**:
+    - **ユーザー要望**: 「アプリ内のテスト入力フォームに、追加されたテストが反映されていない」の解消。
+    - **原因分析**:
+      - アプリ内モーダル（`TestPlanModal.tsx`）が参照するデータソース `src/data/testPlanData.ts`、およびスタンドアロン検証フォーム `tools/test_form.html` において、新設した **Suite 11（統合自動テストスイート: `TC-INT-01`〜`TC-INT-05`）**、および直近で追加されていた **Suite 3（`TC-FILE-07`〜`13`）**、**Suite 7（`TC-KITTY-18`, `20`）**、**Suite 8（`TC-SEC-16`〜`21`）**、**Suite 10（`TC-ENH-01`〜`06`）** のデータ定義が未登録または旧定義のまま乖離していた。
+    - **実施内容**:
+      - **`src/data/testPlanData.ts`**:
+        - `TEST_SUITES`: Suite 11（統合自動テストスイート & セキュリティ/回帰検証）を追加（全 11 スイート）。
+        - `TEST_CASES`: Suite 3（`TC-FILE-07`〜`13`）、Suite 8（`TC-SEC-19`〜`21`）、Suite 11（`TC-INT-01`〜`05`）を追加・更新（全 108 項目）。
+        - `TestPlanModal.tsx` が動的レンダリング（`${TEST_CASES.length}`, `${TEST_SUITES.length}`, `TEST_SUITES.map`）を行うため、アプリ内の全スイートタブ、合否入力カード、検索、プログレスバー、Markdown レポート出力に自動反映。
+      - **`tools/test_form.html`**:
+        - `TEST_SUITES`: Suite 10 および Suite 11 を追加。
+        - `TEST_CASES`: `TC-FILE-07`〜`13`、`TC-KITTY-20`、`TC-SEC-16`〜`21`、`TC-ENH-01`〜`06`、`TC-INT-01`〜`05` を追加し、全 108 項目を完全同期。
+      - **`docs/TEST_PLAN.md` & `docs/TEST_PLAN.ja.md`**:
+        - Suite 7 テーブルで抜けていた `TC-KITTY-18`（ANSI CSI エスケープシーケンス追従）を復元。
+        - Section 5 の表内項目数（Suite 1: 10, Suite 2: 8, Suite 3: 13, Suite 4: 6, Suite 5: 8, Suite 6: 6, Suite 7: 20, Suite 8: 21, Suite 9: 5, Suite 10: 6, Suite 11: 5、計 108 項目）を実態と 100% 整合。
+    - **検証結果**:
+      - 全 4 ファイル（`testPlanData.ts`, `test_form.html`, `TEST_PLAN.ja.md`, `TEST_PLAN.md`）間で `Diff: []`（項目数 108 件、ID 完全一致）。
+      - `npm run build`: TypeScript 型検査 & Vite 本番ビルド成功（エラー 0 件）。
+      - `npm run test:all`: 4 ステージ全 70 テスト + 静的監査 + 視覚回帰 + メモリ監査 ALL PASS。
+      - `cargo clippy --all-targets`: 警告 0 件。
+
 ---
 
 ## 6. 次回再開時の検討・作業候補（Next Steps）
