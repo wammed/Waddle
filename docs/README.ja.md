@@ -10,6 +10,7 @@
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
 [![Ollama](https://img.shields.io/badge/Ollama-Local_AI-white?style=for-the-badge&logo=ollama&logoColor=black)](https://ollama.com/)
 [![Platform](https://img.shields.io/badge/Platform-Linux_(Wayland_/_X11)-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://www.kernel.org/)
+[![Tested On](https://img.shields.io/badge/Tested_On-CachyOS_(COSMIC)-00C49F?style=for-the-badge&logo=archlinux&logoColor=white)](#-動作環境に関する重要なご注意-environment-notice)
 [![Vibe Coding](https://img.shields.io/badge/Built_with-AI_Vibe_Coding-8A2BE2?style=for-the-badge&logo=sparkles&logoColor=white)](#-このプロジェクトについて-ai-vibe-coding)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](../LICENSE)
 
@@ -23,6 +24,13 @@
 </p>
 
 </div>
+
+---
+
+> [!WARNING]
+> ### 動作環境に関する重要なご注意 (Environment Notice)
+> 本アプリケーション（Waddle）の開発、動作検証、および自動/手動テストは、すべて **CachyOS の COSMIC Desktop Environment** 上で行われております。  
+> **他のデスクトップ環境（KDE Plasma, GNOME, XFCE 等）や他のディストリビューションでは動作確認が取れておりません。** 環境固有のウィンドウマネージャー、コンポジター、Wayland 挙動、フォントレンダリング等の差異により、一部の表示や挙動が異なる可能性があります。
 
 ---
 
@@ -65,6 +73,8 @@
 
 ### 1. 必要環境
 
+- **検証済み動作環境**: **CachyOS + COSMIC Desktop Environment**
+  - *※ KDE Plasma, GNOME, XFCE など他のデスクトップ環境や他ディストリビューションでは動作未検証です。*
 - [Rust (Cargo)](https://rustup.rs/) (1.70 以上)
 - [Node.js & npm](https://nodejs.org/) (Node 18 以上)
 - [Ollama](https://ollama.com/) (ローカル AI エンジン)

@@ -1019,6 +1019,16 @@ npm run tauri dev
       - `npm run test:all`: 4 ステージ全 70 テスト + 静的監査 + 視覚回帰 + メモリ監査 ALL PASS。
       - `cargo clippy --all-targets`: 警告 0 件。
 
+46. **動作検証環境（CachyOS + COSMIC Desktop Environment）の明記と注意書きの追加**:
+    - **ユーザー要望**: 「READMEに注意書きを追加して、開発、検証、テストはすべて CachyOSのCOSMIC Desktop Environment 上で行っており、他の環境（KDE,GNOME等）では動作確認が取れていないことを明記して」
+    - **実施内容**:
+      - **[`docs/README.ja.md`](file:///home/susie/GitHUB/wammed/Waddle/docs/README.ja.md) & [`docs/README.md`](file:///home/susie/GitHUB/wammed/Waddle/docs/README.md)** (ルート `README.ja.md` / `README.md` シンボリックリンク):
+        - トップバッジに `[![Tested On](https://img.shields.io/badge/Tested_On-CachyOS_(COSMIC)-00C49F?style=for-the-badge&logo=archlinux&logoColor=white)]` を追加。
+        - スクリーンショット直前に GitHub Alert（`> [!WARNING]`）として「動作環境に関する重要なご注意 (Environment Notice)」を新設。開発・検証・自動/手動テストがすべて CachyOS + COSMIC Desktop Environment 上で実施されていること、および KDE Plasma, GNOME, XFCE 等の他環境では動作未確認であることを明記。
+        - 「1. 必要環境 (Prerequisites)」セクションの第1項目として「検証済み動作環境 (Verified Desktop Environment)」を追記。
+      - **[`docs/TEST_PLAN.ja.md`](file:///home/susie/GitHUB/wammed/Waddle/docs/TEST_PLAN.ja.md) & [`docs/TEST_PLAN.md`](file:///home/susie/GitHUB/wammed/Waddle/docs/TEST_PLAN.md)**:
+        - Section 5 の環境表記を `Linux 7.2 (CachyOS / Arch Linux, COSMIC Desktop Environment)` に更新。
+
 ---
 
 ## 6. 次回再開時の検討・作業候補（Next Steps）

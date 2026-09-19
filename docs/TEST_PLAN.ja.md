@@ -266,7 +266,7 @@ npx lefthook run pre-commit
 ### テスト実行記録
 - **実行日**: 2026-09-19
 - **テスター**: Susie (User) & Antigravity (DeepMind Pair Programming Assistant)
-- **環境**: Linux 7.2 (CachyOS / Arch), WebKitGTK 4.1, Node 20+, Rust 1.85+, Google Chrome 153
+- **環境**: Linux 7.2 (CachyOS / Arch Linux, COSMIC Desktop Environment), WebKitGTK 4.1, Node 20+, Rust 1.85+, Google Chrome 153
 - **総合判定**: ALL PASS (108 / 108 項目 - 100% 合格)
 
 | スイート | 項目数 | 合格数 | 不合格数 | 備考 |

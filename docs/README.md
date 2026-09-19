@@ -10,6 +10,7 @@
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
 [![Ollama](https://img.shields.io/badge/Ollama-Local_AI-white?style=for-the-badge&logo=ollama&logoColor=black)](https://ollama.com/)
 [![Platform](https://img.shields.io/badge/Platform-Linux_(Wayland_/_X11)-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://www.kernel.org/)
+[![Tested On](https://img.shields.io/badge/Tested_On-CachyOS_(COSMIC)-00C49F?style=for-the-badge&logo=archlinux&logoColor=white)](#-important-notice-on-supported-environments)
 [![Vibe Coding](https://img.shields.io/badge/Built_with-AI_Vibe_Coding-8A2BE2?style=for-the-badge&logo=sparkles&logoColor=white)](#-about-this-project-ai-vibe-coding)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](../LICENSE)
 
@@ -23,6 +24,13 @@
 </p>
 
 </div>
+
+---
+
+> [!WARNING]
+> ### Important Notice on Supported Environments
+> All development, validation, and automated/manual testing for Waddle are conducted exclusively on **CachyOS with the COSMIC Desktop Environment**.  
+> **Compatibility with other desktop environments (such as KDE Plasma, GNOME, XFCE) or other Linux distributions has not been tested or verified.** Due to variations in window management, compositors, Wayland protocol behavior, and font rendering, unexpected visual or functional discrepancies may occur on unverified platforms.
 
 ---
 
@@ -65,6 +73,8 @@
 
 ### 1. Prerequisites
 
+- **Verified Desktop Environment**: **CachyOS + COSMIC Desktop Environment**
+  - *Note: Other desktop environments (e.g., KDE Plasma, GNOME, XFCE) or other distributions have not been tested or verified.*
 - [Rust (Cargo)](https://rustup.rs/) (1.70+)
 - [Node.js & npm](https://nodejs.org/) (Node 18+)
 - [Ollama](https://ollama.com/) (Local AI engine)
