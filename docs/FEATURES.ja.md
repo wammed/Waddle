@@ -705,15 +705,20 @@ flowchart TD
    - 破壊的操作を含まない通常の安全なコマンド（`ls`, `cargo build`, `git status`、および `format_disk` 変数などの harmless 文字列）。
    - 保留なく即座に PTY マスター FD へ書き込まれ実行されます。
 2. **`PolicyAction::Review` (確認要求)**:
-   - 破壊リスクを伴うため、人間の明示的な承認を必要とするコマンド：
+   - 破壊リスクまたは情報漏洩リスクを伴うため、人間の明示的な承認を必要とするコマンド：
+     - **資格情報・機密ファイル参照**: `cat ~/.ssh/id_rsa`, `cat ~/.aws/credentials`, `grep token .env` 等（`~/.ssh/id_*`, `~/.aws/*`, `~/.config/gcloud/*`, `~/.azure/*`, `~/.gnupg/*`, `~/.local/share/keyrings/*`, `.env*`, `*secret*`, `*credential*`, `*token*` を引数に含む表示・検索系コマンド全般）
+     - **環境変数平文ダンプ**: `printenv`, `env`, `export -p`, `declare -x`, `set`（平文でのシークレット一括露出を防止）
+     - **難読化セパレータ検出**: `$IFS`, `${IFS}` を含むコマンドライン
      - 強制・破壊的 Git 操作: `git reset --hard`, `git push --force`, `git push --delete`, `git branch -D`
      - デバイス・ファイルシステム操作: `dd if=`, `mkfs`, `mkswap`, `cryptsetup`
      - システムデーモン停止: `systemctl stop`, `systemctl disable`
-     - 全権限開放: `chmod -R 777`
+     - 全権限開放: `chmod -R 777`, `sudo`, `doas`, `pkexec`
    - クライアントから `confirmed: Some(true)`（モーダルでの承認）が渡されない限り、Rust 側でエラーを返して実行を遮断します。
 3. **`PolicyAction::Block` (完全遮断)**:
-   - システム全体を破壊する致命的コマンド、またはエクスプロイト手法：
+   - システム全体を破壊する致命的コマンド、または難読化エクスプロイト手法：
      - ルート領域破壊: `rm -rf /`, `rm -rf /*`, `rm -rf --no-preserve-root /`
+     - シェル難読化解除後の破壊的コマンド: `rm${IFS}-rf${IFS}/`, `\rm -rf /`, `command rm -rf /`
+     - 改行・連結による危険コマンド混入: `true\nrm -rf /`（ステートメント単位での分割評価）
      - シェルフォーク爆弾: `:(){ :|:& };:`
      - パイプ経由のリモートスクリプト直接実行: `curl ... | bash`, `wget ... | sh`, `bash <(...)`, `python <(...)`
    - 承認フラグの有無にかかわらず、Rust カーネル境界で無条件に即座拒絶（`Err`）されます。

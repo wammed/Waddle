@@ -162,9 +162,9 @@ UI モーダルや Webview の JavaScript は IPC 経由の直接実行やプロ
 
 | ポリシー判定 | 対象コマンド・分類 | 動作仕様 |
 | :--- | :--- | :--- |
-| **`Safe`** | 無害な通常コマンド（`ls`, `git status`, `cargo build`, `cat file.txt` 等）。無害な単語に含まれる文字列（`echo 'imparted wisdom'` や変数名 `format_disk`）も正しく通過。 | 保留することなく PTY マスターへ即時書き込み・実行。 |
-| **`Review`** | 人間の明示的確認を必須とする高リスク・破壊的操作：<br>・破壊的 Git 操作: `git reset --hard`, `git push --force`, `git push --delete`, `git branch -D`<br>・ディスク・ファイルシステム操作: `dd if=`, `mkfs`, `mkswap`, `cryptsetup`<br>・デーモン操作: `systemctl stop`, `systemctl disable`<br>・権限全開放: `chmod -R 777` | デフォルトで遮断（`Err`）。フロントエンドの確認モーダルで承認された証跡（`confirmed: Some(true)`）が渡された場合のみ実行を許可。 |
-| **`Block`** | いかなる場合でも絶対に実行を許可してはならない致命的コマンド・エクスプロイト：<br>・ルート領域完全破壊: `rm -rf /`, `rm -rf /*`, `rm -rf --no-preserve-root /`<br>・シェルフォーク爆弾: `:(){ :|:& };:`<br>・パイプ経由スクリプト直接実行: `curl ... \| bash`, `wget ... \| sh`, `bash <(...)`, `python <(...)` | 承認フラグの有無に関わらず、カーネル境界で無条件に即時拒絶（`Err`）。 |
+| **`Safe`** | 無害な通常コマンド（`ls`, `git status`, `cargo build`, `cat src/main.rs`, `echo "rm -rf"` 等）。無害な単語に含まれる文字列（`echo 'imparted wisdom'` や変数名 `format_disk`）も正しく通過。※機密ファイル参照や環境変数ダンプを含まない純粋表示・検索のみ即時許可。 | 保留することなく PTY マスターへ即時書き込み・実行。 |
+| **`Review`** | 人間の明示的確認を必須とする高リスク・機密アクセス・破壊的操作：<br>・**資格情報・機密ファイル参照**: `cat ~/.ssh/id_rsa`, `cat ~/.aws/credentials`, `grep token .env` 等（`~/.ssh/id_*`, `~/.aws/*`, `~/.config/gcloud/*`, `~/.azure/*`, `~/.gnupg/*`, `~/.local/share/keyrings/*`, `.env*`, `*secret*`, `*credential*`, `*token*` を引数に含む全表示・検索系コマンド）<br>・**環境変数平文ダンプ**: `printenv`, `env`, `export -p`, `declare -x`, `set`（平文での全シークレット露出を防止）<br>・**破壊的 Git 操作**: `git reset --hard`, `git push --force`, `git push --delete`, `git branch -D`<br>・**ディスク・ファイルシステム操作**: `dd if=`, `mkfs`, `mkswap`, `cryptsetup`<br>・**デーモン・権限操作**: `systemctl stop`, `chmod -R 777`, `sudo`, `doas`, `pkexec`<br>・**難読化セパレータ検出**: `$IFS`, `${IFS}` を含むコマンドライン | デフォルトで遮断（`Err`）。フロントエンドの確認モーダルで承認された証跡（`confirmed: Some(true)`）が渡された場合のみ実行を許可。 |
+| **`Block`** | いかなる場合でも絶対に実行を許可してはならない致命的コマンド・エクスプロイト：<br>・ルート領域完全破壊: `rm -rf /`, `rm -rf /*`, `rm -rf --no-preserve-root /`<br>・シェルフォーク爆弾: `:(){ :|:& };:`<br>・パイプ経由スクリプト直接実行: `curl ... \| bash`, `wget ... \| sh`, `bash <(...)`, `python <(...)`<br>・難読化解除後の破壊的コマンド: `rm${IFS}-rf${IFS}/`, `\rm -rf /`, `command rm -rf /`, `true\nrm -rf /` | 承認フラグの有無に関わらず、カーネル境界で無条件に即時拒絶（`Err`）。 |
 
 ### ユーザー確認オプション (フロントエンド連動)
 AI やエディタから `Review` 判定のコマンドが発行された場合、フロントエンドの `DangerousCommandModal` が表示されます：
@@ -172,13 +172,18 @@ AI やエディタから `Review` 判定のコマンドが発行された場合�
 2. **安全に入力のみ（Enterは手動）**: ターミナルに入力行としてペーストし、手動確認できるようにする。
 3. **キャンセル**: コマンドの実行を取りやめる。
 
-### 4. 100+ パターン攻撃コーパス & 誤検知防止マトリクス
-攻撃者や悪意ある AI プロンプトがサブシェル、ラッパー、動的評価を用いてコマンド検査をすり抜けることを防ぐため、Waddle は広範な自動検証コーパス（`tests/command_policy_corpus.rs`）によってテストされています：
+### 4. 100+ パターン攻撃コーパス & 難読化バイパス耐性マトリクス
+攻撃者や悪意ある AI プロンプトがサブシェル、ラッパー、環境変数偽装、動的評価を用いてコマンド検査をすり抜けることを防ぐため、Waddle は広範な自動検証コーパス（`tests/command_policy_corpus.rs`）によってテストされています：
+- **資格情報・機密ファイルアクセスの強制 Review 化**: `cat`, `head`, `tail`, `less`, `more`, `grep`, `awk`, `sed` 等の表示コマンドであっても、引数に `~/.ssh/id_*`, `~/.aws/credentials`, `~/.config/gcloud/`, `~/.azure/`, `~/.gnupg/`, `~/.local/share/keyrings/`, `.env`, `token`, `secret`, `credential` が含まれる場合は `Safe` を解除して即座に `Review` を要求。
+- **環境変数ダンプコマンドの Review 化**: 平文で全環境変数を漏洩させる `env`, `printenv`, `export -p`, `declare -x`, `set` を漏れなく捕捉し、明示的承認を強制。
+- **シェル難読化・$IFS 偽装耐性**: `$IFS`, `${IFS}` 内部フィールドセパレータによる空白偽装（例: `rm${IFS}-rf${IFS}/`）を自動正規化・検知し、破壊的コマンドを確実に `Block`、一般コマンドも `Review` へルーティング。
+- **マルチライン・コマンド連結の分割評価**: 改行コード（`\n`）やセミコロン（`;`）、論理演算子（`&&`, `||`）で連結されたコマンド列（例: `true\nrm -rf /`）を構文単位で個別評価し、最も危険度の高い判定（`Block` > `Review` > `Safe`）を適用。
+- **コマンド名エスケープ・ラッパーの正規化**: `\rm`, `'r'm`, `"r"m`, `command rm`, `builtin rm` などのエスケープや組み込みプレフィックスを解除・正規化して評価。
 - **シェル間接実行の検出**: `sh -c`, `bash -c`, `bash -lc`, `zsh -c`, `dash -c`, `ksh -c` などのサブシェル呼び出しを捕捉し、内包されたペイロードを直接評価。
 - **インタプリタ動的評価の遮断**: スクリプト実行フラグ（`python -c`, `python3 -c`, `node -e`, `ruby -e`, `perl -e`, `php -r`）を検出し、即座に `PolicyAction::Review` を強制。
 - **パイプ・引数委譲の迂回阻止**: シェルへのパイプ（`... | sh`, `... | bash`）、委譲コマンド（`xargs ...`, `env ...`）、コマンド置換（`$(...)`, `` `...` ``）、Base64 デコードパイプ（`base64 -d | sh`）を漏れなく検知。
 - **特権昇格の検出**: `sudo`, `doas`, `pkexec` を検知し、昇格操作に対する明示的確認を強制。
-- **開発コマンドの誤検知防止保証**: 危険キーワードを含む無害なテキスト出力や検索コマンド（`echo "rm -rf"`, `echo "wipefs -a"`, `cat /var/log/delete.log`, `grep "format" disk.txt` 等）は、シェルメタ文字を含まない場合に `is_pure_safe_display_or_search` により優先判定され、100% 確実に `PolicyAction::Safe` として即時実行されます。
+- **開発コマンドの誤検知防止保証**: 危険キーワードを含む無害なテキスト出力や検索コマンド（`echo "rm -rf"`, `echo "wipefs -a"`, `cat /var/log/delete.log`, `grep "format" disk.txt` 等）は、機密パスやシェルメタ文字を含まない場合に `is_pure_safe_display_or_search` により優先判定され、100% 確実に `PolicyAction::Safe` として即時実行されます。
 
 ---
 

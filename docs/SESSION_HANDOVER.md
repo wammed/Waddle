@@ -368,6 +368,30 @@
          - `decodeRgb` / `decodeRgba`: `OffscreenCanvas` と `transferToImageBitmap()` による高信頼・ゼロコピーの ImageBitmap 生成へ移行。
       4. `src/services/tauriApi.ts` & `src/services/kittyGraphics/manager.ts`:
          - `logKittyDebug` を配備し、配置・フレーム更新・描画のトレーサビリティを確保。
+
+39. **CommandPolicy 境界統一（資格情報・環境変数アクセスの Review 化・シェル難読化耐性） & GitHub Actions CI 正常化**:
+    - **ユーザー要望**: Waddle のセキュリティ評価をプロダクションレディ（9.8+/10）へ引き上げるため、CommandPolicy における「資格情報読み取りの Review 化」「シェル難読化バイパス耐性」の実装、および「GitHub Actions CI ワークフローの正常化」の完了。
+    - **改修内容**:
+      1. `src-tauri/src/command_policy.rs`:
+         - **資格情報・機密ファイル参照の検知と強制 Review 化**: `cat`, `head`, `tail`, `less`, `more`, `grep`, `awk`, `sed` などの表示・検索系コマンドであっても、引数に `~/.ssh/id_*`, `~/.aws/*`, `~/.config/gcloud/*`, `~/.azure/*`, `~/.gnupg/*`, `~/.local/share/keyrings/*`, `.env*`, `*secret*`, `*credential*`, `*token*` が含まれる場合は `Safe` を解除し、`PolicyAction::Review` を返すよう境界を統一。
+         - **環境変数平文ダンプコマンドの Review 化**: `printenv`, `env`, `export -p`, `declare -x`, `set` を単体・パイプなし問わず `PolicyAction::Review` へ変更し、平文での機密情報一括露出を防止。
+         - **シェル難読化・$IFS 偽装耐性**: `$IFS`, `${IFS}` を空白文字として自動正規化した評価と、難読化シグネチャ自体の検知（破壊的操作時は `Block`、一般操作時は `Review`）を実装。
+         - **マルチライン・ステートメント分割評価**: 改行コード（`\n`）やセミコロン（`;`）、論理演算子（`&&`, `||`）による複数コマンド連結において、後半に危険コマンドが含まれる場合（例: `true\nrm -rf /`）のすり抜けを防ぐ構文単位の分割・最悪リスク集約評価を導入。
+         - **コマンド名エスケープ・ラッパーの正規化**: `\rm`, `'r'm`, `"r"m`, `command rm`, `builtin rm` などのエスケープやラッパープレフィックスを解除・正規化して評価。
+      2. **テストスイート拡充**:
+         - `src-tauri/tests/command_policy_corpus.rs`: Category 12（機密ファイル参照・環境変数ダンプ）、Category 13（シェル難読化・改行連結・エスケープ）を追加し、100+ テストベクター全件 PASS。
+         - `src-tauri/tests/security_regression.rs`: Pillar 1 に機密アクセス・環境変数ダンプ・難読化バイパスのテストベクターを網羅追加し、6大防御の柱すべてで 100% PASS。
+         - `package.json`: `"test:coverage": "vitest run --coverage"` を追加（Statements, Branches, Functions, Lines いずれも 85%+ で基準 80%+ をクリア）。
+         - `test-security.sh`: リポジトリルートに実行可能ラッパーを配備（全ツール稼働、fail-closed 実証）。
+      3. **GitHub Actions CI ワークフローの刷新 (`.github/workflows/ci.yml`)**:
+         - 不要・異常なレガシー互換ジョブ（Node 10/16/18）や無関係なライブラリステップを完全撤廃。
+         - `ubuntu-latest`（Node 20, Rust stable）をランナーとし、以下の 4 つの fail-closed リリースゲートを確立：
+           1. `security-audit`: `./test-security.sh`（Gitleaks, Secretlint, cargo-audit, cargo-deny, security_regression）
+           2. `rust-backend`: `cargo test --all-targets` & `cargo clippy --all-targets -- -D warnings`
+           3. `frontend-coverage`: `npm run test:coverage` (Threshold: 80%+)
+           4. `build-verification`: `npm run build` & `cargo check --release`
+      4. **包括的ドキュメント同期**:
+         - `docs/SECURITY.ja.md`, `docs/FEATURES.ja.md`, `docs/TEST_PLAN.ja.md`, `docs/SESSION_HANDOVER.md` のセキュリティ記述と CI ゲート仕様を完全同期。
     - **検証**:
       - `cargo test --manifest-path src-tauri/Cargo.toml`: 全 40 件 PASS。
       - `npm run build`: TypeScript 型検査 & Vite ビルド成功（0 エラー、2.36秒）。

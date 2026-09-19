@@ -31,6 +31,10 @@ fn test_security_pillar1_command_policy() {
         "rm -rf /",
         "rm -rf /*",
         "rm -fr /",
+        "rm${IFS}-rf${IFS}/",
+        "true\nrm -rf /",
+        "\\rm -rf /",
+        "command rm -rf /",
         ":(){ :|:& };:",
         "mkfs.ext4 /dev/sda1",
         "wipefs -a /dev/nvme0n1",
@@ -54,6 +58,11 @@ fn test_security_pillar1_command_policy() {
 
     // 2. Bypass & Elevation attempts must be REVIEW
     let review_cmds = [
+        "env",
+        "printenv",
+        "cat ~/.ssh/id_rsa",
+        "cat ~/.aws/credentials",
+        "grep token .env",
         "sh -c 'ls -la'",
         "bash -c 'whoami'",
         "bash -lc 'id'",
@@ -108,8 +117,6 @@ fn test_security_pillar1_command_policy() {
         "pwd",
         "whoami",
         "uname -a",
-        "env",
-        "printenv",
     ];
     for cmd in safe_cmds {
         let eval = CommandPolicy::evaluate(cmd);

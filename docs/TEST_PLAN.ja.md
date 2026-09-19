@@ -283,12 +283,12 @@ npx lefthook run pre-commit
 
 | ゲート | 対象範囲 | 実行コマンド / ツール | 合格判定基準 (Pass Threshold) |
 | :--- | :--- | :--- | :--- |
-| **Gate 1: 静的セキュリティ & 秘匿情報監査** | Gitleaks（平文秘匿情報走査）、Secretlint（コードベース静的監査）、Cargo Audit（RUSTSEC脆弱性）、Cargo Deny（ライセンス・禁止クレート・依存重複） | `npm run test:security` | 秘匿情報リーク 0 件、認証情報露出 0 件、脆弱性警告 0 件、ライセンス違反 0 件 |
+| **Gate 1: 静的セキュリティ & 秘匿情報監査** | Gitleaks（平文秘匿情報走査）、Secretlint（コードベース静的監査）、Cargo Audit（RUSTSEC脆弱性）、Cargo Deny（ライセンス・禁止クレート・依存重複）、Security Regression | `./test-security.sh` (`npm run test:security`) | 秘匿情報リーク 0 件、認証情報露出 0 件、脆弱性警告 0 件、ライセンス違反 0 件、ツール欠落時即座に exit 1 |
 | **Gate 2: セキュリティ回帰統合検証** | 6大防御の柱: CommandPolicy, SSRF DNS Pinning, パストラバーサル, シンボリックリンク脱出, 未信頼ルール無効化, SecretMasker | `cargo test --test security_regression` | 6/6 全ての防御の柱で 100% PASS（エラー 0 件） |
-| **Gate 3: CommandPolicy 攻撃コーパス** | 100+ の攻撃・安全マトリクス（シェル間接実行、動的評価、プロセス置換、特権昇格、難読化、誤検知防止） | `cargo test --test command_policy_corpus` | 100% PASS（全テストベクターで期待されるポリシーアクションを検証） |
-| **Gate 4: ユニットテスト & カバレッジ** | フロントエンド Vitest（V8カバレッジ） & バックエンド Cargo unittests | `npm run test:unit` | V8 カバレッジ 4 指標 >= 80%（Statements, Branches, Functions, Lines）、Cargo テスト 100% PASS |
+| **Gate 3: CommandPolicy 攻撃コーパス & 難読化耐性** | 100+ の攻撃・安全マトリクス（資格情報アクセスReview化、環境変数ダンプReview化、シェル難読化$IFS、改行マルチライン連結、コマンド名エスケープ、間接実行、動的評価、特権昇格、誤検知防止） | `cargo test --test command_policy_corpus` | 100% PASS（全テストベクターで期待されるポリシーアクションを検証） |
+| **Gate 4: ユニットテスト & カバレッジ** | フロントエンド Vitest（V8カバレッジ 80%+） & バックエンド Cargo unittests | `npm run test:coverage` & `cargo test --all-targets` | V8 カバレッジ 4 指標 >= 80%（Statements, Branches, Functions, Lines）、Cargo テスト 100% PASS |
 | **Gate 5: 視覚的回帰 & リソースリーク** | Playwright Canvas 描画スナップショット & Chromium CDP メモリ監査 | `npm run test:visual && npm run test:memory` | テーマ/Canvas のピクセル完全一致、ヒープ上限 < 300MB、DOM リーク 0 件、PTY ゾンビ 0 件 |
-| **Gate 6: 本番ビルド & 静的解析** | TypeScript 厳格型検査 & Vite 本番バンドル & ネイティブビルド | `npm run build && cargo clippy` | TypeScript 型エラー 0 件、Clippy 警告 0 件、クリーンなネイティブバイナリ生成 |
+| **Gate 6: 本番ビルド & 静的解析** | TypeScript 厳格型検査 & Vite 本番バンドル & ネイティブビルド & Clippy | `npm run build && cargo clippy --all-targets -- -D warnings` | TypeScript 型エラー 0 件、Clippy 警告 0 件、クリーンなネイティブバイナリ生成 |
 
 ---
 

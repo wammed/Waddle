@@ -8,6 +8,7 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "test:unit": "bash scripts/test-unit.sh",
     "test:security": "bash scripts/test-security.sh",

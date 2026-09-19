@@ -637,17 +637,67 @@ fn test_command_policy_exhaustive_corpus() {
             expected_action: PolicyAction::Safe,
             description: "Harmless shell variable assignment",
         },
+
+        // ====================================================================
+        // Category 12: Sensitive Credential & Secret Access Protection (Review)
+        // ====================================================================
         PolicyTestCase {
-            category: "False Positive Prevention",
-            command: "env",
-            expected_action: PolicyAction::Safe,
-            description: "Environment listing without sub-command",
+            category: "Sensitive Credential Access",
+            command: "cat ~/.ssh/id_rsa",
+            expected_action: PolicyAction::Review,
+            description: "SSH private key read attempt",
         },
         PolicyTestCase {
-            category: "False Positive Prevention",
+            category: "Sensitive Credential Access",
+            command: "cat ~/.aws/credentials",
+            expected_action: PolicyAction::Review,
+            description: "AWS credentials file read attempt",
+        },
+        PolicyTestCase {
+            category: "Sensitive Credential Access",
+            command: "grep token .env",
+            expected_action: PolicyAction::Review,
+            description: "Grepping token from local .env file",
+        },
+        PolicyTestCase {
+            category: "Environment Variable Dump",
+            command: "env",
+            expected_action: PolicyAction::Review,
+            description: "Environment listing exposes plaintext secrets",
+        },
+        PolicyTestCase {
+            category: "Environment Variable Dump",
             command: "printenv",
-            expected_action: PolicyAction::Safe,
-            description: "Print environment variables read-only",
+            expected_action: PolicyAction::Review,
+            description: "Print environment variables read-only exposes secrets",
+        },
+
+        // ====================================================================
+        // Category 13: Shell Obfuscation & Multiline Evasion (Block / Review)
+        // ====================================================================
+        PolicyTestCase {
+            category: "Shell Obfuscation",
+            command: "rm${IFS}-rf${IFS}/",
+            expected_action: PolicyAction::Block,
+            description: "IFS deobfuscation targeting root destruction",
+        },
+        PolicyTestCase {
+            category: "Multiline Statement Evasion",
+            command: "true\nrm -rf /",
+            expected_action: PolicyAction::Block,
+            description: "Newline separated multiline catastrophic deletion",
+        },
+        PolicyTestCase {
+            category: "Command Name Escape",
+            command: "\\rm -rf /",
+            expected_action: PolicyAction::Block,
+            description: "Backslash escaped rm command invoking root deletion",
+        },
+        PolicyTestCase {
+            category: "Command Wrapper Evasion",
+            command: "command rm -rf /",
+            expected_action: PolicyAction::Block,
+            description: "Builtin command wrapper invoking root deletion",
         },
     ];
 
