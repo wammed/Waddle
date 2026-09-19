@@ -24,7 +24,7 @@
 | :--- | :--- | :--- | :--- | :--- |
 | **TC-PTY-01** | 0ms 同期起動ハンドシェイク (start_pty) | 🟢 PASS | Manual | - |
 | **TC-PTY-02** | 高スループットストリーミング & カーネル協調流量制御 | 🟢 PASS | Manual | - |
-| **TC-PTY-03** | UTF-8 マルチバイト境界処理 | 🟢 PASS | Manual | 文字化けは無いけど絵文字と文字が重なっている |
+| **TC-PTY-03** | UTF-8 マルチバイト境界処理 | 🟢 PASS | Manual | - |
 | **TC-PTY-04** | CanvasAddon ハードウェア描画 | 🟢 PASS | Manual | - |
 | **TC-PTY-05** | フリッカーフリーなリサイズ & FitAddon | 🟢 PASS | Manual | - |
 | **TC-PTY-06** | プロセスグループ完全終了 (POSIX) | 🟢 PASS | Automated / Manual | - |
