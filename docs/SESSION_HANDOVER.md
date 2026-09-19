@@ -1049,6 +1049,32 @@ npm run tauri dev
     - **全リンク自動検証**:
       - Node.js 検証スクリプトにより、4 つのファイル（`README.md`, `README.ja.md`, `docs/README.md`, `docs/README.ja.md`）に含まれる全画像・Markdownリンク・HTMLタグリンク（計 100+ リンク）を走査。全件 `100% OK`（エラー 0 件）を確認。
 
+48. **AI コミットメッセージ自動生成の不具合解消 & commitlint (Conventional Commits) 完全準拠対応**:
+    - **背景と課題**:
+      - GitHub ポップアップ（GitQuickPopover）における「AI コミット生成」機能が作動しない事象の解消。
+      - リポジトリの `commitlint.config.mjs`（`@commitlint/config-conventional`）規約に適合し、コミット時に Lefthook の `commit-msg` フックで弾かれないメッセージを確実に生成する要件。
+    - **原因究明と対策**:
+      1. **未追跡ファイル（Untracked Files）による差分ゼロ化**:
+         - `git diff` / `git diff --cached` は新規作成ファイル（`??`）を拾わないため、未追跡ファイルのみの状態で「差分なし」エラーが発生していた。
+         - `src-tauri/src/pty.rs` の `git_get_diff` を改修し、未ステージ差分取得時に未追跡ファイルを自動検知してシンセティック差分（`--- /dev/null\n+++ b/...`）を生成するよう強化。
+      2. **マルチバイト文字（日本語等）境界パニック完全防御**:
+         - `src-tauri/src/ai.rs` において、`&diff[..6000]` で UTF-8 文字の途中でスライスされた場合にパニックする問題を `safe_truncate_str`（文字境界スライス）により根本解消。
+      3. **思考モデル（Thinking Models: Gemma 4 等）の思考タグ混入防止**:
+         - ローカル Ollama の `gemma4-coder:latest` 等が出力する `<think>...</think>` や `<thought>...</thought>`、前置き文（`Here is...`）を完全除去。
+      4. **commitlint 完全準拠のフォーマッター & ポストプロセッサ配備 (`format_commitlint_message`)**:
+         - Conventional Commits 仕様（`<type>(<scope>): <subject>`）を抽出し、`type` を小文字化、非標準タイプ（`add` -> `feat`, `update` -> `chore` 等）を自動正規化。
+         - `subject` 先頭を小文字化、末尾ピリオド（`.`）等の句読点を完全除去、100 文字以内へ安全に切り詰め。
+         - `npx commitlint` のチェックをエラー 0 件で 100% パスすることを保証。
+      5. **Ollama モデル動的自動フォールバック (`resolve_ollama_model`)**:
+         - モデル未指定時や不一致時に `/api/tags` からインストール済みモデルを自動検知してフォールバック。
+      6. **UI & UX の強化 (`GitQuickPopover.tsx` & `src/index.css`)**:
+         - コミットバーに commitlint 状態を示すスマートバッジ（`[✓ commitlint: valid]`）を新設。
+         - 多言語辞書（日英）のラベルを `AI コミット生成 (commitlint)` / `AI Generate Commit (commitlint)` に更新。
+    - **テスト同期 & 検証**:
+      - `TEST_PLAN.md`, `TEST_PLAN.ja.md`, `src/data/testPlanData.ts`, `tools/test_form.html`: 全 108 項目を完全同期し `TC-GIT-03` を commitlint 対応に更新。
+      - Rust 単体テスト 2 件追加（`test_git_get_diff_untracked_synthetic`, `test_format_commitlint_message`、Rust 計 62 テスト全パス）。
+      - 実機 Ollama + `npx commitlint` パス確認。
+
 ---
 
 ## 6. 次回再開時の検討・作業候補（Next Steps）

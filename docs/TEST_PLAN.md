@@ -114,7 +114,7 @@ This document provides a comprehensive, end-to-end test plan for **Waddle**, cov
 | :--- | :--- | :--- | :--- | :--- |
 | **TC-GIT-01** | Status Bar Git Indicator & Popover | Modify files in a Git repository and click the branch indicator in status bar. | Dirty counts and Ahead/Behind badges illuminate; Git Quick Popover opens. | Manual |
 | **TC-GIT-02** | GUI Diff Viewer | Select a modified file from popover to view diff. | Line additions (green) and deletions (red) render with syntax-highlighted side-by-side / unified view. | Manual |
-| **TC-GIT-03** | AI Conventional Commit Generator | With staged/unstaged changes, click "Generate Commit Message". | Valid Conventional Commit message (e.g. `feat(scope): ...`) populates input field. | Manual |
+| **TC-GIT-03** | AI Conventional Commit Generator (commitlint) | With staged, unstaged, or untracked changes, click "AI Generate Commit (commitlint)". | Generates commitlint-compliant Conventional Commit (`<type>(<scope>): <subject>`), illuminates green badge, and passes `npx commitlint` validation with 0 errors. | Automated / Manual |
 | **TC-GIT-04** | Interactive `git push` & `git pull` | Click Push / Pull buttons when Ahead / Behind counts are non-zero. | Spinner animates; toast notification confirms success; Ahead/Behind counters reset to 0. | Manual |
 | **TC-GIT-05** | Authentication Guidance (SSH / CLI) | Trigger Push without configured credentials. | Error banner displays clear steps to run `gh auth login` or add an SSH key. | Manual |
 | **TC-GIT-06** | GitHub-Only Remote Policy (`restrict_to_github`) | Attempt Push/Pull in a repository pointing to non-GitHub remote (e.g. GitLab). | Operation aborts before invocation; warning confirms restriction to GitHub endpoints. | Automated / Manual |

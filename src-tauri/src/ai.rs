@@ -1,5 +1,6 @@
 use crate::config::AiConfig;
 use futures_util::StreamExt;
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::time::Duration;
@@ -106,6 +107,173 @@ pub fn validate_ollama_endpoint(endpoint: &str) -> Result<String, String> {
     }
 
     Ok(clean.trim_end_matches('/').to_string())
+}
+
+/// UTF-8 文字境界を壊さずに安全に文字列を切り詰める
+pub fn safe_truncate_str(s: &str, max_bytes: usize) -> &str {
+    if s.len() <= max_bytes {
+        return s;
+    }
+    let mut end = max_bytes;
+    while end > 0 && !s.is_char_boundary(end) {
+        end -= 1;
+    }
+    &s[..end]
+}
+
+/// AIの生の出力から思考タグや余計な文章を除去し、commitlint (Conventional Commits) 規格に準拠した形式に整形
+pub fn format_commitlint_message(raw: &str) -> String {
+    // 1. <think>...</think> や <thought>...</thought> 思考ブロックの除去
+    let think_re = Regex::new(r"(?is)<(think|thought)>.*?</(think|thought)>").unwrap();
+    let text = think_re.replace_all(raw, "");
+
+    // 2. マークダウンのコードフェンスや余計なタグの除去
+    let code_re = Regex::new(r"(?s)```[a-zA-Z0-9_-]*\n?(.*?)```").unwrap();
+    let text = code_re.replace_all(&text, "$1");
+
+    // 行ごとに走査して、Conventional Commits 形式に合致する行を探す
+    let cc_re = Regex::new(r"^([a-zA-Z0-9_-]+)(?:\(([a-zA-Z0-9_\/.-]+)\))?(!)?:\s*(.+)$").unwrap();
+
+    let mut candidate = String::new();
+
+    for line in text.lines() {
+        let trimmed = line
+            .trim()
+            .trim_matches('`')
+            .trim_matches('"')
+            .trim_matches('\'')
+            .trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+
+        // 前置き文をスキップ（Here is..., Sure! 等）
+        let lower = trimmed.to_lowercase();
+        if lower.starts_with("here is")
+            || lower.starts_with("here's")
+            || lower.starts_with("sure")
+            || lower.starts_with("commit message:")
+            || lower.starts_with("conventional commit:")
+        {
+            continue;
+        }
+
+        if let Some(caps) = cc_re.captures(trimmed) {
+            let raw_type = caps.get(1).map_or("", |m| m.as_str()).to_lowercase();
+            let scope = caps.get(2).map(|m| m.as_str().to_lowercase());
+            let breaking = caps.get(3).is_some();
+            let subject = caps.get(4).map_or("", |m| m.as_str()).trim();
+
+            // タイプ名のマッピング・正規化
+            let normalized_type = match raw_type.as_str() {
+                "feat" | "fix" | "docs" | "style" | "refactor" | "perf" | "test" | "build" | "ci" | "chore" | "revert" => raw_type,
+                "add" | "added" | "feature" | "new" => "feat".to_string(),
+                "bug" | "bugfix" | "hotfix" | "fixed" | "patch" => "fix".to_string(),
+                "doc" | "documentation" | "readme" => "docs".to_string(),
+                "refac" | "refactoring" | "clean" | "cleanup" | "restructure" => "refactor".to_string(),
+                "performance" | "optimize" | "optimization" => "perf".to_string(),
+                "tests" | "testing" => "test".to_string(),
+                "deps" | "dependency" | "dependencies" => "build".to_string(),
+                "pipeline" | "workflow" | "actions" => "ci".to_string(),
+                "update" | "updated" | "change" | "changed" | "modify" | "modified" | "misc" | "maintenance" => "chore".to_string(),
+                "rollback" | "undo" => "revert".to_string(),
+                _ => "chore".to_string(),
+            };
+
+            // subject のサニタイズ（先頭小文字、末尾ピリオド除去）
+            let mut clean_subject = subject
+                .trim_matches('`')
+                .trim_matches('"')
+                .trim_matches('\'')
+                .trim_end_matches('.')
+                .trim_end_matches(';')
+                .trim_end_matches('!')
+                .trim()
+                .to_string();
+
+            if let Some(first_char) = clean_subject.chars().next() {
+                if first_char.is_ascii_uppercase() {
+                    let mut chars = clean_subject.chars();
+                    let lower_first = chars.next().unwrap().to_lowercase();
+                    clean_subject = format!("{}{}", lower_first, chars.as_str());
+                }
+            }
+
+            if clean_subject.is_empty() {
+                clean_subject = "update project files".to_string();
+            }
+
+            let mut header = if let Some(s) = scope {
+                if breaking {
+                    format!("{}({})!: {}", normalized_type, s, clean_subject)
+                } else {
+                    format!("{}({}): {}", normalized_type, s, clean_subject)
+                }
+            } else if breaking {
+                format!("{}!: {}", normalized_type, clean_subject)
+            } else {
+                format!("{}: {}", normalized_type, clean_subject)
+            };
+
+            // 100文字以内で安全に切り詰め
+            if header.len() > 100 {
+                header = safe_truncate_str(&header, 100).trim_end().to_string();
+                header = header.trim_end_matches('.').to_string();
+            }
+
+            candidate = header;
+            break;
+        } else if candidate.is_empty() {
+            // cc_re に直接マッチしなかった場合でも、最初の有効な行を候補として記録
+            candidate = trimmed.to_string();
+        }
+    }
+
+    if candidate.is_empty() {
+        return "chore: update project files".to_string();
+    }
+
+    // もし candidate がまだ Conventional Commits 形式（<type>: <subject>）になっていなければ強制補正
+    if !cc_re.is_match(&candidate) {
+        let clean = candidate
+            .trim_matches('`')
+            .trim_matches('"')
+            .trim_matches('\'')
+            .trim_end_matches('.')
+            .trim_end_matches(';')
+            .trim_end_matches('!')
+            .trim();
+        let lower = clean.to_lowercase();
+        let inferred_type = if lower.contains("fix") || lower.contains("bug") {
+            "fix"
+        } else if lower.contains("add") || lower.contains("feature") {
+            "feat"
+        } else if lower.contains("doc") || lower.contains("readme") {
+            "docs"
+        } else if lower.contains("test") {
+            "test"
+        } else if lower.contains("refactor") {
+            "refactor"
+        } else {
+            "chore"
+        };
+
+        let mut sub = clean.to_string();
+        if let Some(first_char) = sub.chars().next() {
+            if first_char.is_ascii_uppercase() {
+                let mut chars = sub.chars();
+                let lower_first = chars.next().unwrap().to_lowercase();
+                sub = format!("{}{}", lower_first, chars.as_str());
+            }
+        }
+        candidate = format!("{}: {}", inferred_type, sub);
+        if candidate.len() > 100 {
+            candidate = safe_truncate_str(&candidate, 100).trim_end().to_string();
+            candidate = candidate.trim_end_matches('.').to_string();
+        }
+    }
+
+    candidate
 }
 
 pub const DEFAULT_RULES_EN: &str = r#"# Waddle Global AI Rules & Context
@@ -660,29 +828,56 @@ Output ONLY the resulting code. Wrap the code in a single markdown code block li
         Ok(extract_code_from_markdown(response))
     }
 
-    /// Git Diff から Conventional Commits 形式のコミットメッセージを自動生成 (Ollama)
+    /// Ollama で使用可能なモデルを解決（未指定時は /api/tags の先頭モデルへ自動フォールバック）
+    async fn resolve_ollama_model(&self, endpoint: &str, preferred_model: &str) -> String {
+        let trimmed = preferred_model.trim();
+        if !trimmed.is_empty() {
+            return trimmed.to_string();
+        }
+
+        let tags_url = format!("{}/api/tags", endpoint);
+        if let Ok(res) = self.client.get(&tags_url).send().await {
+            if let Ok(json) = res.json::<serde_json::Value>().await {
+                if let Some(models) = json["models"].as_array() {
+                    for m in models {
+                        if let Some(name) = m["name"].as_str() {
+                            if !name.is_empty() {
+                                return name.to_string();
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        "llama3.2".to_string()
+    }
+
+    /// Git Diff から commitlint (Conventional Commits) 形式のコミットメッセージを自動生成 (Ollama)
     pub async fn generate_commit_message(
         &self,
         diff: &str,
         config: &AiConfig,
     ) -> Result<String, String> {
-        let system_prompt = "You are an expert Git assistant. Given a git diff, generate a concise and descriptive Conventional Commits message (e.g. 'feat: add user login' or 'fix: resolve race condition in pty listener'). Output ONLY the commit message itself on a single line with no markdown code blocks, no backticks, and no explanations.";
+        let system_prompt = "You are an expert Git assistant following the Conventional Commits specification for commitlint.
+Given a git diff, generate a concise, descriptive commit message.
+STRICT RULES:
+1. Format: <type>(<optional-scope>): <subject> OR <type>: <subject>
+2. Allowed types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert.
+3. The type MUST be strictly lowercase.
+4. The subject MUST start with a lowercase letter.
+5. Never end the subject with a period, semicolon, or exclamation mark.
+6. The entire message MUST be under 100 characters on a single line.
+7. Output ONLY the raw commit message itself without thinking process, explanations, quotes, or markdown code blocks.";
 
-        let truncated_diff = if diff.len() > 6000 {
-            &diff[..6000]
-        } else {
-            diff
-        };
+        // UTF-8 文字境界を安全に考慮して最大 6000 バイトで切り詰める
+        let truncated_diff = safe_truncate_str(diff, 6000);
 
-        let user_prompt = format!("Generate a commit message for this diff:\n\n```diff\n{}\n```", truncated_diff);
+        let user_prompt = format!("Generate a Conventional Commit message for this diff:\n\n```diff\n{}\n```", truncated_diff);
 
         let endpoint = validate_ollama_endpoint(&config.ollama_endpoint)?;
         let url = format!("{}/api/generate", endpoint);
-        let model = if config.ollama_model.is_empty() {
-            "llama3.2"
-        } else {
-            &config.ollama_model
-        };
+        let model = self.resolve_ollama_model(&endpoint, &config.ollama_model).await;
 
         let body = serde_json::json!({
             "model": model,
@@ -703,7 +898,9 @@ Output ONLY the resulting code. Wrap the code in a single markdown code block li
             .map_err(|e| format!("Ollamaへの接続に失敗しました: {}", e))?;
 
         if !res.status().is_success() {
-            return Err(format!("Ollama HTTP Error: {}", res.status()));
+            let status = res.status();
+            let err_body = res.text().await.unwrap_or_default();
+            return Err(format!("Ollama HTTP Error ({}): {}", status, err_body));
         }
 
         let json: serde_json::Value = res
@@ -711,18 +908,9 @@ Output ONLY the resulting code. Wrap the code in a single markdown code block li
             .await
             .map_err(|e| format!("Failed to parse response: {}", e))?;
 
-        let raw = json["response"].as_str().unwrap_or("").trim();
-        let cleaned = raw
-            .trim_matches('`')
-            .trim_matches('"')
-            .trim_matches('\'')
-            .trim();
-        let first_line = cleaned.lines().next().unwrap_or(cleaned).trim();
-        if first_line.is_empty() {
-            Ok("chore: update project files".to_string())
-        } else {
-            Ok(first_line.to_string())
-        }
+        let raw = json["response"].as_str().unwrap_or("");
+        let formatted = format_commitlint_message(raw);
+        Ok(formatted)
     }
 
     // --- Ollama Implementation ---
@@ -1207,5 +1395,111 @@ mod tests {
 
         let _ = std::fs::remove_dir_all(&temp_dir);
         let _ = std::fs::remove_dir_all(&isolated_temp);
+    }
+
+    #[test]
+    fn test_safe_truncate_str() {
+        let ascii = "hello world";
+        assert_eq!(safe_truncate_str(ascii, 5), "hello");
+        assert_eq!(safe_truncate_str(ascii, 20), "hello world");
+
+        // Multibyte (3 bytes per character)
+        let ja = "あいうえお"; // 15 bytes
+        // 4 bytes: 'あ' (3 bytes) fits, 'い' (starts at 3, ends at 6) does not fit
+        assert_eq!(safe_truncate_str(ja, 4), "あ");
+        assert_eq!(safe_truncate_str(ja, 6), "あい");
+        assert_eq!(safe_truncate_str(ja, 7), "あい");
+        assert_eq!(safe_truncate_str(ja, 15), "あいうえお");
+    }
+
+    #[test]
+    fn test_format_commitlint_message() {
+        // Standard lowercase
+        assert_eq!(
+            format_commitlint_message("feat: add user login"),
+            "feat: add user login"
+        );
+
+        // Capitalized type & subject, trailing period
+        assert_eq!(
+            format_commitlint_message("Feat: Add User Login."),
+            "feat: add User Login"
+        );
+        assert_eq!(
+            format_commitlint_message("Fix: Resolve race condition in PTY listener."),
+            "fix: resolve race condition in PTY listener"
+        );
+
+        // Scope with capitalized subject and trailing punctuation
+        assert_eq!(
+            format_commitlint_message("fix(pty): Handle backpressure flow control!"),
+            "fix(pty): handle backpressure flow control"
+        );
+
+        // Breaking change
+        assert_eq!(
+            format_commitlint_message("feat(api)!: Drop deprecated endpoint."),
+            "feat(api)!: drop deprecated endpoint"
+        );
+
+        // Non-standard synonyms normalized
+        assert_eq!(
+            format_commitlint_message("Add: new terminal themes"),
+            "feat: new terminal themes"
+        );
+        assert_eq!(
+            format_commitlint_message("Bugfix: memory leak in canvas"),
+            "fix: memory leak in canvas"
+        );
+        assert_eq!(
+            format_commitlint_message("Documentation: update README for CachyOS"),
+            "docs: update README for CachyOS"
+        );
+
+        // Markdown code blocks
+        assert_eq!(
+            format_commitlint_message("```\nfeat: support kitty graphics\n```"),
+            "feat: support kitty graphics"
+        );
+
+        // Thinking models (<think>...</think> or <thought>...</thought>)
+        let with_thinking = "<think>\nThinking about the diff...\nIt adds a secret masker.\n</think>\nfeat(security): add zero-mutation visual secret masking";
+        assert_eq!(
+            format_commitlint_message(with_thinking),
+            "feat(security): add zero-mutation visual secret masking"
+        );
+
+        let with_thought = "<thought>Let's write a commit</thought>\nfix: prevent path traversal in autosave";
+        assert_eq!(
+            format_commitlint_message(with_thought),
+            "fix: prevent path traversal in autosave"
+        );
+
+        // Conversational preamble
+        let with_preamble = "Sure! Here is the conventional commit message for your diff:\n\nrefactor: modularize manager.ts into renderer and controller";
+        assert_eq!(
+            format_commitlint_message(with_preamble),
+            "refactor: modularize manager.ts into renderer and controller"
+        );
+
+        // Header length cap under 100 chars
+        let long_msg = format!("feat: {}", "a".repeat(120));
+        let formatted = format_commitlint_message(&long_msg);
+        assert!(formatted.len() <= 100);
+        assert!(formatted.starts_with("feat: aaaa"));
+
+        // Fallback when no Conventional Commits format found
+        assert_eq!(
+            format_commitlint_message("update project files"),
+            "chore: update project files"
+        );
+        assert_eq!(
+            format_commitlint_message("fixed critical bug in pty"),
+            "fix: fixed critical bug in pty"
+        );
+        assert_eq!(
+            format_commitlint_message(""),
+            "chore: update project files"
+        );
     }
 }

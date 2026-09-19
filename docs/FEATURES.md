@@ -315,8 +315,13 @@ Welcome to the comprehensive feature guide for **Waddle**, the AI-integrated, pr
 - **One-Click Push & Pull**:
   - Background asynchronous execution (`spawn_blocking`) with `GIT_TERMINAL_PROMPT=0` ensures GUI and terminal never freeze during network requests.
   - Animated count badges indicate ahead (`↑`) and behind (`↓`) commits.
-- **Local AI Conventional Commit Generator**:
-  - Local Ollama analyzes staged diffs to draft semantic commit messages (`feat: ...`, `fix: ...`).
+- **Local AI Conventional Commit Generator (commitlint Compliant)**:
+  - Local Ollama analyzes staged, unstaged, or untracked changes to draft semantic commit messages (`feat: ...`, `fix: ...`, `docs: ...`).
+  - **commitlint Strict Conformance**: Automatically enforces `@commitlint/config-conventional` specifications (lowercase type and subject, allowed type enum, no trailing punctuation, under 100 characters).
+  - **Robust Post-Processing**: Automatically strips thinking tags (`<think>`, `<thought>`), code fences, and conversational preambles; normalizes synonyms (`add` -> `feat`, `update` -> `chore`, etc.); guarantees zero commitlint validation failures.
+  - **Untracked File Synthetic Diffs**: Safely constructs synthetic diffs for newly created files so messages can be generated even prior to staging.
+  - **Multibyte Char Boundary Protection**: Uses safe UTF-8 slicing to prevent boundary panics on non-ASCII commit diffs.
+  - **Dynamic Model Fallback**: Automatically discovers installed models via `/api/tags` if no model is specified.
 - **Visual Syntax-Highlighted Diff Viewer**:
   - Inspect unified diffs with side-by-side line numbers and diff hunks.
   - Stage, unstage, or discard changes directly from the viewer.

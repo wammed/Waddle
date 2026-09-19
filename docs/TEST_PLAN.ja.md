@@ -114,7 +114,7 @@
 | :--- | :--- | :--- | :--- | :--- |
 | **TC-GIT-01** | ステータスバー Git 表示 & ポップオーバー | 変更のある Git リポジトリでステータスバーのブランチをクリック。 | 変更数、Ahead / Behind バッジが点灯し、Git クイックポップオーバーが開く。 | Manual |
 | **TC-GIT-02** | GUI 差分ビューワー (Diff Viewer) | 変更ファイルを選択して Diff を表示。 | 追加行（緑）と削除行（赤）が正確にハイライト表示される。 | Manual |
-| **TC-GIT-03** | Conventional Commits 自動生成 | 差分がある状態で「AI コミット生成」をクリック。 | `feat(scope): ...` 形式の適切なメッセージが入力欄に自動補完される。 | Manual |
+| **TC-GIT-03** | AI Conventional Commit 自動生成 (commitlint) | ステージ済・未ステージ・未追跡ファイルがある状態で「AI コミット生成 (commitlint)」をクリック。 | commitlint（Conventional Commits: `<type>(<scope>): <subject>`）に完全準拠したメッセージが生成され、緑色バッジ点灯 & `npx commitlint` を 0 エラーでパスする。 | Automated / Manual |
 | **TC-GIT-04** | インタラクティブ `git push` & `git pull` | Ahead / Behind がある状態で Push / Pull ボタンを押下。 | スピナーが回転し、成功時にトースト通知が表示され、Ahead/Behind 数が 0 に更新される。 | Manual |
 | **TC-GIT-05** | 認証エラーガイダンス (SSH / GitHub CLI) | 認証情報のない状態で Push を試行。 | エラーバナーが表示され、`gh auth login` や SSH 鍵設定の解決方法が案内される。 | Manual |
 | **TC-GIT-06** | GitHub 限定ポリシー (`restrict_to_github`) | リモートが非 GitHub（GitLab 等）のリポジトリで Push/Pull を実行。 | 操作が事前遮断され、GitHub 以外のリモートへの送信制限警告が表示される。 | Automated / Manual |

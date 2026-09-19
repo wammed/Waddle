@@ -79,15 +79,15 @@ pub async fn git_generate_commit_message(
     state: State<'_, AppState>,
     repo_path: String,
 ) -> Result<String, String> {
-    let diff = pty::git_get_diff(&repo_path, None, true)?;
-    let target_diff = if diff.trim().is_empty() {
-        pty::git_get_diff(&repo_path, None, false)?
+    let staged_diff = pty::git_get_diff(&repo_path, None, true).unwrap_or_default();
+    let target_diff = if !staged_diff.trim().is_empty() {
+        staged_diff
     } else {
-        diff
+        pty::git_get_diff(&repo_path, None, false).unwrap_or_default()
     };
 
     if target_diff.trim().is_empty() {
-        return Err("No staged or unstaged changes found to generate commit message.".to_string());
+        return Err("No staged, modified, or untracked changes found to generate commit message.".to_string());
     }
 
     let config = state.config_manager.load();
@@ -160,5 +160,24 @@ mod tests {
         assert!(!pty::is_github_host("https://bitbucket.org/wammed/Waddle.git"));
         assert!(!pty::is_github_host(""));
         assert!(!pty::is_github_host("invalid-url"));
+    }
+
+    #[test]
+    fn test_git_diff_clean_repo_empty() {
+        let temp_dir = std::env::temp_dir().join(format!("waddle_git_clean_{}", uuid::Uuid::new_v4()));
+        let _ = std::fs::create_dir_all(&temp_dir);
+        let path_str = temp_dir.to_str().unwrap();
+
+        let _ = std::process::Command::new("git")
+            .args(["init"])
+            .current_dir(&temp_dir)
+            .output();
+
+        let staged = pty::git_get_diff(path_str, None, true).unwrap_or_default();
+        let unstaged = pty::git_get_diff(path_str, None, false).unwrap_or_default();
+        assert!(staged.is_empty());
+        assert!(unstaged.is_empty());
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
     }
 }

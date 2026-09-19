@@ -1205,6 +1205,48 @@ pub fn git_get_diff(path_str: &str, file_path: Option<&str>, staged: bool) -> Re
                         return Ok(synthetic);
                     }
                 }
+            } else if !staged {
+                // If diff is empty and no staged flag, check for untracked files
+                let status_output = std::process::Command::new("git")
+                    .args(["status", "--porcelain", "-uall"])
+                    .current_dir(&repo_dir)
+                    .output();
+                if let Ok(st_out) = status_output {
+                    if st_out.status.success() {
+                        let stdout_str = String::from_utf8_lossy(&st_out.stdout);
+                        let mut synthetic_all = String::new();
+                        let mut untracked_count = 0;
+                        for line in stdout_str.lines() {
+                            if let Some(stripped) = line.strip_prefix("?? ") {
+                                let untracked_path = stripped.trim().trim_matches('"');
+                                let full_p = repo_dir.join(untracked_path);
+                                if full_p.is_file() && untracked_count < 10 {
+                                    untracked_count += 1;
+                                    if let Ok(content) = std::fs::read_to_string(&full_p) {
+                                        synthetic_all.push_str(&format!(
+                                            "--- /dev/null\n+++ b/{}\n@@ -0,0 +1,{} @@\n",
+                                            untracked_path,
+                                            content.lines().count().min(50)
+                                        ));
+                                        for l in content.lines().take(50) {
+                                            synthetic_all.push('+');
+                                            synthetic_all.push_str(l);
+                                            synthetic_all.push('\n');
+                                        }
+                                    } else {
+                                        synthetic_all.push_str(&format!(
+                                            "--- /dev/null\n+++ b/{}\n@@ -0,0 +1,1 @@\n+[untracked binary/non-utf8 file]\n",
+                                            untracked_path
+                                        ));
+                                    }
+                                }
+                            }
+                        }
+                        if !synthetic_all.is_empty() {
+                            return Ok(synthetic_all);
+                        }
+                    }
+                }
             }
         }
         Ok(diff_str)
@@ -1302,6 +1344,34 @@ pub fn git_pull(path_str: &str, restrict_to_github: bool) -> Result<String, Stri
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_git_get_diff_untracked_synthetic() {
+        let temp_dir = std::env::temp_dir().join(format!("waddle_git_diff_{}", uuid::Uuid::new_v4()));
+        let _ = std::fs::create_dir_all(&temp_dir);
+        let path_str = temp_dir.to_str().unwrap();
+
+        let _ = std::process::Command::new("git")
+            .args(["init"])
+            .current_dir(&temp_dir)
+            .output();
+
+        // Create an untracked file
+        let file_path = temp_dir.join("sample.txt");
+        std::fs::write(&file_path, "hello world\nsecond line").unwrap();
+
+        // Staged diff should be empty
+        let staged_diff = git_get_diff(path_str, None, true).unwrap();
+        assert!(staged_diff.is_empty(), "Staged diff should be empty");
+
+        // Unstaged diff should now pick up untracked file as synthetic diff
+        let unstaged_diff = git_get_diff(path_str, None, false).unwrap();
+        assert!(unstaged_diff.contains("--- /dev/null"));
+        assert!(unstaged_diff.contains("+++ b/sample.txt"));
+        assert!(unstaged_diff.contains("+hello world"));
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
 
     #[test]
     fn test_git_discard_file_path_traversal() {

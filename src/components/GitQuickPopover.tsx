@@ -596,6 +596,31 @@ export const GitQuickPopover: React.FC<GitQuickPopoverProps> = ({
       {/* Commit Box */}
       <div className="git-popover-commit">
         <div className="git-commit-ai-bar">
+          <div className="git-commitlint-badge-wrapper">
+            {commitMessage.trim() ? (
+              /^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-z0-9_/-]+\))?(!)?:\s*[a-z0-9].+[^.]$/.test(
+                commitMessage.trim()
+              ) ? (
+                <span
+                  className="commitlint-badge valid"
+                  title="commitlint: Valid Conventional Commit"
+                >
+                  <Check size={10} /> commitlint: valid
+                </span>
+              ) : (
+                <span
+                  className="commitlint-badge invalid"
+                  title="commitlint rule: <type>: <subject> (lowercase, no trailing dot)"
+                >
+                  commitlint: &lt;type&gt;: &lt;subject&gt;
+                </span>
+              )
+            ) : (
+              <span className="commitlint-badge hint">
+                Conventional Commits (commitlint)
+              </span>
+            )}
+          </div>
           <button
             className="btn-ai-gen"
             onClick={handleAiGenerateCommit}
