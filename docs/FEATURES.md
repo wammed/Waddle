@@ -104,6 +104,52 @@ Welcome to the comprehensive feature guide for **Waddle**, the AI-integrated, pr
 ---
 
 ### 4. 📝 Hardened Embedded Code Editor & Multi-Tab Workspace (`Ctrl + E`)
+<a id="4--embedded-lightweight-code-editor--ai-code-assistant-ctrl--e"></a>
+
+> 🎯 **Design Philosophy & Scope (Dedicated to Config Files & Quick Tasks)**:
+> Waddle's embedded editor is not intended as a replacement for heavy, full-featured IDEs like VS Code, JetBrains, or complex Neovim environments. Rather, it is designed specifically for **"editing configuration files (dotfiles, YAML, TOML, JSON, ini, conf, .env, etc.)"**, **"quick inspection and minor fixes of shell scripts"**, and **"lightweight scratch notes & previews"**.
+> It is built to be summoned instantly via `Ctrl + E` without losing terminal context (CWD, Git status), safely complete edits, and immediately return to the command line.
+
+#### 💡 Deliberately Omitted Features for Security, Lightweightness & Simplicity (Design Trade-offs)
+Rather than building an all-encompassing heavyweight editor, Waddle intentionally compromises and omits features along three core pillars to preserve Linux system integrity and lightweight performance:
+
+1. **Security Requirements**:
+   - **Total Elimination of Root/Elevated Operations (`sudo`, `pkexec`, etc.)**:
+     To prevent accidental system corruption or privilege escalation vulnerabilities, editing is strictly restricted to files within `$HOME` owned by the current process effective UID (`$USER`). System-critical paths (`/etc`, `/var`, etc.) and files owned by other users are mounted strictly Read-Only (saving blocked).
+   - **ReDoS Vulnerability Elimination via Plain-Text Search/Replace**:
+     Regular expressions in search and replace are completely omitted to prevent editor freeze attacks caused by catastrophic backtracking (ReDoS). Only exact substring matching is supported.
+   - **Exclusion of Plugins / Arbitrary Extension Ecosystem**:
+     To eliminate supply-chain attack vectors and unvetted background script execution, third-party plugin engines are completely omitted in favor of a self-contained, statically audited codebase.
+   - **Pre-emptive Guard on Sensitive Credentials, Virtual FS & Binaries**:
+     Direct opening of SSH/GPG private keys, OS keyrings, virtual filesystem paths (`/proc`, `/sys`, `/dev`), and binary files (detected via initial 1KB `\0` null-byte scan) is blocked immediately at the Rust backend.
+   - **5MB File Size Guard**:
+     To prevent DOM memory bloat and Denial-of-Service (DoS) crashes, files larger than 5MB are refused with guidance to use terminal pagers like `less`.
+
+2. **Lightweightness (Instant 0ms Startup & Minimal Memory)**:
+   - **Strict Avoidance of Heavy Editor Engines (Monaco, CodeMirror, etc.)**:
+     Avoids bloated JavaScript bundles and launch latency by adopting a minimal dual-layer design: a Prism.js syntax `<pre>` layer beneath a transparent `<textarea>` synchronized 1:1 down to the pixel.
+   - **5-Tab Hard Limit & Lazy DOM Mounting**:
+     Prevents runaway tab creation and memory consumption. Only the active tab is mounted into the DOM, while inactive tabs reside in lightweight state.
+   - **Exclusion of Background Language Server Protocol (LSP) Daemons**:
+     Avoids background daemon processes that continuously consume substantial CPU and RAM for language indexing.
+
+3. **Simplicity & Prevention of Config Corruption**:
+   - **Deliberate Omission of Smart Auto-Indentation**:
+     Indentation-sensitive files (such as YAML and TOML) frequently suffer from accidental syntax errors when editors make automatic indentation assumptions. Waddle sticks to standard newlines and soft tabs (4 spaces) without unpredictable auto-shifts.
+   - **Exclusion of Complex Multi-Cursors, Column Blocks, and Macros**:
+     Focuses purely on fast, predictable configuration adjustments without cognitive overhead or complex keybinding conflicts.
+
+#### 📊 Feature Matrix: What It Can Do vs. What It Cannot Do
+
+| Category | What It Can Do (Supported) | What It Cannot Do / Deliberately Omitted |
+| :--- | :--- | :--- |
+| **Primary Scope & File Operations** | ・Rapid editing of configuration files in `$HOME` (dotfiles, YAML, TOML, JSON, ini, conf, .env, etc.) and scripts<br>・Multi-tab editing up to 5 tabs with lazy DOM rendering for low memory<br>・Symlink resolution within `$HOME` with safe atomic saving to the canonical target<br>・Rich previews for Markdown, CSV, and JSON | ・Full-stack software engineering (large-scale IDE workflows, full debugging suites)<br>・Editing large files (>5MB) or massive logs (terminal `less` recommended)<br>・Editing binary files (blocked via 1KB null-byte inspection)<br>・Unlimited tab sprawl (hard-capped at 5 tabs) |
+| **Security & Privilege Boundaries** | ・Safe atomic saving strictly for files matching the unprivileged UID<br>・Forced Read-Only protection for paths outside `$HOME` or files owned by other users<br>・Zero-mutation visual secret protection (masks API keys with `•` overlay while keeping raw bytes intact)<br>・Blocking saves for hazardous symlinks pointing outside `$HOME` | ・Direct editing or overwriting system files (`/etc`, etc.) via root/elevation (`sudo`, `pkexec`)<br>・Viewing or editing sensitive credentials (SSH/GPG keys, OS keyrings)<br>・Inspecting virtual kernel files (`/proc`, `/sys`, `/dev`) |
+| **Editing & Input Assistance** | ・Soft tabs (4 spaces) insertion and multi-line indent/unindent<br>・Auto-closing bracket and quote pairs (`[`, `{`, `(`, `"`, `'`) and selection wrapping<br>・Self-contained Undo/Redo (`Ctrl+Z`, `Ctrl+Y` / `Ctrl+Shift+Z`)<br>・Exact plain-text Search & Replace (`Ctrl+F`, `Ctrl+H`, navigation, Replace All) | ・Smart auto-indentation (intentionally omitted to prevent YAML/TOML syntax corruption)<br>・Regular expression search/replace (eliminated to prevent ReDoS freeze risks)<br>・Multi-cursor editing, columnar selection, macro recording |
+| **Code Intelligence & Extensibility** | ・Syntax highlighting for major languages & config formats via Prism.js<br>・Local Ollama AI assistance for refactoring and explanations (`Ctrl + Shift + K`)<br>・Direct script execution in active terminal (Play button with dangerous command warnings) | ・LSP (Language Server Protocol) definition jumping, type checking, renaming (avoids background daemon bloat)<br>・Third-party plugins/extensions (eliminating supply-chain vulnerabilities)<br>・Integrated visual debugger (breakpoints, stepping) |
+| **Data Protection & Recovery** | ・First-input anchored 120-second automated backup rotation (AutoSave)<br>・Up to 6-generation snapshot retention with permanent header `Restore (N)` UI<br>・Safe sandboxed backup directory (`~/.cache/waddle/autosave/` [0700/0600])<br>・Crash recovery prompt on startup if uncommitted snapshots exist | ・Real-time collaborative editing<br>・In-editor Git branch graph exploration (handled by dedicated Git Popover & Diff Viewer) |
+
+---
 
 - **Ultra-Lightweight Dual-Layer Architecture**:
   - Maintains zero-lag typing and instant startup by strictly avoiding heavy web editors like Monaco. Uses Prism.js background `<pre>` layer pixel-perfectly aligned beneath a transparent editable `<textarea>` (`-webkit-text-fill-color: transparent !important;`).
