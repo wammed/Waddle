@@ -217,6 +217,19 @@ pub fn read_file(path: String) -> Result<String, String> {
 pub fn write_file(path: String, content: String) -> Result<(), String> {
     let p = Path::new(&path);
     validate_safe_write(p)?;
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        if let Ok(meta) = fs::symlink_metadata(p) {
+            let file_uid = meta.uid();
+            let process_euid = unsafe { libc::geteuid() };
+            if file_uid != process_euid {
+                return Err("EACCES: 対象ファイルの所有者が現在のユーザーと異なるため書き込みは拒絶されました。 (Access denied: file owner UID does not match process EUID)".to_string());
+            }
+        }
+    }
+
     if let Some(parent) = p.parent() {
         let _ = fs::create_dir_all(parent);
     }
@@ -355,11 +368,29 @@ pub fn delete_entry(path: String) -> Result<(), String> {
     if !p.exists() {
         return Ok(());
     }
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        if let Ok(meta) = fs::symlink_metadata(p) {
+            let file_uid = meta.uid();
+            let process_euid = unsafe { libc::geteuid() };
+            if file_uid != process_euid {
+                return Err("EACCES: 対象ファイル/ディレクトリの所有者が現在のユーザーと異なるため削除は拒絶されました。 (Access denied: owner UID does not match process EUID)".to_string());
+            }
+        }
+    }
+
     if p.is_dir() {
         fs::remove_dir_all(p).map_err(|e| format!("Failed to delete directory: {}", e))
     } else {
         fs::remove_file(p).map_err(|e| format!("Failed to delete file: {}", e))
     }
+}
+
+#[tauri::command]
+pub fn delete_file(path: String) -> Result<(), String> {
+    delete_entry(path)
 }
 
 #[tauri::command]
@@ -371,6 +402,19 @@ pub fn rename_entry(old_path: String, new_path: String) -> Result<(), String> {
     if !old_p.exists() {
         return Err("変更対象のファイルまたはディレクトリが存在しません。".to_string());
     }
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        if let Ok(meta) = fs::symlink_metadata(old_p) {
+            let file_uid = meta.uid();
+            let process_euid = unsafe { libc::geteuid() };
+            if file_uid != process_euid {
+                return Err("EACCES: 変更対象の所有者が現在のユーザーと異なるため名前変更は拒絶されました。 (Access denied: owner UID does not match process EUID)".to_string());
+            }
+        }
+    }
+
     if new_p.exists() {
         return Err("変更先のファイル名またはパスが既に存在します。".to_string());
     }
@@ -378,6 +422,11 @@ pub fn rename_entry(old_path: String, new_path: String) -> Result<(), String> {
         let _ = fs::create_dir_all(parent);
     }
     fs::rename(old_p, new_p).map_err(|e| format!("名前の変更に失敗しました: {}", e))
+}
+
+#[tauri::command]
+pub fn rename_file(old_path: String, new_path: String) -> Result<(), String> {
+    rename_entry(old_path, new_path)
 }
 
 #[tauri::command]

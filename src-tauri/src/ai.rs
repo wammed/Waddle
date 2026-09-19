@@ -153,6 +153,56 @@ pub fn validate_ollama_endpoint(endpoint: &str) -> Result<String, String> {
     Ok(clean.trim_end_matches('/').to_string())
 }
 
+/// Builds a reqwest client pinned strictly to the verified IP address of the Ollama endpoint,
+/// eliminating DNS Rebinding and TOCTOU risks.
+pub fn create_pinned_client(endpoint: &str) -> Result<(reqwest::Client, String, std::net::SocketAddr), String> {
+    let clean_endpoint = validate_ollama_endpoint(endpoint)?;
+    let parsed = reqwest::Url::parse(&clean_endpoint)
+        .map_err(|e| format!("Invalid Ollama endpoint URL: {}", e))?;
+
+    let host_str = parsed.host_str().ok_or_else(|| "Ollama endpoint missing host".to_string())?.to_lowercase();
+    let port = parsed.port_or_known_default().unwrap_or(11434);
+    let bare_host = host_str.trim_start_matches('[').trim_end_matches(']').to_string();
+
+    let verified_addr: std::net::SocketAddr = if let Ok(ip) = bare_host.parse::<std::net::IpAddr>() {
+        if is_forbidden_metadata_ip(&ip) {
+            return Err("Access to link-local / cloud metadata IP via Ollama endpoint is forbidden".to_string());
+        }
+        std::net::SocketAddr::new(ip, port)
+    } else {
+        use std::net::ToSocketAddrs;
+        let socket_target = format!("{}:{}", bare_host, port);
+        let addrs: Vec<std::net::SocketAddr> = socket_target.to_socket_addrs()
+            .map_err(|e| format!("Failed to resolve Ollama endpoint host '{}': {}", bare_host, e))?
+            .collect();
+
+        if addrs.is_empty() {
+            return Err(format!("No IP addresses found for Ollama endpoint host '{}'", bare_host));
+        }
+
+        for addr in &addrs {
+            if is_forbidden_metadata_ip(&addr.ip()) {
+                return Err(format!(
+                    "DNS Rebinding / SSRF blocked: host '{}' resolves to forbidden metadata IP '{}'",
+                    bare_host,
+                    addr.ip()
+                ));
+            }
+        }
+
+        addrs[0]
+    };
+
+    let client = reqwest::Client::builder()
+        .resolve(&bare_host, verified_addr)
+        .redirect(reqwest::redirect::Policy::none())
+        .timeout(Duration::from_secs(60))
+        .build()
+        .map_err(|e| format!("Failed to build pinned HTTP client: {}", e))?;
+
+    Ok((client, clean_endpoint, verified_addr))
+}
+
 /// UTF-8 文字境界を壊さずに安全に文字列を切り詰める
 pub fn safe_truncate_str(s: &str, max_bytes: usize) -> &str {
     if s.len() <= max_bytes {
@@ -523,7 +573,7 @@ pub fn load_project_rules(cwd: &str) -> Option<String> {
 }
 
 pub struct AiClient {
-    client: reqwest::Client,
+    pub client: reqwest::Client,
 }
 
 impl Default for AiClient {
@@ -545,8 +595,8 @@ impl AiClient {
 
     /// Ollama 接続状態とインストール済みモデル一覧の取得
     pub async fn check_ollama_status(&self, endpoint: &str) -> OllamaStatus {
-        let clean_endpoint = match validate_ollama_endpoint(endpoint) {
-            Ok(ep) => ep,
+        let (client, clean_endpoint, _) = match create_pinned_client(endpoint) {
+            Ok(res) => res,
             Err(err) => {
                 return OllamaStatus {
                     available: false,
@@ -559,7 +609,7 @@ impl AiClient {
         let tags_url = format!("{}/api/tags", clean_endpoint);
         let version_url = format!("{}/api/version", clean_endpoint);
 
-        let version_res = self.client.get(&version_url).send().await;
+        let version_res = client.get(&version_url).send().await;
         let mut version = None;
         if let Ok(res) = version_res {
             if let Ok(json) = res.json::<serde_json::Value>().await {
@@ -567,7 +617,7 @@ impl AiClient {
             }
         }
 
-        let tags_res = self.client.get(&tags_url).send().await;
+        let tags_res = client.get(&tags_url).send().await;
         match tags_res {
             Ok(res) if res.status().is_success() => {
                 let mut models = Vec::new();
@@ -845,7 +895,7 @@ Output ONLY the resulting code. Wrap the code in a single markdown code block li
             instruction, code
         );
 
-        let endpoint = validate_ollama_endpoint(&config.ollama_endpoint)?;
+        let (client, endpoint, _) = create_pinned_client(&config.ollama_endpoint)?;
         let url = format!("{}/api/generate", endpoint);
 
         let model = if config.ollama_model.is_empty() {
@@ -861,8 +911,7 @@ Output ONLY the resulting code. Wrap the code in a single markdown code block li
             "stream": false
         });
 
-        let res = self
-            .client
+        let res = client
             .post(&url)
             .json(&body)
             .send()
@@ -888,14 +937,14 @@ Output ONLY the resulting code. Wrap the code in a single markdown code block li
     }
 
     /// Ollama で使用可能なモデルを解決（未指定時は /api/tags の先頭モデルへ自動フォールバック）
-    async fn resolve_ollama_model(&self, endpoint: &str, preferred_model: &str) -> String {
+    async fn resolve_ollama_model(&self, client: &reqwest::Client, endpoint: &str, preferred_model: &str) -> String {
         let trimmed = preferred_model.trim();
         if !trimmed.is_empty() {
             return trimmed.to_string();
         }
 
         let tags_url = format!("{}/api/tags", endpoint);
-        if let Ok(res) = self.client.get(&tags_url).send().await {
+        if let Ok(res) = client.get(&tags_url).send().await {
             if let Ok(json) = res.json::<serde_json::Value>().await {
                 if let Some(models) = json["models"].as_array() {
                     for m in models {
@@ -934,9 +983,9 @@ STRICT RULES:
 
         let user_prompt = format!("Generate a Conventional Commit message for this diff:\n\n```diff\n{}\n```", truncated_diff);
 
-        let endpoint = validate_ollama_endpoint(&config.ollama_endpoint)?;
+        let (client, endpoint, _) = create_pinned_client(&config.ollama_endpoint)?;
         let url = format!("{}/api/generate", endpoint);
-        let model = self.resolve_ollama_model(&endpoint, &config.ollama_model).await;
+        let model = self.resolve_ollama_model(&client, &endpoint, &config.ollama_model).await;
 
         let body = serde_json::json!({
             "model": model,
@@ -948,8 +997,7 @@ STRICT RULES:
             }
         });
 
-        let res = self
-            .client
+        let res = client
             .post(&url)
             .json(&body)
             .send()
@@ -980,7 +1028,7 @@ STRICT RULES:
         user_prompt: &str,
         config: &AiConfig,
     ) -> Result<String, String> {
-        let endpoint = validate_ollama_endpoint(&config.ollama_endpoint)?;
+        let (client, endpoint, _) = create_pinned_client(&config.ollama_endpoint)?;
         let url = format!("{}/api/generate", endpoint);
 
         let model = if config.ollama_model.is_empty() {
@@ -997,8 +1045,7 @@ STRICT RULES:
             "format": "json"
         });
 
-        let res = self
-            .client
+        let res = client
             .post(&url)
             .json(&body)
             .send()
@@ -1031,7 +1078,7 @@ STRICT RULES:
         messages: Vec<ChatMessage>,
         config: &AiConfig,
     ) -> Result<(), String> {
-        let endpoint = validate_ollama_endpoint(&config.ollama_endpoint)?;
+        let (client, endpoint, _) = create_pinned_client(&config.ollama_endpoint)?;
         let url = format!("{}/api/chat", endpoint);
 
         let model = if config.ollama_model.is_empty() {
@@ -1058,8 +1105,7 @@ STRICT RULES:
             "stream": true
         });
 
-        let res = self
-            .client
+        let res = client
             .post(&url)
             .json(&body)
             .send()
@@ -1372,6 +1418,27 @@ mod tests {
         assert!(validate_ollama_endpoint("http://instance-data/latest/meta-data/").is_err());
         assert!(validate_ollama_endpoint("http://[fd00:ec2::254]/").is_err());
         assert!(validate_ollama_endpoint("http://[fe80::1]/").is_err());
+    }
+
+    #[test]
+    fn test_create_pinned_client() {
+        // 1. Localhost pinning
+        let res = create_pinned_client("http://localhost:11434");
+        assert!(res.is_ok());
+        let (_, endpoint, addr) = res.unwrap();
+        assert_eq!(endpoint, "http://localhost:11434");
+        assert_eq!(addr.port(), 11434);
+
+        // 2. Direct IPv4 pinning
+        let res_ip = create_pinned_client("http://127.0.0.1:11434");
+        assert!(res_ip.is_ok());
+        let (_, _, addr_ip) = res_ip.unwrap();
+        assert_eq!(addr_ip, "127.0.0.1:11434".parse::<std::net::SocketAddr>().unwrap());
+
+        // 3. Cloud metadata blocked before pinning
+        assert!(create_pinned_client("http://169.254.169.254:80").is_err());
+        assert!(create_pinned_client("http://[fd00:ec2::254]:80").is_err());
+        assert!(create_pinned_client("http://metadata.google.internal:80").is_err());
     }
 
     #[test]

@@ -236,6 +236,8 @@
 | **TC-INT-03** | Playwright 視覚的描画回帰テスト (`npm run test:visual`) | ヘッドレス Chromium で Canvas レイヤーのスナップショット比較を実行。Unicode プレースホルダー（`U+10EEEE`）、TUI プレビュー枠（Yazi/Ranger）、高電圧ネオンテーマを検証。 | 未定義グリフ（豆腐文字 □）の非表示確認、TUI 枠線のズレ・文字消失ゼロ、高輝度ネオンテーマのコントラスト保持を確認。 | Automated |
 | **TC-INT-04** | CDP メモリ & リソースリーク計測 (`npm run test:memory`) | Chrome DevTools Protocol を接続。10,000+ バッファ操作ストリーミング後およびタブ生成・破棄後のヒープと DOM ノード数を計測。 | 大量ストリーミング後も JSHeap が 300MB 以内に抑制され、タブ破棄後の DOM ノード・Document 残存リークがゼロ（差分許容値内）に保たれる。 | Automated |
 | **TC-INT-05** | 単一コマンド統合パイプライン & Lefthook Git 連動 (`npm run test:all`) | `npm run test:all` を実行。Lefthook（`pre-commit`, `commit-msg`, `pre-push`）フックの動作を検証。 | 全 4 レイヤーが順次完走して ALL PASS で終了。不正コミットやリグレッションのプッシュが機械的に遮断される。 | Automated |
+| **TC-INT-06** | CommandPolicy 攻撃・誤検知検証コーパス (`command_policy_corpus`) | `cargo test --test command_policy_corpus` を実行（シェル間接実行、動的評価、パイプ迂回、特権昇格、難読化など 100+ パターンおよび日常の開発コマンド）。 | 迂回試行が 100% 確実に `Review` または `Block` され、日常的な開発コマンド（git, npm, cargo, 破壊的単語を含む echo/cat）は 100% 確実に `Safe` と判定される。 | Automated |
+| **TC-INT-07** | 統合セキュリティ回帰テストスイート (`security_regression`) | `cargo test --test security_regression` を実行し、6大防御の柱（CommandPolicy, SSRF DNS Pinning, パストラバーサル, シンボリックリンク脱出, 未信頼ルール保護, シークレットマスク）を検証。 | 6大防御の柱すべてで 100% PASS を達成し、セキュリティ境界におけるリグレッションがゼロであることを保証。 | Automated |
 
 ---
 
@@ -245,52 +247,78 @@
 # 1. 統合フルテストパイプラインの実行 (Security + Unit/Coverage + Visual + Memory)
 npm run test:all
 
-# 2. セキュリティ & 依存関係監査 (Gitleaks, Secretlint, cargo-audit, cargo-deny)
+# 2. セキュリティ & 依存関係監査 (Gitleaks, Secretlint, cargo-audit, cargo-deny, security_regression)
 npm run test:security
 
-# 3. ユニットテスト & V8 HTML カバレッジレポート生成 (Vitest + Cargo test)
+# 3. Rust 単体セキュリティ回帰テストスイート (6大防御の柱)
+cargo test --manifest-path src-tauri/Cargo.toml --test security_regression
+
+# 4. Rust CommandPolicy 100+ 攻撃・安全検証コーパス
+cargo test --manifest-path src-tauri/Cargo.toml --test command_policy_corpus
+
+# 5. ユニットテスト & V8 HTML カバレッジレポート生成 (Vitest + Cargo test)
 npm run test:unit
 
-# 4. 視覚的描画回帰テスト (Playwright toHaveScreenshot)
+# 6. 視覚的描画回帰テスト (Playwright toHaveScreenshot)
 npm run test:visual
 
-# 5. メモリ & リソースリーク自動計測 (Playwright CDP)
+# 7. メモリ & リソースリーク自動計測 (Playwright CDP)
 npm run test:memory
 
-# 6. バックエンド静的コード解析 (警告 0 件確認)
+# 8. バックエンド静的コード解析 (警告 0 件確認)
 cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets
 
-# 7. フロントエンドの型検査 & 本番ビルド (警告・エラー 0 件確認)
+# 9. フロントエンドの型検査 & 本番ビルド (警告・エラー 0 件確認)
 npm run build
 
-# 8. Git フックの手動検証 (Lefthook)
+# 10. Git フックの手動検証 (Lefthook)
 npx lefthook run pre-commit
 ```
 
 ---
 
-## 5. テスト結果エビデンス記録フォーマット
+## 5. リリース基準 & 品質パイプラインゲート (Release Criteria & Gates)
 
-各テスト実行時は、以下のテンプレートに従って合否結果を記録します：
+本番環境の安全性とセキュリティ回帰ゼロを機械的に担保するため、すべてのリリース候補（Release Candidate）は以下の 6 つの品質ゲートを完全に満たす必要があります：
+
+| ゲート | 対象範囲 | 実行コマンド / ツール | 合格判定基準 (Pass Threshold) |
+| :--- | :--- | :--- | :--- |
+| **Gate 1: 静的セキュリティ & 秘匿情報監査** | Gitleaks（平文秘匿情報走査）、Secretlint（コードベース静的監査）、Cargo Audit（RUSTSEC脆弱性）、Cargo Deny（ライセンス・禁止クレート・依存重複） | `npm run test:security` | 秘匿情報リーク 0 件、認証情報露出 0 件、脆弱性警告 0 件、ライセンス違反 0 件 |
+| **Gate 2: セキュリティ回帰統合検証** | 6大防御の柱: CommandPolicy, SSRF DNS Pinning, パストラバーサル, シンボリックリンク脱出, 未信頼ルール無効化, SecretMasker | `cargo test --test security_regression` | 6/6 全ての防御の柱で 100% PASS（エラー 0 件） |
+| **Gate 3: CommandPolicy 攻撃コーパス** | 100+ の攻撃・安全マトリクス（シェル間接実行、動的評価、プロセス置換、特権昇格、難読化、誤検知防止） | `cargo test --test command_policy_corpus` | 100% PASS（全テストベクターで期待されるポリシーアクションを検証） |
+| **Gate 4: ユニットテスト & カバレッジ** | フロントエンド Vitest（V8カバレッジ） & バックエンド Cargo unittests | `npm run test:unit` | V8 カバレッジ 4 指標 >= 80%（Statements, Branches, Functions, Lines）、Cargo テスト 100% PASS |
+| **Gate 5: 視覚的回帰 & リソースリーク** | Playwright Canvas 描画スナップショット & Chromium CDP メモリ監査 | `npm run test:visual && npm run test:memory` | テーマ/Canvas のピクセル完全一致、ヒープ上限 < 300MB、DOM リーク 0 件、PTY ゾンビ 0 件 |
+| **Gate 6: 本番ビルド & 静的解析** | TypeScript 厳格型検査 & Vite 本番バンドル & ネイティブビルド | `npm run build && cargo clippy` | TypeScript 型エラー 0 件、Clippy 警告 0 件、クリーンなネイティブバイナリ生成 |
+
+---
+
+## 6. テスト結果エビデンス記録フォーマット
+
+各テスト実行時は、以下のテンプレートに従って環境メタデータおよび合否結果を記録します：
 
 ```markdown
 ### テスト実行記録
 - **実行日**: 2026-09-19
 - **テスター**: Susie (User) & Antigravity (DeepMind Pair Programming Assistant)
-- **環境**: Linux 7.2 (CachyOS / Arch Linux, COSMIC Desktop Environment), WebKitGTK 4.1, Node 20+, Rust 1.85+, Google Chrome 153
-- **総合判定**: ALL PASS (108 / 108 項目 - 100% 合格)
+- **Commit SHA**: 74c90eb9a7fb608502e3c5c92af1e2320cbc0946
+- **OS/Kernel**: Linux 7.2.6-1-cachyos x86_64
+- **Rust version**: rustc 1.98.1 (48a229cea 2026-09-01)
+- **Node version**: v26.8.2
+- **WebKitGTK version**: 2.52.6
+- **総合判定**: ALL PASS (110 / 110 項目 - 100% 合格)
 
 | スイート | 項目数 | 合格数 | 不合格数 | 備考 |
 | :--- | :--- | :--- | :--- | :--- |
 | Suite 1: PTY & コアターミナル基盤 | 10 | 10 | 0 | 0ms 同期起動、流量制御、32KB コアレッシング確認済 |
 | Suite 2: タブ・10種分割・セッション | 8 | 8 | 0 | 16px 分割線、セッション自動復元確認済 |
 | Suite 3: ファイルツリー & エディタ | 13 | 13 | 0 | 500件動的ページネーション、マルチタブ5件制限、非特権/安全Symlink、ReDoS完全一致検索、AutoSave 6世代、復元UI & 安全Undo確認済 |
-| Suite 4: AI & プロンプト連携 | 6 | 6 | 0 | 64KB ガード、コンテキスト注入、リモート警告確認済 |
-| Suite 5: Git 連携 & リモート制限 | 8 | 8 | 0 | GitHub 限定ポリシー、Diff 表示、Conventional Commits 生成確認済 |
+| Suite 4: AI & プロンプト連携 | 6 | 6 | 0 | 64KB ガード、コンテキスト注入、リモート警告、DNS Pinning 確認済 |
+| Suite 5: Git 連携 & リモート制限 | 8 | 8 | 0 | GitHub 限定ポリシー、Diff 表示、Conventional Commits 生成、リポジトリ UID 所有権境界確認済 |
 | Suite 6: テーマ・UI・壁紙 | 6 | 6 | 0 | 11種ネオン発光同期、壁紙D&D、リアルタイムプレビュー確認済 |
 | Suite 7: Kitty Graphics Protocol | 20 | 20 | 0 | 豆腐抑止、クリッピング、アニメ、32-bit RGBA差分合成、単一Canvas積層、0msクエリ応答、ANSI CSI追従、TUI/CLIエコシステム完全対応確認済 |
-| Suite 8: セキュリティ & ガードレール | 21 | 21 | 0 | 仮想FS走査・SSRF・Git Ref検証、SecretMasker リアルタイムマスク、エディタ非破壊保護、履歴サニタイズ確認済 |
+| Suite 8: セキュリティ & ガードレール | 21 | 21 | 0 | 仮想FS走査・SSRF DNS Pinning・Git Ref検証、SecretMasker リアルタイムマスク、エディタ非破壊保護、履歴サニタイズ確認済 |
 | Suite 9: パフォーマンス & リソース | 5 | 5 | 0 | 256MB LRU、0% アイドル、メモリ300MB制限確認済 |
 | Suite 10: 次世代拡張 & ワークフロー | 6 | 6 | 0 | マスク、タイムライン、プレビュー、Watchdog、パイプライン、プロジェクトAIルール確認済 |
-| Suite 11: 統合自動テストパイプライン | 5 | 5 | 0 | Gitleaks/Secretlint/cargo-audit/cargo-deny、Vitest V8 カバレッジ 85%、Playwright 視覚回帰、CDP メモリ監査全パス |
+| Suite 11: 統合自動テストパイプライン | 7 | 7 | 0 | Gitleaks/Secretlint/cargo-audit/cargo-deny、Vitest V8 カバレッジ 80%、Playwright 視覚回帰、CDP メモリ監査、PTY 1000 サイクル、CommandPolicy 100+ コーパス、セキュリティ回帰 6 大柱全パス |
 ```
+

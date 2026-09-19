@@ -64,7 +64,7 @@ fi
 
 # 4. Cargo Deny License & Dependency Audit
 echo ""
-echo "🔍 [4/4] Running Cargo Deny (Licenses, Bans, Advisories, Sources)..."
+echo "🔍 [4/5] Running Cargo Deny (Licenses, Bans, Advisories, Sources)..."
 if check_required_tool "cargo-deny" "command -v cargo-deny || cargo deny --version"; then
   if (cd src-tauri && cargo deny check); then
     echo "✅ Cargo Deny: All checks passed (licenses, advisories, bans, sources OK)."
@@ -73,6 +73,16 @@ if check_required_tool "cargo-deny" "command -v cargo-deny || cargo deny --versi
     FAILED=$((FAILED + 1))
   fi
 else
+  FAILED=$((FAILED + 1))
+fi
+
+# 5. Rust Security Regression Suite
+echo ""
+echo "🔍 [5/5] Running Rust Security Regression Suite (cargo test --test security_regression)..."
+if (cd src-tauri && cargo test --test security_regression); then
+  echo "✅ Security Regression Suite: All 6 defense pillars passed."
+else
+  echo "❌ Security Regression Suite: Security regression failures detected!" >&2
   FAILED=$((FAILED + 1))
 fi
 

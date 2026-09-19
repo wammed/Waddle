@@ -368,15 +368,41 @@ flowchart TD
     end
 ```
 
-- **カーネル境界での不可避な防護**:
-  - `Block` 判定（`rm -rf /`、`:(){ :|:& };:`、パイプ経由スクリプト実行等）は、Rust ネイティブ関数の入り口で `Err` として即座に拒絶されます。
-  - `Review` 判定（`git reset --hard`、`git push --force`、`dd if=`、`mkfs`、`systemctl stop` 等）は、UI モーダルで人間が確認した証跡である `confirmed: Some(true)` フラグが必須となります。
-- **SSRF・DNS リバインディング・リダイレクト防御**:
-  - `validate_ollama_endpoint` は HTTP 通信開始前に同期 DNS 名前解決（`ToSocketAddrs`）を実行し、全解決先 IP がリンクローカル（`169.254.0.0/16`, `fe80::/10`）やクラウドメタデータ（`169.254.169.254`, `[fd00:ec2::254]`）でないことを機械的検証。
+- **カーネル境界 & 統一 IPC セキュリティ境界監査**:
+  - `Block` 判定（`rm -rf /`、`:(){ :|:& };:`、パイプ経由スクリプト実行、生ディスク上書き等）は、Rust ネイティブ関数の入り口で `Err` として即座に拒絶されます。
+  - `Review` 判定（`sh -c`、`python -c`、`xargs`、`env`、`sudo`、`eval`、`$(...)`、`` `...` ``、`base64 -d | sh`、`git reset --hard`、`git push --force` 等）は、UI モーダルで人間が確認した証跡である `confirmed: Some(true)` フラグが必須となります。
+  - 誤検知防止として、パイプ・置換を伴わない安全な表示・検索コマンド（`echo "rm -rf"`、`cat /var/log/delete.log`、`grep "format" disk.txt`、`git status`、`cargo test`、`npm run build`）は `Safe` として確実に維持されます。
+  - 全ファイル・Git 操作 IPC コマンド（`write_file`、`editor_save_file`、`delete_file`/`delete_entry`、`rename_file`/`rename_entry`、`git_push`、`git_pull`）はフロントエンドの入力を一切信用せず、パスの正規化（`resolve_canonical_path`）、システム領域保護、および現在プロセス EUID 一致検証（`libc::geteuid() == file_uid`）を徹底します。
+- **SSRF・DNS リバインディング・DNS Pinning 静的固定防御**:
+  - `validate_ollama_endpoint` は HTTP 通信開始前に同期 DNS 名前解決（`ToSocketAddrs`）を実行し、リンクローカル（`169.254.0.0/16`, `fe80::/10`）やクラウドメタデータ（`169.254.169.254`, `[fd00:ec2::254]`, `metadata.google.internal`）への通信を即時遮断。
+  - **`reqwest::ClientBuilder::resolve` による DNS Pinning（実接続先 IP の完全保証）**: 検証を通過した IP アドレスを HTTP クライアントのソケット解決設定へ静的にピン留めしてリクエストを発行。「検査した IP」と「実際にパケットを送信する IP」の完全一致を保証し、DNS Rebinding / TOCTOU リスクを完全排除。
   - `reqwest::redirect::Policy::none()` により、外部サーバーを踏み台にしたリダイレクト追従を遮断。
 - **不信プロジェクトルールの完全隔離**:
   - `.waddle/rules.md` を不信入力として扱い、閉じタグエスケープの上で `<untrusted_project_rules>` ブロックに隔離。
   - AI 生成コマンドは Rust の `CommandPolicy::evaluate` を必ず経由し、決定論的にブロック判定へ強制上書き。
+
+---
+
+## 🚦 リリース基準 & 品質パイプラインゲート (Release Criteria & Quality Gates)
+
+製品リリースにおける堅牢性を担保し、セキュリティ回帰を永久に防止するため、Waddle のリリース候補は以下の 6 つのリリースゲート全件をクリアする必要があります：
+
+| ゲート名 | 対象スコープ | コマンド / ツール | 合格判定基準 |
+| :--- | :--- | :--- | :--- |
+| **1. 静的セキュリティ・機密ゲート** | Gitleaks シークレット検知、Secretlint 機密コード監査、Cargo Audit (RUSTSEC)、Cargo Deny (ライセンス・禁止・勧告) | `npm run test:security` | 漏洩シークレット 0件、資格情報 0件、既知脆弱性 0件、ライセンス違反 0件 |
+| **2. セキュリティ回帰ゲート** | 6大防御柱: CommandPolicy, SSRF DNS Pinning, Path Traversal, Symlink Escape, Untrusted Rules, Secret Masking | `cargo test --test security_regression` | 6柱全件 PASS (100% 合格、エラー 0件) |
+| **3. CommandPolicy コーパスゲート** | 100+ 攻撃・安全マトリクス（シェル間接実行、動的評価、引数渡し、特権昇格、難読化、誤検知防止） | `cargo test --test command_policy_corpus` | 100+ パターン全件検証 PASS |
+| **4. 単体テスト & カバレッジゲート** | フロントエンド Vitest (V8 カバレッジ) & バックエンド Cargo ユニットテスト | `npm run test:unit` | Vitest 4指標 (Statements, Branches, Functions, Lines) 各 80% 以上、Cargo 全テスト PASS |
+| **5. 視覚回帰 & リソースリークゲート** | Playwright 視覚回帰スナップショット & Chromium CDP メモリ監査 | `npm run test:visual && npm run test:memory` | 全テーマ・Canvas スナップショット一致、Heap 上限 300MB 未満、DOM リーク 0件、ゾンビプロセス 0件 |
+| **6. プロダクションビルドゲート** | TypeScript 厳格型検査、Vite 本番バンドル、Rust Clippy 静的解析、ネイティブパッケージング | `npm run build && cargo clippy` | 型エラー 0件、Clippy 警告 0件、正常ビルド完了 |
+
+### 必須環境メタデータ記録フォーマット
+テスト実行エビデンスには、以下の環境メタデータ欄の記載が必須となります：
+- `Commit SHA`: テスト対象の 40文字 Git コミットハッシュ（例: `74c90eb9a7fb608502e3c5c92af1e2320cbc0946`）
+- `OS/Kernel`: OS およびカーネルバージョン（例: `Linux 7.2.6-1-cachyos x86_64`）
+- `Rust version`: Rust コンパイラバージョン（例: `rustc 1.98.1`）
+- `Node version`: Node.js ランタイムバージョン（例: `v26.8.2`）
+- `WebKitGTK version`: システム WebKitGTK ライブラリバージョン（例: `2.52.6`）
 
 ---
 

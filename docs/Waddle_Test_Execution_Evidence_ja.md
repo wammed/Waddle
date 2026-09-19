@@ -1,8 +1,12 @@
 ### テスト実行記録 (Test Execution Evidence)
 - **実行日**: 2026-09-19
-- **テスター**: Waddle Quality Assurance Team
-- **環境**: Linux (Linux x86_64, WebKitGTK, Node.js >= 20, Rust >= 1.75)
-- **総合判定**: **[PASS]** (合格: 108 / 不合格: 0 / 保留・スキップ: 0 / 未検証: 0)
+- **テスター**: Susie (User) & Antigravity (DeepMind Pair Programming Assistant)
+- **Commit SHA**: 74c90eb9a7fb608502e3c5c92af1e2320cbc0946
+- **OS/Kernel**: Linux 7.2.6-1-cachyos x86_64
+- **Rust version**: rustc 1.98.1 (48a229cea 2026-09-01)
+- **Node version**: v26.8.2
+- **WebKitGTK version**: 2.52.6
+- **総合判定**: **[PASS]** (合格: 110 / 不合格: 0 / 保留・スキップ: 0 / 未検証: 0)
 
 | スイート | 項目数 | 合格数 | 不合格数 | 備考 |
 | :--- | :--- | :--- | :--- | :--- |
@@ -16,7 +20,7 @@
 | セキュリティポリシー & 多層防御ガードレール | 21 | 21 | 0 | 全項目合格確認済 |
 | パフォーマンス & リソースリーク耐性 | 5 | 5 | 0 | 全項目合格確認済 |
 | 次世代ワークフロー & 生産性拡張機能 | 6 | 6 | 0 | 全項目合格確認済 |
-| 統合自動テストスイート & セキュリティ/回帰検証 | 5 | 5 | 0 | 全項目合格確認済 |
+| 統合自動テストスイート & セキュリティ/回帰検証 | 7 | 7 | 0 | Gitleaks/Secretlint/cargo-audit/cargo-deny, Vitest V8, Playwright, CDP, PTY 1000, CommandPolicy コーパス, セキュリティ回帰 6 大柱全合格確認済 |
 
 ### 詳細エビデンス & 特記事項
 
@@ -130,3 +134,6 @@
 | **TC-INT-03** | Playwright 視覚的描画回帰テスト (npm run test:visual) | 🟢 PASS | Automated |  npm run test:visual npm notice run tauri-app@0.1.0 test:visual npm notice run playwright test tests/visual [WebServer] npm notice run tauri-app@0.1.0 dev [WebServer] npm notice run vite --host 127.0.0.1 --port 5173  Running 4 tests using 1 worker    ✓  1 tests/visual/visual.spec.ts:15:3 › Waddle Visual Regression Testing › TC-VISUAL-01: Kitty Unicode Placeholder (U+10EEEE) suppresses tofu and renders image (1.1s) PAGE LOG: [vite] connecting... PAGE LOG: [vite] connected. PAGE LOG: Visual harness ready! PAGE LOG: Failed to load resource: the server responded with a status of 404 (Not Found)   ✓  2 tests/visual/visual.spec.ts:23:3 › Waddle Visual Regression Testing › TC-VISUAL-02: TUI preview box borders and image alignment (Yazi / Ranger) (968ms) PAGE LOG: [vite] connecting... PAGE LOG: [vite] connected. PAGE LOG: Visual harness ready!   ✓  3 tests/visual/visual.spec.ts:31:3 › Waddle Visual Regression Testing › TC-VISUAL-03: High-Voltage Neon theme rendering and color fidelity (957ms) PAGE LOG: [vite] connecting... PAGE LOG: [vite] connected. PAGE LOG: Visual harness ready!   ✓  4 tests/visual/visual.spec.ts:39:3 › Waddle Visual Regression Testing › TC-VISUAL-04: Main Waddle Application UI Layout & Shell (1.9s) PAGE LOG: [vite] connecting... PAGE LOG: [vite] connected. PAGE LOG: Visual harness ready! PAGE LOG: [vite] connecting... PAGE LOG: [vite] connected. PAGE LOG: %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold    4 passed (5.8s) |
 | **TC-INT-04** | CDP メモリ & リソースリーク計測 (npm run test:memory) | 🟢 PASS | Automated | 󱉸  npm run test:memory npm notice run tauri-app@0.1.0 test:memory npm notice run playwright test tests/memory [WebServer] npm notice run tauri-app@0.1.0 dev [WebServer] npm notice run vite --host 127.0.0.1 --port 5173  Running 2 tests using 1 worker    ✓  1 tests/memory/memory_audit.spec.ts:4:3 › Waddle Memory & Resource Leak Audit (CDP) › TC-MEM-01: Massive streaming stress retains memory under 300MB cap (2.2s) [CDP Memory Audit] Baseline Heap: 12.56 MB [CDP Memory Audit] Post-Stream Heap: 12.89 MB (Strict 300MB Cap) [CDP Memory Audit] DOM Node Count: 425   ✓  2 tests/memory/memory_audit.spec.ts:45:3 › Waddle Memory & Resource Leak Audit (CDP) › TC-MEM-02: Tab lifecycle and destruction retains zero lingering DOM leaks (2.8s) [CDP Memory Audit] Documents: Before=2, After=2 [CDP Memory Audit] DOM Nodes: Before=425, After=487 (Diff: 62)    2 passed (5.8s) |
 | **TC-INT-05** | 単一コマンド統合パイプライン & Lefthook Git 連動 (npm run test:all) | 🟢 PASS | Automated | 🎉 ALL AUDIT & TEST SUITES PASSED SUCCESSFULLY (ALL PASS)! ⏱️  Total Duration: 20s |
+| **TC-INT-06** | CommandPolicy 攻撃・誤検知検証コーパス (command_policy_corpus) | 🟢 PASS | Automated | cargo test --manifest-path src-tauri/Cargo.toml --test command_policy_corpus<br>running 8 tests: test_indirect_shell_execution_bypass ... ok, test_dynamic_interpreter_evaluation ... ok, test_pipe_and_argument_passing ... ok, test_privilege_escalation ... ok, test_dangerous_obfuscations ... ok, test_catastrophic_variants ... ok, test_false_positive_prevention ... ok, test_corpus_summary ... ok<br>test result: ok. 8 passed (101 individual vectors evaluated); 0 failed; finished in 0.00s |
+| **TC-INT-07** | 統合セキュリティ回帰テストスイート (security_regression) | 🟢 PASS | Automated | cargo test --manifest-path src-tauri/Cargo.toml --test security_regression<br>running 6 tests: test_pillar_1_command_policy_boundaries ... ok, test_pillar_2_ssrf_and_dns_pinning ... ok, test_pillar_3_filesystem_traversal_guards ... ok, test_pillar_4_symlink_escape_defense ... ok, test_pillar_5_untrusted_rules_and_git_boundaries ... ok, test_pillar_6_secret_masking_integration ... ok<br>test result: ok. 6 passed; 0 failed; finished in 0.01s |
+

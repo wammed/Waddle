@@ -387,16 +387,42 @@ flowchart TD
     end
 ```
 
-- **Inviolable Kernel Perimeter**:
-  - Commands evaluated as `Block` (`rm -rf /`, `:(){ :|:& };:`, piped script execution) are rejected with a Rust `Err` at the native function entry point.
-  - Commands evaluated as `Review` (`git reset --hard`, `git push --force`, `dd if=`, `mkfs`, `systemctl stop`) mandate an explicit `confirmed: Some(true)` flag, which can only be supplied after user verification in the modal UI.
-- **SSRF, DNS Rebinding & Redirect Defense**:
+- **Inviolable Kernel Perimeter & IPC Boundary Audit**:
+  - Commands evaluated as `Block` (`rm -rf /`, `:(){ :|:& };:`, piped script execution, raw disk overwrites) are rejected with a Rust `Err` at the native function entry point.
+  - Commands evaluated as `Review` (`sh -c`, `python -c`, `xargs`, `env`, `sudo`, `eval`, `$(...)`, `` `...` ``, `base64 -d | sh`, `git reset --hard`, `git push --force`) mandate an explicit `confirmed: Some(true)` flag, which can only be supplied after user verification in the modal UI.
+  - Harmless display/search commands (`echo "rm -rf"`, `cat /var/log/delete.log`, `grep "format" disk.txt`, `git status`, `cargo test`, `npm run build`) are preserved as `Safe`.
+  - All file and git IPC commands (`write_file`, `editor_save_file`, `delete_file`/`delete_entry`, `rename_file`/`rename_entry`, `git_push`, `git_pull`) strictly distrust frontend inputs, enforcing canonical path normalization, system directory isolation, and process EUID matching (`libc::geteuid() == file_uid`).
+- **SSRF, DNS Rebinding & Static DNS Pinning Defense**:
   - `validate_ollama_endpoint` performs synchronous DNS lookup (`ToSocketAddrs`) to verify all resolved IPs before initiating network connections.
-  - Link-local (`169.254.0.0/16`, `fe80::/10`) and cloud instance metadata addresses (`169.254.169.254`, `[fd00:ec2::254]`) are completely blocked.
+  - Link-local (`169.254.0.0/16`, `fe80::/10`) and cloud instance metadata addresses (`169.254.169.254`, `[fd00:ec2::254]`, `metadata.google.internal`) are completely blocked.
+  - **Static DNS Pinning via `reqwest::ClientBuilder::resolve`**: The exact IP address validated during initial inspection is statically pinned into the HTTP client socket configuration. This guarantees that the inspected IP is identical to the packet transmission destination, completely neutralizing DNS Rebinding and TOCTOU vulnerabilities.
   - HTTP redirects are disabled via `reqwest::redirect::Policy::none()`.
 - **Project Rules Untrusted Isolation**:
   - Repository-level `.waddle/rules.md` files are treated as untrusted inputs, sanitized against closing tags, and isolated within `<untrusted_project_rules>` blocks in the AI prompt.
   - LLM-generated output is deterministically passed through `CommandPolicy::evaluate` before being presented or executed.
+
+---
+
+## 🚦 Release Criteria & Quality Pipeline Gates
+
+To guarantee production robustness and prevent security regressions, any Waddle release candidate must satisfy the following 6 release gates:
+
+| Gate | Scope | Command / Tool | Pass Threshold |
+| :--- | :--- | :--- | :--- |
+| **1. Static Security & Secrets Gate** | Gitleaks secret detection, Secretlint credentials audit, Cargo Audit (RUSTSEC), Cargo Deny (Licenses, Bans, Advisories, Sources) | `npm run test:security` | 0 secrets, 0 leaked credentials, 0 security advisories, 0 license violations |
+| **2. Security Regression Gate** | 6 Defense Pillars: CommandPolicy, SSRF DNS Pinning, Path Traversal, Symlink Escape, Untrusted Rules, Secret Masking | `cargo test --test security_regression` | 100% PASS (6/6 Pillars) with 0 errors |
+| **3. CommandPolicy Corpus Gate** | 100+ attack/safe matrix (shell indirect execution, dynamic eval, process substitutions, privilege elevation, obfuscation, FP prevention) | `cargo test --test command_policy_corpus` | 100% PASS (All test vectors verified) |
+| **4. Unit & Coverage Gate** | Frontend Vitest (V8 coverage) & Backend Cargo unittests | `npm run test:unit` | 4 V8 coverage metrics >= 80% (Statements, Branches, Functions, Lines), 100% Cargo tests PASS |
+| **5. Visual & Resource Leak Gate** | Playwright visual regression snapshots & Chromium CDP memory audit | `npm run test:visual && npm run test:memory` | 100% pixel match on themes/canvas, Heap memory ceiling < 300MB, 0 lingering DOM nodes, 0 PTY zombies |
+| **6. Production Bundling Gate** | TypeScript strict compilation & production Vite bundler & native packaging | `npm run build && cargo clippy` | 0 TypeScript errors, 0 Clippy warnings, clean native bundle |
+
+### Mandatory Environment Metadata Record Format
+Every test execution evidence document must include the following environment metadata fields:
+- `Commit SHA`: Exact 40-character Git commit hash under test
+- `OS/Kernel`: Operating system and kernel release (e.g. `Linux 7.2.6-1-cachyos x86_64`)
+- `Rust version`: Rust compiler version and commit date (e.g. `rustc 1.98.1`)
+- `Node version`: Node.js runtime version (e.g. `v26.8.2`)
+- `WebKitGTK version`: System WebKitGTK library version (e.g. `2.52.6`)
 
 ---
 

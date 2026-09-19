@@ -48,11 +48,12 @@ Path validation is performed **before** checking file existence or invoking unde
 ### 4. Large Directory Bounded Pagination (Client DoS Prevention)
 Browsing massive directories (such as `node_modules` or system libraries with tens of thousands of entries) could cause client-side WebKitGTK DOM memory exhaustion and application hangs. Waddle's `read_directory` backend command enforces an initial hard cap of 500 entries with explicit pagination metadata (`DirectoryListing { entries, total_count, has_more }`). Clients must explicitly request user-driven incremental pagination (`limit`), preventing automated or accidental memory exhaustion DoS attacks.
 
-### 5. Embedded Code Editor Security Boundaries & Non-Privileged Execution
+### 5. Embedded Code Editor & IPC Filesystem Security Boundaries
 - **Strict Non-Privileged Operation**: Root privilege escalation or execution (`libc::geteuid() == 0`) inside the editor is completely prohibited (`[権限エラー] エディタ内での root 権限操作（sudo等）は禁止されています。ターミナルをご利用ください。`).
-- **Owner UID & `$HOME` Boundary Verification**: Editing and saving are strictly limited to files whose canonical real path resides under `$HOME` and whose file owner UID (`MetadataExt::uid()`) matches the process effective UID (`$USER`).
+- **Owner UID & `$HOME` Boundary Verification**: All mutating IPC operations (`write_file`, `editor_save_file`, `delete_entry` / `delete_file`, `rename_entry` / `rename_file`) strictly verify that the target file's owner UID matches the process effective UID (`libc::geteuid() == file_uid`). Modification or deletion of files owned by other system users (e.g. `root`) is rejected with `Permission Denied` before filesystem alteration.
 - **Forced Read-Only Protection**: Files outside `$HOME` (e.g. `/etc/hosts`), files owned by other system users, or filesystem write-protected files are mounted as forced `🔒 Read-Only` with tooltip explanation, preventing accidental or unauthorized modifications.
-- **Symlink Canonicalization & Escape Defense**: Every file open and save verifies the resolved canonical path (`std::fs::canonicalize`). Links targeting files outside `$HOME` are blocked as traversal escapes (`[保存不可] このファイルはシンボリックリンクですが、リンク先の実ファイル (<実体パス>) が $HOME 外にあるため編集・保存は遮断されました。`). Links targeting files inside `$HOME` are safely saved directly to the real target file while preserving symlink structure and original file permissions.
+- **Symlink Canonicalization & Escape Defense**: Every file open, save, deletion, and rename verifies the resolved canonical path (`std::fs::canonicalize`). Links targeting files outside `$HOME` are blocked as traversal escapes (`[保存不可] このファイルはシンボリックリンクですが、リンク先の実ファイル (<実体パス>) が $HOME 外にあるため編集・保存は遮断されました。`). Links targeting files inside `$HOME` are safely saved directly to the real target file while preserving symlink structure and original file permissions.
+- **Git Repo Trust Boundary (`validate_safe_git_repo`)**: Background and foreground Git operations (`git_push`, `git_pull`) canonicalize repository paths and verify that the target directory is owned by the current process UID, blocking confused deputy executions in alien repositories.
 - **File Pre-Validation**: Files larger than 5MB are refused with guidance to use terminal `less`, and binary files (containing null bytes `\0` in the first 1KB) are blocked from editor mounting.
 - **Dedicated AutoSave Sandbox & 6-Generation Rotation**: AutoSave caches uncommitted changes to `~/.cache/waddle/autosave/` (directory permission `0700`, file permission `0600`), replacing path separators with `%` and appending millisecond timestamps (e.g., `%home%user%.config%fish%config.fish.1726500000000`). Up to 6 generations per file are rotated automatically.
 - **AutoSave Path Traversal & Escape Prevention**: Cache file retrieval (`editor_load_autosave_content`) strictly rejects traversal components (`..`, `/`, `\`) and validates that resolved canonical paths reside strictly inside the autosave cache directory. Stale cache cleanup is bounded by a 7-day TTL (604,800s) preventing unbounded disk consumption.
@@ -173,11 +174,28 @@ When a command evaluated as `Review` is initiated from AI or the editor, the fro
 2. **Safe Insert (Without Enter)**: Pastes the command into the prompt for manual inspection without execution.
 3. **Cancel**: Safely drops the command.
 
+### 4. 100+ Pattern Attack Corpus & False-Positive Prevention Matrix
+To ensure that attackers or malicious prompts cannot bypass command screening through subshells, wrappers, or dynamic evaluation, Waddle validates against an extensive automated corpus (`tests/command_policy_corpus.rs`):
+- **Indirect Shell Execution**: Intercepts commands wrapped in `sh -c`, `bash -c`, `bash -lc`, `zsh -c`, `dash -c`, `ksh -c` and evaluates the nested payload directly.
+- **Dynamic Interpreter Evaluation**: Flags code execution flags in scripting runtimes (`python -c`, `python3 -c`, `node -e`, `ruby -e`, `perl -e`, `php -r`) forcing `PolicyAction::Review`.
+- **Pipeline & Argument Bypasses**: Catches piping into shells (`... | sh`, `... | bash`), wrapper delegations (`xargs ...`, `env ...`), process substitutions (`$(...)`, `` `...` ``), and base64 decode pipes (`base64 -d | sh`).
+- **Privilege Escalation**: Flags `sudo`, `doas`, `pkexec` ensuring elevated operations undergo explicit review.
+- **Benign Developer Command Guarantee**: Harmless text output and queries containing dangerous keywords (e.g. `echo "rm -rf"`, `echo "wipefs -a"`, `cat /var/log/delete.log`, `grep "format" disk.txt`) are prioritized via `is_pure_safe_display_or_search` and verified as 100% `PolicyAction::Safe` when free of shell metacharacters.
+
 ---
 
 ## 🌐 Network Isolation & Content Security Policy (CSP)
 
-### 1. Webview CSP
+### 1. SSRF Defense with Static DNS Pinning (`reqwest::ClientBuilder::resolve`)
+Waddle restricts outbound AI HTTP requests (Ollama) through a strict two-stage SSRF defense:
+1. **Host & Target IP Validation (`validate_ollama_endpoint`)**:
+   - Only `http` and `https` schemes are accepted.
+   - For IP literals and resolved hostnames, Waddle prohibits Loopback (`127.0.0.0/8`, `::1`), Private RFC1918 networks (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), Carrier-Grade NAT (`100.64.0.0/10`), Link-Local metadata addresses (`169.254.169.254`), AWS IPv6 metadata (`fd00:ec2::254`), broadcast (`255.255.255.255`), and unspecified (`0.0.0.0`) addresses.
+2. **Static DNS Pinning (TOCTOU / DNS Rebinding Immunity)**:
+   - Standard HTTP clients perform an independent DNS resolution when executing a request. An attacker could exploit this Time-of-Check to Time-of-Use (TOCTOU) gap by returning a public IP during `validate_ollama_endpoint` and subsequently flipping the DNS response to `169.254.169.254` (DNS Rebinding).
+   - Waddle constructs the outbound HTTP client via `create_pinned_client(endpoint)` using `reqwest::Client::builder().resolve(bare_host, verified_socket_addr)`. The HTTP transport is hardwired to connect strictly to the socket address validated during the check, completely preventing DNS rebinding and guaranteeing destination fidelity.
+
+### 2. Webview CSP
 Waddle's `tauri.conf.json` enforces a restrictive Content Security Policy:
 ```
 default-src 'self';
@@ -189,7 +207,7 @@ font-src 'self' asset: data:;
 - Arbitrary script injection and unauthorized third-party telemetry domains are blocked by the Webview engine.
 - External connections are restricted exclusively to the local Ollama instance and GitHub APIs (when Git features are active).
 
-### 2. Scoped Asset Protocol
+### 3. Scoped Asset Protocol
 Tauri's `assetProtocol.scope` is restricted to:
 - `$CONFIG/waddle/**/*`
 - `$PICTURE/**/*`
@@ -197,10 +215,10 @@ Tauri's `assetProtocol.scope` is restricted to:
 
 Broad `$CONFIG/**/*` access is completely disallowed, shielding sensitive application data (e.g. browser profiles, Slack tokens, AWS credentials) from the asset server.
 
-### 3. Remote Ollama Warning Banner
+### 4. Remote Ollama Warning Banner
 If an external or remote endpoint is configured instead of `localhost` / `127.0.0.1`, Waddle displays an amber warning banner in the Settings modal reminding users that data will traverse an external network.
 
-### 4. GitHub-Only Push/Pull Policy
+### 5. GitHub-Only Push/Pull Policy
 When the GitHub restriction policy is enabled, Waddle inspects `git remote -v` using strict host validation (`is_github_host`) before executing `git push` or `git pull`.
 - Host must strictly match `github.com`, `gist.github.com`, or `*.github.io` (via SSH `git@github.com:...` or HTTPS/SSH URLs).
 - Subdomain spoofing (e.g. `https://github.com.attacker.com/repo.git`) and path-embedded trick URLs (e.g. `https://attacker.com/user/github.com.git`) are definitively rejected.

@@ -18,8 +18,8 @@ use tauri::{AppHandle, State};
 
 pub use editor_ops::*;
 pub use fs_ops::{
-    create_directory, create_file, delete_entry, read_directory, read_file, rename_entry,
-    reveal_in_file_manager, write_file, DirectoryListing, FileEntry,
+    create_directory, create_file, delete_entry, delete_file, read_directory, read_file,
+    rename_entry, rename_file, reveal_in_file_manager, write_file, DirectoryListing, FileEntry,
 };
 pub use git_ops::*;
 pub use system::*;
@@ -296,7 +296,9 @@ pub fn run() {
             create_file,
             create_directory,
             delete_entry,
+            delete_file,
             rename_entry,
+            rename_file,
             reveal_in_file_manager,
             check_ollama_status,
             evaluate_command_policy,

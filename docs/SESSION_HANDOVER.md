@@ -1106,6 +1106,30 @@ npm run tauri dev
       9. **8 ドキュメント（日英セット）の完全同期**:
          - `README.md` & `README.ja.md`（ルート実体）および `docs/README.md` & `docs/README.ja.md`（docs実体）、`docs/FEATURES.md` & `docs/FEATURES.ja.md`、`docs/ARCHITECTURE.md` & `docs/ARCHITECTURE.ja.md`、`docs/SECURITY.md` & `docs/SECURITY.ja.md`、`docs/SESSION_HANDOVER.md` を完全対称同期。
 
+50. **Trust Boundary 堅牢化 & セキュリティ回帰コーパス構築スプリント (P0 & P1)**:
+    - **背景と目的**:
+      - 確立された Rust 側の Trust Boundary（CommandPolicy、IPC境界、SSRF防護）に対し、バイパス・すり抜け攻撃を徹底検証する「攻撃・安全両面コーパス」を構築。
+      - SSRF の実接続先保証（Static DNS Pinning）およびリリースゲート（6つの品質基準）、環境メタデータ明文化を完了。
+    - **実施内容**:
+      1. **CommandPolicy 攻撃・誤検知検証コーパスの構築 (`tests/command_policy_corpus.rs`, P0-1)**:
+         - シェル間接実行（`sh -c`, `bash -c`, `zsh -c`）、動的評価（`python -c`, `node -e`, `ruby -e` 等）、パイプ・引数委譲（`xargs`, `env`, `$(...)`, `` `...` ``）、特権昇格（`sudo`, `doas`, `pkexec`）の網羅的遮断を実装。
+         - 日常的な開発コマンドの誤検知防止（`is_pure_safe_display_or_search`）により、破壊的キーワードを含む無害なコマンド（`echo "rm -rf"`, `echo "wipefs -a"`, `cat /var/log/delete.log`, `grep "format" disk.txt`）を 100% `Safe` に判定。
+         - 全 8 カテゴリ・101 パターンの網羅テストを作成し、全件 100% PASS を達成。
+      2. **統一 Tauri IPC セキュリティ境界監査 (P0-2)**:
+         - `fs_ops.rs`: `write_file`, `delete_entry` (`delete_file`), `rename_entry` (`rename_file`), `editor_ops.rs`: `editor_save_file` において、`canonicalize` とともにプロセスの実効 UID（`libc::geteuid()`）とファイル所有者 UID（`MetadataExt::uid()`）の一致を検証。他ユーザー所有ファイルの変更・削除を遮断。
+         - `pty.rs`: `validate_safe_git_repo` を新設し、`git_push` / `git_pull` 実行時にリポジトリパスの存在確認、正準化、ディレクトリ所有権（`euid == file_uid`）を事前強制。
+         - `lib.rs`: `delete_file` および `rename_file` をハンドラー登録し IPC 境界を統一。
+      3. **SSRF 防護の実接続先保証 & 静的 DNS Pinning (`reqwest::ClientBuilder::resolve`, P1-3)**:
+         - 事前名前解決（`validate_ollama_endpoint`）で安全性を確認したソケットアドレスに対し、`create_pinned_client` で `reqwest::Client::builder().resolve(bare_host, verified_socket_addr)` を適用。
+         - 全 AI エンドポイント通信（ステータス確認、コード編集、コミット生成、モデル解決、ストリーミング）で Pinned Client を使用し、DNS リバインディング（TOCTOU）攻撃を原理的に根絶。
+      4. **セキュリティ回帰テストスイートの独立化 (`tests/security_regression.rs`, P1-4)**:
+         - 6大防御の柱（CommandPolicy, SSRF DNS Pinning, パストラバーサル, シンボリックリンク脱出, 未信頼ルール無効化, SecretMasker）を束ねる統合テストを作成。全 6 テスト 100% PASS。
+         - `scripts/test-security.sh` の Step 5/5 に組み込み、CI/CD で機械的実行を保証。
+      5. **リリース基準（6つの品質ゲート）および環境メタデータ明文化 (P1-5)**:
+         - `Commit SHA`, `OS/Kernel`, `Rust version`, `Node version`, `WebKitGTK version` を含む環境メタデータ記録基準を策定。
+         - 全 6 つの品質ゲート（Gate 1〜6）を明文化し、テスト総数を 110 項目に更新。
+         - 日英ドキュメント全 8 点（`ARCHITECTURE`, `TEST_PLAN`, `SECURITY`, `README` ルート/docs、`Waddle_Test_Execution_Evidence_ja`）を完全同期。
+
 ---
 
 ## 6. 次回再開時の検討・作業候補（Next Steps）

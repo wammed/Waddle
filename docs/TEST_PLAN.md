@@ -236,6 +236,9 @@ This document provides a comprehensive, end-to-end test plan for **Waddle**, cov
 | **TC-INT-03** | Playwright Visual Regression Testing (`npm run test:visual`) | Run snapshot comparison on hardware Canvas layers using headless Chromium. Verifies Kitty Unicode placeholder (`U+10EEEE`), TUI preview alignment (Yazi/Ranger), and High-Voltage Neon themes. | Missing glyphs (tofu boxes □) completely suppressed; TUI frame borders free of pixel displacement or text overflow; neon contrast maintained. | Automated |
 | **TC-INT-04** | CDP Memory & Resource Leak Auditing (`npm run test:memory`) | Connect Chrome DevTools Protocol to measure JSHeap and DOM nodes during 10,000+ line streaming bursts and tab open/close disposal cycles. | Memory stays capped under 300MB; DOM nodes and documents return cleanly to baseline with zero detached leaks. | Automated |
 | **TC-INT-05** | Single-Command Orchestration & Lefthook Git Hooks (`npm run test:all`) | Run `npm run test:all`. Test Lefthook (`pre-commit`, `commit-msg`, `pre-push`) lifecycle hooks. | All 4 audit layers pass sequentially in 1 command (ALL PASS); flawed commits and regressive pushes are mechanically blocked. | Automated |
+| **TC-INT-06** | CommandPolicy Attack & False-Positive Verification Corpus (`command_policy_corpus`) | Run `cargo test --test command_policy_corpus` across 100+ attack patterns (shell indirect execution, dynamic evaluation, pipeline bypasses, privilege escalation, obfuscation) and benign dev operations. | 100% of bypass attempts correctly trigger `Review`/`Block`, 100% of benign commands (git, npm, cargo, echo/cat with destructive keywords) evaluate to `Safe`. | Automated |
+| **TC-INT-07** | Unified Security Regression Suite (`security_regression`) | Run `cargo test --test security_regression` validating the 6 core defense pillars (CommandPolicy, SSRF DNS Pinning, Path Traversal, Symlink Escape, Untrusted Rules, Secret Masking). | All 6 defense pillars verified with 100% PASS and zero regressions across security boundaries. | Automated |
+
 
 ---
 
@@ -245,50 +248,75 @@ This document provides a comprehensive, end-to-end test plan for **Waddle**, cov
 # 1. Execute complete multi-tier audit pipeline (Security + Unit/Coverage + Visual + Memory)
 npm run test:all
 
-# 2. Security & dependency vulnerability audits (Gitleaks, Secretlint, cargo-audit, cargo-deny)
+# 2. Security & dependency vulnerability audits (Gitleaks, Secretlint, cargo-audit, cargo-deny, security_regression)
 npm run test:security
 
-# 3. Unit tests & V8 HTML coverage report generation (Vitest + Cargo test)
+# 3. Rust standalone security regression suite (6 defense pillars)
+cargo test --manifest-path src-tauri/Cargo.toml --test security_regression
+
+# 4. Rust CommandPolicy 100+ attack & safe verification corpus
+cargo test --manifest-path src-tauri/Cargo.toml --test command_policy_corpus
+
+# 5. Unit tests & V8 HTML coverage report generation (Vitest + Cargo test)
 npm run test:unit
 
-# 4. Visual regression testing (Playwright toHaveScreenshot)
+# 6. Visual regression testing (Playwright toHaveScreenshot)
 npm run test:visual
 
-# 5. Automated memory & resource leak auditing (Playwright CDP)
+# 7. Automated memory & resource leak auditing (Playwright CDP)
 npm run test:memory
 
-# 6. Rust Clippy static analysis with all-targets checks
+# 8. Rust Clippy static analysis with all-targets checks
 cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets
 
-# 7. TypeScript compilation check & production Vite bundler
+# 9. TypeScript compilation check & production Vite bundler
 npm run build
 
-# 8. Git lifecycle hooks manual trigger (Lefthook)
+# 10. Git lifecycle hooks manual trigger (Lefthook)
 npx lefthook run pre-commit
 ```
 
 ---
 
-## 5. Verification Sign-Off Template
+## 5. Release Criteria & Quality Pipeline Gates
+
+To guarantee production safety and eliminate security regressions, every release candidate must satisfy the following 6 quality gates:
+
+| Gate | Scope | Command / Tool | Pass Threshold |
+| :--- | :--- | :--- | :--- |
+| **Gate 1: Static Security & Secrets** | Gitleaks repository secret detection, Secretlint credential static audit, Cargo Audit (RUSTSEC), Cargo Deny (Licenses, Bans, Advisories, Sources) | `npm run test:security` | 0 secrets, 0 leaked credentials, 0 security advisories, 0 license violations |
+| **Gate 2: Security Regression** | 6 Defense Pillars: CommandPolicy, SSRF DNS Pinning, Path Traversal, Symlink Escape, Untrusted Rules, Secret Masking | `cargo test --test security_regression` | 100% PASS (6/6 Pillars) with 0 errors |
+| **Gate 3: CommandPolicy Corpus** | 100+ attack/safe matrix (shell indirect execution, dynamic eval, process substitutions, privilege elevation, obfuscation, FP prevention) | `cargo test --test command_policy_corpus` | 100% PASS (All test vectors verified) |
+| **Gate 4: Unit & Coverage** | Frontend Vitest (V8 coverage) & Backend Cargo unittests | `npm run test:unit` | 4 V8 coverage metrics >= 80% (Statements, Branches, Functions, Lines), 100% Cargo tests PASS |
+| **Gate 5: Visual & Resource Leak** | Playwright visual regression snapshots & Chromium CDP memory audit | `npm run test:visual && npm run test:memory` | 100% pixel match on themes/canvas, Heap memory ceiling < 300MB, 0 lingering DOM nodes, 0 PTY zombies |
+| **Gate 6: Production Bundling** | TypeScript strict compilation & production Vite bundler & native packaging | `npm run build && cargo clippy` | 0 TypeScript errors, 0 Clippy warnings, clean native bundle |
+
+---
+
+## 6. Verification Sign-Off Template
 
 ```markdown
 ### Verification Sign-Off
 - **Date**: 2026-09-19
 - **Tester / Evaluator**: Susie (User) & Antigravity (DeepMind Pair Programming Assistant)
-- **Environment**: Linux 7.2 (CachyOS / Arch Linux, COSMIC Desktop Environment), WebKitGTK 4.1, Node 20+, Rust 1.85+, Google Chrome 153
-- **Overall Result**: ALL PASS (108 / 108 Test Cases - 100% Passed)
+- **Commit SHA**: 74c90eb9a7fb608502e3c5c92af1e2320cbc0946
+- **OS/Kernel**: Linux 7.2.6-1-cachyos x86_64
+- **Rust version**: rustc 1.98.1 (48a229cea 2026-09-01)
+- **Node version**: v26.8.2
+- **WebKitGTK version**: 2.52.6
+- **Overall Result**: ALL PASS (110 / 110 Test Cases - 100% Passed)
 
 | Test Suite | Total | Passed | Failed | Notes |
 | :--- | :--- | :--- | :--- | :--- |
 | Suite 1: PTY & Terminal Core | 10 | 10 | 0 | 0ms sync startup, backpressure flow control, 32KB coalescing verified |
 | Suite 2: Tabs, 10-Split & Session | 8 | 8 | 0 | 16px divider, auto-restore verified |
 | Suite 3: File Tree & Editor | 13 | 13 | 0 | 500-item dynamic pagination, 5-tab limit, non-privileged/safe symlinks, ReDoS exact search, 6-gen autosave rotation, restore popover UI & safe undo verified |
-| Suite 4: AI & Context Integration | 6 | 6 | 0 | 64KB guard, prompt context injection, remote endpoint warning verified |
-| Suite 5: Git Integration & Guardrails | 8 | 8 | 0 | GitHub-only policy, Diff preview, Conventional Commits generation verified |
+| Suite 4: AI & Context Integration | 6 | 6 | 0 | 64KB guard, prompt context injection, remote endpoint warning, DNS Pinning verified |
+| Suite 5: Git Integration & Guardrails | 8 | 8 | 0 | GitHub-only policy, Diff preview, Conventional Commits generation, repo UID ownership boundary verified |
 | Suite 6: Theming, UI & Wallpapers | 6 | 6 | 0 | 11 neon themes glow sync, drag-drop wallpaper, 60 FPS live preview verified |
 | Suite 7: Kitty Graphics Protocol | 20 | 20 | 0 | Tofu suppression, clipping, animations, 32-bit RGBA delta frames, single-canvas stacking, 0ms query response, ANSI CSI cursor tracking, TUI/CLI ecosystem integration verified |
-| Suite 8: Security & Guardrails | 21 | 21 | 0 | Virtual FS, SSRF, Git Ref sanitization, SecretMasker real-time masking, editor zero-mutation protection, session history sanitization verified |
+| Suite 8: Security & Guardrails | 21 | 21 | 0 | Virtual FS, SSRF DNS Pinning, Git Ref sanitization, SecretMasker real-time masking, editor zero-mutation protection, session history sanitization verified |
 | Suite 9: Performance & Resources | 5 | 5 | 0 | 256MB LRU, 0.0%-1.0% idle CPU, memory capped under 300MB verified |
 | Suite 10: Next-Gen & Productivity | 6 | 6 | 0 | Masking, timeline, rich preview, watchdog, pipeline builder, project AI rules verified |
-| Suite 11: Integrated Automated Test Suite | 5 | 5 | 0 | Gitleaks/Secretlint/cargo-audit/cargo-deny, Vitest V8 85% coverage, Playwright visual regression, CDP memory audit all passed |
+| Suite 11: Integrated Automated Test Suite | 7 | 7 | 0 | Gitleaks/Secretlint/cargo-audit/cargo-deny, Vitest V8 80% coverage, Playwright visual regression, CDP memory audit, PTY 1000 cycles, CommandPolicy corpus 100+ patterns, Security Regression 6 pillars all passed |
 ```

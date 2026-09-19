@@ -1294,8 +1294,37 @@ pub fn git_get_diff(path_str: &str, file_path: Option<&str>, staged: bool) -> Re
     }
 }
 
+pub fn validate_safe_git_repo(path_str: &str) -> Result<std::path::PathBuf, String> {
+    let p = std::path::Path::new(path_str);
+    if !p.exists() {
+        return Err(format!("無効なリポジトリパスです: 指定されたパス '{}' が存在しません。", path_str));
+    }
+    let canon = p.canonicalize().map_err(|e| format!("パスの正規化に失敗しました: {}", e))?;
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        if let Ok(meta) = std::fs::metadata(&canon) {
+            let file_uid = meta.uid();
+            let process_euid = unsafe { libc::geteuid() };
+            if file_uid != process_euid {
+                return Err(format!(
+                    "EACCES: Gitリポジトリ '{}' の所有者 UID ({}) が現在のプロセス EUID ({}) と一致しません。",
+                    canon.display(), file_uid, process_euid
+                ));
+            }
+        }
+    }
+
+    let repo_dir = resolve_repo_root(&canon.to_string_lossy()).ok_or_else(|| {
+        format!("指定されたディレクトリ '{}' は有効な Git リポジトリではありません。", canon.display())
+    })?;
+
+    Ok(repo_dir)
+}
+
 pub fn git_push(path_str: &str, restrict_to_github: bool) -> Result<String, String> {
-    let repo_dir = get_effective_repo_dir(path_str);
+    let repo_dir = validate_safe_git_repo(path_str)?;
     if restrict_to_github {
         let (_, blocked) = inspect_github_remotes(&repo_dir);
         if let Some(blocked_url) = blocked {
@@ -1338,7 +1367,7 @@ pub fn git_push(path_str: &str, restrict_to_github: bool) -> Result<String, Stri
 }
 
 pub fn git_pull(path_str: &str, restrict_to_github: bool) -> Result<String, String> {
-    let repo_dir = get_effective_repo_dir(path_str);
+    let repo_dir = validate_safe_git_repo(path_str)?;
     if restrict_to_github {
         let (_, blocked) = inspect_github_remotes(&repo_dir);
         if let Some(blocked_url) = blocked {
