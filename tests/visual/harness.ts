@@ -3,8 +3,14 @@ import { CanvasAddon } from '@xterm/addon-canvas';
 import { KittyGraphicsManager } from '../../src/services/kittyGraphics';
 import { THEMES } from '../../src/theme';
 
-// Helper to create a test bitmap
-async function createTestBitmap(width: number, height: number, color: string): Promise<ImageBitmap> {
+// Helper to send a real Kitty Graphics APC escape sequence
+async function sendKittyImage(
+  manager: KittyGraphicsManager,
+  id: number,
+  width: number,
+  height: number,
+  color: string
+): Promise<void> {
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
@@ -12,7 +18,7 @@ async function createTestBitmap(width: number, height: number, color: string): P
   ctx.fillStyle = color;
   ctx.fillRect(0, 0, width, height);
 
-  // Draw some interior details so it's a distinct image
+  // Draw interior details so it's a distinct image
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(width * 0.25, height * 0.25, width * 0.5, height * 0.5);
   ctx.fillStyle = '#ff0055';
@@ -20,7 +26,11 @@ async function createTestBitmap(width: number, height: number, color: string): P
   ctx.arc(width * 0.5, height * 0.5, width * 0.15, 0, Math.PI * 2);
   ctx.fill();
 
-  return await createImageBitmap(canvas);
+  const dataUrl = canvas.toDataURL('image/png');
+  const base64 = dataUrl.split(',')[1];
+  const apcSeq = `\x1b_Ga=t,f=100,i=${id},s=${width},v=${height};${base64}\x1b\\`;
+  manager.filterPtyOutput(apcSeq);
+  await manager.flush();
 }
 
 // 1. Scenario 1: Kitty Unicode Placeholder (U+10EEEE)
@@ -43,15 +53,8 @@ async function initUnicodePlaceholderScenario() {
   const manager = new KittyGraphicsManager(term, container, 'visual-unicode');
   manager.installCanvasRendererHook();
 
-  const testBitmap = await createTestBitmap(64, 32, '#00d26a');
-  (manager as any).cache.set(42, {
-    id: 42,
-    bitmap: testBitmap,
-    width: 64,
-    height: 32,
-    byteSize: 64 * 32 * 4,
-    lastUsed: Date.now(),
-  });
+  // Send real Kitty APC escape sequence through protocol pipeline
+  await sendKittyImage(manager, 42, 64, 32, '#00d26a');
 
   term.write('\x1b[1;32m●\x1b[0m Waddle Kitty Graphics Unicode Placeholder Protocol Test\r\n');
   term.write('Verifying that \\u{10EEEE} suppresses undef glyph (□ tofu):\r\n\r\n');
@@ -79,15 +82,8 @@ async function initTuiPreviewScenario() {
   const manager = new KittyGraphicsManager(term, container, 'visual-tui');
   manager.installCanvasRendererHook();
 
-  const testBitmap = await createTestBitmap(120, 60, '#3b82f6');
-  (manager as any).cache.set(88, {
-    id: 88,
-    bitmap: testBitmap,
-    width: 120,
-    height: 60,
-    byteSize: 120 * 60 * 4,
-    lastUsed: Date.now(),
-  });
+  // Send real Kitty APC escape sequence through protocol pipeline
+  await sendKittyImage(manager, 88, 120, 60, '#3b82f6');
 
   term.write('┌─ Yazi Preview: banner.png ──────────────────────────────────┐\r\n');
   term.write('│                                                             │\r\n');

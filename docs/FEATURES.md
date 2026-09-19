@@ -670,8 +670,8 @@ Waddle incorporates an industry-standard, multi-layered quality assurance and se
 - **cargo-deny**: Audits licenses (MIT, Apache-2.0, BSD, ISC, Unicode, etc.), detects banned crates/features, and prevents unauthorized transitive sources.
 
 #### 2. Unit Testing & V8 Coverage Visualization (`npm run test:unit`)
-- **@vitest/coverage-v8**: Measures code coverage for TypeScript/React services and components with statements threshold >= 80%. Automatically outputs an interactive HTML dashboard to `coverage/index.html`.
-- **cargo test**: Executes all 58 backend Rust unit tests covering PTY, Kitty Graphics, filesystem boundaries, AI guardrails, and Git sandboxing.
+- **@vitest/coverage-v8**: Measures code coverage for TypeScript/React services and components with comprehensive multi-axis thresholds (`statements: 80%`, `branches: 80%`, `functions: 80%`, `lines: 80%`). Automatically outputs an interactive HTML dashboard to `coverage/index.html`.
+- **cargo test**: Executes all backend Rust unit tests covering PTY, CommandPolicy, Kitty Graphics, filesystem boundaries, AI guardrails, and Git sandboxing.
 
 #### 3. Visual Regression Testing (`npm run test:visual`)
 - **Playwright (`toHaveScreenshot`)**:
@@ -688,6 +688,67 @@ Waddle incorporates an industry-standard, multi-layered quality assurance and se
 - `pre-commit`: Runs Gitleaks, `cargo clippy --all-targets`, and staged file Vitest tests in parallel.
 - `commit-msg`: Validates Conventional Commits format with `@commitlint/cli`.
 - `pre-push`: Executes `npm run test:all` to ensure zero regressions reach the remote repository.
+
+---
+
+### 24. 🛡️ Rust-Centric Trust Boundary & CommandPolicy Engine
+
+Waddle establishes the **native Rust core as the absolute security boundary (Trust Boundary)**. Rather than relying on frontend UI modal dialogs or browser JavaScript checks which can be bypassed via IPC or prompt manipulation, execution safety is enforced irreversibly inside the Tauri backend right before terminal input injection.
+
+```mermaid
+flowchart TD
+    User["User Input / AI Generated / IPC Request"] --> RustPTY["write_pty(session_id, data, confirmed)"]
+    RustPTY --> Engine["CommandPolicy::evaluate(data)"]
+    
+    Engine -->|Safe| Execute["PTY Master Write (Kernel Execution)"]
+    Engine -->|Review| CheckConfirmed{"confirmed == true?"}
+    CheckConfirmed -->|Yes| Execute
+    CheckConfirmed -->|No| RejectReview["Return Err('Execution requires explicit user confirmation')"]
+    Engine -->|Block| RejectBlock["Return Err('Execution strictly blocked: ...')"]
+```
+
+#### 1. Three-Tier Policy Evaluation (`PolicyAction`)
+1. **`PolicyAction::Safe`**:
+   - Harmless, read-only, or benign commands (e.g. `ls`, `cargo build`, `git status`, harmless variable names like `format_disk`).
+   - Dispatched immediately to the active PTY master FD without suspension.
+2. **`PolicyAction::Review`**:
+   - Potentially dangerous or destructive operations that require human oversight:
+     - Forced/destructive Git operations: `git reset --hard`, `git push --force`, `git push --delete`, `git branch -D`
+     - Device & filesystem operations: `dd if=`, `mkfs`, `mkswap`, `cryptsetup`
+     - System service disruptions: `systemctl stop`, `systemctl disable`
+     - Destructive permission mutations: `chmod -R 777`
+   - Rejects execution with an error unless the client explicitly passes `confirmed: Some(true)` after user modal acknowledgement.
+3. **`PolicyAction::Block`**:
+   - Irreversibly catastrophic or exploit-like commands that must NEVER be executed under any circumstances:
+     - Root-level filesystem destruction: `rm -rf /`, `rm -rf /*`, `rm -rf --no-preserve-root /`
+     - Shell fork bombs: `:(){ :|:& };:`
+     - Unchecked piped remote execution: `curl ... | bash`, `wget ... | sh`, `bash <(...)`, `python <(...)`
+   - Rejected unconditionally at the Rust kernel boundary (`Err`), preventing even confirmed executions.
+
+#### 2. SSRF, DNS Rebinding & HTTP Redirect Defense (`validate_ollama_endpoint`)
+- **Pre-Flight Synchronous DNS Resolution**:
+  - Resolves hostnames via `std::net::ToSocketAddrs` to inspect the exact resolved IP addresses prior to initiating any HTTP requests.
+  - Neutralizes DNS Rebinding attacks by rejecting connections if *any* resolved address belongs to:
+    - IPv4 Link-Local / Cloud Metadata: `169.254.0.0/16` (including `169.254.169.254`)
+    - IPv6 Cloud Metadata: `[fd00:ec2::254]`
+    - IPv6 Link-Local: `fe80::/10`
+- **Redirect Disablement**:
+  - Configures `reqwest::redirect::Policy::none()` on all internal AI HTTP clients, preventing attackers from using external servers to 302-redirect requests into internal AWS/GCP/Azure instance metadata services.
+
+#### 3. Untrusted Project Rules & LLM Output Clamping
+- **Untrusted Context Encapsulation**:
+  - Content from `.waddle/rules.md` is strictly sanitized to escape closing delimiter tags and wrapped in `<untrusted_project_rules>` blocks.
+  - The AI prompt explicitly commands the model that `<untrusted_project_rules>` are user-provided repository files that must NEVER override core security instructions or safety boundaries.
+- **Deterministic Rust Output Override**:
+  - When the AI generates a command via `generate_command`, the proposed command string is fed through Rust's `CommandPolicy::evaluate`.
+  - If the model attempts to emit a destructive or blocked command, the Rust backend deterministically clamps and overrides the output action, neutralizing indirect prompt injection attacks.
+
+#### 4. PTY Process Group Cleanup & Zero-Zombie Guarantee
+- **POSIX Process Group Termination**:
+  - Terminates child shells and all sub-processes using `libc::killpg(pid, SIGTERM)` and `libc::killpg(pid, SIGKILL)`.
+- **Non-Blocking Zombie Harvest Loop (`WNOHANG`)**:
+  - Active `libc::waitpid(pid, &mut status, libc::WNOHANG)` loop sweeps and clears child process entries from the Linux kernel process table upon session termination.
+  - Validated by continuous 1,000-cycle stress tests (`tests/pty_stress.rs`) proving 0 FD leaks, 0 zombie processes, and stable resident memory (< 100KB delta).
 
 ---
 

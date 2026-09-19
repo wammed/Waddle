@@ -1,4 +1,5 @@
 pub mod ai;
+pub mod command_policy;
 pub mod config;
 pub mod editor_ops;
 pub mod fs_ops;
@@ -10,6 +11,7 @@ pub mod system;
 use ai::{
     AiClient, ChatMessage, CommandSuggestion, ErrorExplanation, OllamaStatus, TerminalContext,
 };
+use command_policy::{CommandPolicy, CommandPolicyEvaluation, PolicyAction};
 use config::ConfigManager;
 use pty::{PtyManager, PtySessionInfo};
 use tauri::{AppHandle, State};
@@ -65,8 +67,41 @@ async fn write_pty(
     state: State<'_, AppState>,
     session_id: String,
     data: String,
+    confirmed: Option<bool>,
 ) -> Result<(), String> {
+    let eval = CommandPolicy::evaluate(&data);
+    match eval.action {
+        PolicyAction::Block => {
+            eprintln!(
+                "[CommandPolicy::Block] Blocked execution of destructive command: {}",
+                eval.reason
+            );
+            return Err(format!(
+                "Command blocked by Rust security policy: {}",
+                eval.reason
+            ));
+        }
+        PolicyAction::Review => {
+            if confirmed != Some(true) {
+                eprintln!(
+                    "[CommandPolicy::Review] Execution requires user confirmation: {}",
+                    eval.reason
+                );
+                return Err(format!(
+                    "Command requires explicit user confirmation: {}",
+                    eval.reason
+                ));
+            }
+        }
+        PolicyAction::Safe => {}
+    }
+
     state.pty_manager.write(&session_id, &data).await
+}
+
+#[tauri::command]
+fn evaluate_command_policy(command: String) -> Result<CommandPolicyEvaluation, String> {
+    Ok(CommandPolicy::evaluate(&command))
 }
 
 #[tauri::command]
@@ -264,6 +299,7 @@ pub fn run() {
             rename_entry,
             reveal_in_file_manager,
             check_ollama_status,
+            evaluate_command_policy,
             generate_command,
             explain_error,
             stream_ai_chat,

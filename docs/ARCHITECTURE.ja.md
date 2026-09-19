@@ -83,8 +83,9 @@ Waddle は、高速・堅牢な **Rust バックエンド** と、最新の **Re
 ### 3. ネイティブサービス層 (Rust バックエンド)
 - **非同期ランタイム**: Tokio マルチスレッドランタイム。
 - **主要モジュール**:
-  - `pty.rs`: 疑似端末（PTY）の生成、出力コアレッシング、UTF-8 境界処理、プロセスグループ管理、Git Branch Ref 検証。
-  - `ai.rs`: Ollama HTTP 通信、行バッファリング SSE デコード、プロンプト生成、危険コマンド判定、SSRF クラウドメタデータ遮断、2段階階層 AI ルール解決（上位ディレクトリ走査によるプロジェクト個別 `.waddle/rules_ja.md` / `rules.md` 探索 ＆ `~/.config/waddle/` グローバル共通ルール自動初期化・フォールバック）。
+  - `pty.rs`: 疑似端末（PTY）の生成、出力コアレッシング、UTF-8 境界処理、プロセスグループ管理、非ブロッキング `waitpid` ゾンビ完全回収ループ、Git Branch Ref 検証。
+  - `command_policy.rs`: PTY 書き込み直前に全コマンドを `Safe`, `Review`, `Block` の3段階で評価・強制遮断する Rust セキュリティ境界エンジン。
+  - `ai.rs`: Ollama HTTP 通信、行バッファリング SSE デコード、プロンプト生成、事前 DNS 名前解決による SSRF/DNS リバインディング防御、リダイレクト無効化、不信プロジェクト規約タグ隔離、2段階階層 AI ルール解決。
   - `config.rs`: `~/.config/waddle/config.json` のアトミック保存、壁紙管理。
   - `kitty.rs`: パス正規化・サンドボックス脱出遮断・展開爆弾対策・Base64 エンコード・一時ファイル自動削除。
   - `lib.rs`: コマンドルーティング、仮想ファイルシステム走査遮断 (`/proc`, `/sys`, `/dev`)、SSH/GPG/Keyring 秘密鍵アクセス拒否、Git 操作。
@@ -128,10 +129,11 @@ Waddle は、高速・堅牢な **Rust バックエンド** と、最新の **Re
   - **60ms 以内**にプロンプトへ復帰し、CPU 使用率も 231% から **0.7%〜1.3%** へ瞬時に急降下。
 - **60 FPS 飽和時ペーシング**:
   - 32KB 満杯の連続ストリーム時、リーダースレッドが 16〜20ms（60 FPS）でペーシング制御を実施。キー入力等の対話的コマンド（< 32KB）は 0ms 即時応答を維持。
-- **プロセスグループ終了 & ゾンビ化防止**:
+- **プロセスグループ終了 & ゾンビ完全回収 (`waitpid`)**:
   - PTY プロセスは専用のプロセスグループ（`setpgid`）として起動。
-  - タブやペインのクローズ時、負の PID（`-pid`）に対して `libc::kill(-pid, SIGHUP)` を送信し、プロセスグループ全体を一括終了。
-  - 150ms 以内に終了しない場合は `SIGTERM`、さらに `SIGKILL` を送信し、バックグラウンドの子プロセス（node, python, less 等）のゾンビ化を完全防止。
+  - タブやペインのクローズ時、プロセスグループに対して `libc::killpg(pid, SIGHUP)` および `libc::killpg(pid, SIGTERM)` を送信し一括終了。
+  - 150ms 以内に終了しない場合は `SIGKILL` を送信し、バックグラウンドの子プロセス（node, python, less 等）のゾンビ化を完全防止。
+  - さらに終了時に `libc::waitpid(pid, &mut status, libc::WNOHANG)` による非ブロッキングゾンビ回収ループを常時実行し、Linux カーネルのプロセス管理テーブルから残存ゾンビを完全回収。1,000 連続生成・破棄ストレステストでゾンビ数 0・FD リーク 0 を実証。
 - **`/proc/<pid>/cwd` による CWD リアルタイム追跡**:
   - Linux の `/proc/{child_pid}/cwd` シンボリックリンクを読み取ることで、シェルの `cd` 移動をリアルタイム検出。
   - シェル設定ファイルへのフック追記や特殊エスケープシーケンスは一切不要。
@@ -333,6 +335,48 @@ flowchart TD
     TA --> Layer3
     TA --> Layer4
 ```
+
+---
+
+### 8. Rust セキュリティ Trust Boundary アーキテクチャ (`command_policy.rs`)
+
+UI モーダルの迂回、悪意ある IPC 呼び出し、および AI プロンプトインジェクションによる脱出攻撃を完全に防ぐため、Waddle はセキュリティ判定を Webview 内の JavaScript から完全に分離し、Rust バックエンドコアに絶対的な信頼境界（Trust Boundary）を集約しています。
+
+```mermaid
+flowchart TD
+    subgraph Client["Webview クライアント (信頼不可)"]
+        UI["ユーザー入力 / 貼り付け"]
+        AI["AI コマンド自動生成"]
+        API["IPC invoke('write_pty')"]
+    end
+
+    subgraph Boundary["Rust バックエンド (Trust Boundary)"]
+        Router["write_pty(session_id, data, confirmed)"]
+        Policy["CommandPolicy::evaluate(&data)"]
+        
+        Router --> Policy
+        Policy -->|Safe| PTY["PtyMaster::write_all(data)"]
+        Policy -->|Review| GuardReview{"confirmed == true?"}
+        GuardReview -->|Yes| PTY
+        GuardReview -->|No| ErrReview["Err返却 (ユーザー明示確認を要求)"]
+        Policy -->|Block| ErrBlock["Err返却 (破壊的コマンドとして即時遮断)"]
+    end
+
+    subgraph OS["Linux カーネル"]
+        KernelPTY["POSIX PTY Master /dev/ptmx"]
+        PTY --> KernelPTY
+    end
+```
+
+- **カーネル境界での不可避な防護**:
+  - `Block` 判定（`rm -rf /`、`:(){ :|:& };:`、パイプ経由スクリプト実行等）は、Rust ネイティブ関数の入り口で `Err` として即座に拒絶されます。
+  - `Review` 判定（`git reset --hard`、`git push --force`、`dd if=`、`mkfs`、`systemctl stop` 等）は、UI モーダルで人間が確認した証跡である `confirmed: Some(true)` フラグが必須となります。
+- **SSRF・DNS リバインディング・リダイレクト防御**:
+  - `validate_ollama_endpoint` は HTTP 通信開始前に同期 DNS 名前解決（`ToSocketAddrs`）を実行し、全解決先 IP がリンクローカル（`169.254.0.0/16`, `fe80::/10`）やクラウドメタデータ（`169.254.169.254`, `[fd00:ec2::254]`）でないことを機械的検証。
+  - `reqwest::redirect::Policy::none()` により、外部サーバーを踏み台にしたリダイレクト追従を遮断。
+- **不信プロジェクトルールの完全隔離**:
+  - `.waddle/rules.md` を不信入力として扱い、閉じタグエスケープの上で `<untrusted_project_rules>` ブロックに隔離。
+  - AI 生成コマンドは Rust の `CommandPolicy::evaluate` を必ず経由し、決定論的にブロック判定へ強制上書き。
 
 ---
 

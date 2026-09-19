@@ -376,6 +376,27 @@ impl PtyManager {
         cwd: Option<String>,
         shell: Option<String>,
     ) -> Result<PtySessionInfo, String> {
+        self.create_pty_internal(Some(app), rows, cols, cwd, shell).await
+    }
+
+    pub async fn create_pty_headless(
+        &self,
+        rows: u16,
+        cols: u16,
+        cwd: Option<String>,
+        shell: Option<String>,
+    ) -> Result<PtySessionInfo, String> {
+        self.create_pty_internal(None, rows, cols, cwd, shell).await
+    }
+
+    pub async fn create_pty_internal(
+        &self,
+        app: Option<AppHandle>,
+        rows: u16,
+        cols: u16,
+        cwd: Option<String>,
+        shell: Option<String>,
+    ) -> Result<PtySessionInfo, String> {
         let pty_system = native_pty_system();
         let pixel_width = cols.saturating_mul(9);
         let pixel_height = rows.saturating_mul(18);
@@ -541,8 +562,10 @@ impl PtyManager {
                             }
 
                             if !decoded.is_empty() {
-                                if let Err(e) = app_clone.emit(&event_name, &decoded) {
-                                    eprintln!("Error emitting PTY output: {}", e);
+                                if let Some(ref a) = app_clone {
+                                    if let Err(e) = a.emit(&event_name, &decoded) {
+                                        eprintln!("Error emitting PTY output: {}", e);
+                                    }
                                 }
                             }
                         }
@@ -560,12 +583,16 @@ impl PtyManager {
             }
             if !pending_bytes.is_empty() {
                 let remaining_text = String::from_utf8_lossy(&pending_bytes).to_string();
-                let _ = app_clone.emit(&event_name, remaining_text);
+                if let Some(ref a) = app_clone {
+                    let _ = a.emit(&event_name, remaining_text);
+                }
             }
 
             alive_clone.store(false, Ordering::SeqCst);
             let exit_event = format!("pty-exit-{}", session_id_clone);
-            let _ = app_clone.emit(&exit_event, ());
+            if let Some(ref a) = app_clone {
+                let _ = a.emit(&exit_event, ());
+            }
         });
 
         let session = Session {
@@ -709,6 +736,18 @@ impl PtyManager {
                     let _ = libc::kill(pid, libc::SIGTERM);
                     let _ = libc::kill(-pid, libc::SIGKILL);
                     let _ = libc::kill(pid, libc::SIGKILL);
+
+                    // Reap child process to prevent zombie processes (<defunct>)
+                    let mut status = 0;
+                    for _ in 0..10 {
+                        let res = libc::waitpid(pid, &mut status, libc::WNOHANG);
+                        if res == pid || res == -1 {
+                            break;
+                        }
+                        std::thread::sleep(std::time::Duration::from_millis(2));
+                    }
+                    // Clean up any remaining zombie state
+                    let _ = libc::waitpid(pid, &mut status, libc::WNOHANG);
                 }
             }
             Ok(())

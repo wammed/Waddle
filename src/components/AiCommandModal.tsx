@@ -20,7 +20,7 @@ interface AiCommandModalProps {
   onClose: () => void;
   context: TerminalContext;
   onInsertCommand: (command: string) => void;
-  onExecuteCommand: (command: string) => void;
+  onExecuteCommand: (command: string, confirmed?: boolean) => void;
 }
 
 export const AiCommandModal: React.FC<AiCommandModalProps> = ({
@@ -340,7 +340,7 @@ export const AiCommandModal: React.FC<AiCommandModalProps> = ({
           isOpen={true}
           command={confirmCmd}
           onConfirmExecute={() => {
-            onExecuteCommand(confirmCmd);
+            onExecuteCommand(confirmCmd, true);
             setConfirmCmd(null);
             onClose();
           }}

@@ -28,7 +28,7 @@ interface AiSidebarProps {
   onClose: () => void;
   context: TerminalContext;
   onInsertCommand: (command: string) => void;
-  onExecuteCommand: (command: string) => void;
+  onExecuteCommand: (command: string, confirmed?: boolean) => void;
 }
 
 export const AiSidebar: React.FC<AiSidebarProps> = ({
@@ -464,7 +464,7 @@ export const AiSidebar: React.FC<AiSidebarProps> = ({
           isOpen={true}
           command={confirmCmd}
           onConfirmExecute={() => {
-            onExecuteCommand(confirmCmd);
+            onExecuteCommand(confirmCmd, true);
             setConfirmCmd(null);
           }}
           onSafeInsert={() => {

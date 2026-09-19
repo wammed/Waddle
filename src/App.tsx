@@ -304,10 +304,12 @@ export function App() {
     }
   };
 
-  const handleExecuteCommand = (command: string) => {
+  const handleExecuteCommand = (command: string, confirmed?: boolean) => {
     const targetSessionId = activePane?.sessionId || activeTab?.sessionId;
     if (targetSessionId) {
-      TauriApi.writePty(targetSessionId, `${command}\n`);
+      TauriApi.writePty(targetSessionId, `${command}\n`, confirmed).catch((err) => {
+        console.error('PTY command execution error:', err);
+      });
     }
   };
 

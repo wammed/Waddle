@@ -123,4 +123,44 @@ describe('sessionHistory', () => {
     expect(stored.command).not.toContain(sensitiveToken);
     expect(stored.outputSnippet).not.toContain(awsKey);
   });
+
+  it('rejects empty or whitespace command', async () => {
+    const { sessionHistory } = await import('../sessionHistory');
+    expect(() => sessionHistory.addRecord({ command: '   ', cwd: '/tmp' })).toThrow(
+      'Command cannot be empty'
+    );
+  });
+
+  it('deletes a record by id', async () => {
+    const { sessionHistory } = await import('../sessionHistory');
+    sessionHistory.clearRecords();
+    const rec1 = sessionHistory.addRecord({ command: 'echo first', cwd: '' });
+    const rec2 = sessionHistory.addRecord({ command: 'echo second', cwd: '/home' });
+    expect(rec1.cwd).toBe('~'); // Default cwd fallback
+    expect(sessionHistory.getRecords().length).toBe(2);
+
+    sessionHistory.deleteRecord(rec1.id);
+    expect(sessionHistory.getRecords().length).toBe(1);
+    expect(sessionHistory.getRecords()[0].id).toBe(rec2.id);
+  });
+
+  it('handles corrupted or non-array localStorage data gracefully during load', async () => {
+    storageMock.setItem('waddle_session_history_records', '{ "not": "an array" }');
+    const { sessionHistory } = await import('../sessionHistory');
+    expect(sessionHistory.getRecords()).toBeDefined();
+
+    storageMock.setItem('waddle_session_history_records', 'corrupted invalid json');
+    expect(sessionHistory.getRecords()).toBeDefined();
+
+    // Valid array with records (one with snippet, one without, one with empty command)
+    const validData = [
+      { id: 'rec_1', command: 'git status', outputSnippet: 'On branch main' },
+      { id: 'rec_2', command: '', outputSnippet: undefined },
+    ];
+    storageMock.setItem('waddle_session_history_records', JSON.stringify(validData));
+    const instance = new (sessionHistory.constructor as any)();
+    expect(instance.getRecords().length).toBe(2);
+    expect(instance.getRecords()[0].command).toBe('git status');
+    expect(instance.getRecords()[1].command).toBe('');
+  });
 });

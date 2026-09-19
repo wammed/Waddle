@@ -427,6 +427,10 @@ export class KittyGraphicsManager {
     return cleanText;
   }
 
+  public async flush(): Promise<void> {
+    await this.commandQueue;
+  }
+
   private calculateCursorOffset(text: string): {
     deltaCol: number;
     deltaLine: number;

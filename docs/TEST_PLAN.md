@@ -14,14 +14,15 @@ This document provides a comprehensive, end-to-end test plan for **Waddle**, cov
 1. **PTY & Terminal Core** (10 Test Cases)
 2. **Tabs, 10-Split Layouts & Session Persistence** (8 Test Cases)
 3. **File Tree Sidebar & Embedded Editor** (13 Test Cases)
-4. **AI Assistant & Context Integration** (9 Test Cases)
-5. **Git Integration & Remote Guardrails** (9 Test Cases)
-6. **Theming, UI Glow, Wallpapers & Icons** (7 Test Cases)
-7. **Kitty Graphics Protocol (Complete Subsystem)** (19 Test Cases)
-8. **Security Policy & Multi-Layer Safety Guardrails** (18 Test Cases)
+4. **AI Assistant & Context Integration** (6 Test Cases)
+5. **Git Integration & Remote Guardrails** (8 Test Cases)
+6. **Theming, UI Glow, Wallpapers & Icons** (6 Test Cases)
+7. **Kitty Graphics Protocol (Complete Subsystem)** (20 Test Cases)
+8. **Security Policy & Multi-Layer Safety Guardrails** (21 Test Cases)
 9. **Performance, Resource Bounds & Leak Prevention** (5 Test Cases)
 10. **Next-Gen Workflow & Productivity** (6 Test Cases)
-**Total: 104 Comprehensive Test Cases**
+11. **Integrated Test Suite & Security/Regression** (5 Test Cases)
+**Total: 108 Comprehensive Test Cases (11 Suites)**
 
 ### 1.3 Prerequisites & Environment
 - **Operating System**: Linux (Ubuntu 22.04+, Debian 12+, Arch Linux, etc., WebKitGTK 4.1 / 4.0)
@@ -138,6 +139,11 @@ This document provides a comprehensive, end-to-end test plan for **Waddle**, cov
 
 ### Suite 7: Kitty Graphics Protocol (Complete Subsystem)
 
+> [!NOTE]
+> **Suite 7 Extended Scope (TC-KITTY-18 & TC-KITTY-20 Background & Specifications)**:
+> - **TC-KITTY-18 (ANSI CSI Cursor Tracking)**: Added to track cursor repositioning escape sequences (CUF/CUB/CHA) emitted by tools like Neovim and Fastfetch prior to image transmission, preventing column offsets and visual line-wrapping errors.
+> - **TC-KITTY-20 (Universal CLI/TUI Ecosystem Compatibility)**: Added to validate compatibility with `viu`, `timg`, `ranger`, and `lf` through XTVERSION probe handling, DA1 Sixel sanitization, PTY-level temp file inlining (`t=t` -> `t=d`), explicit image ID sync for `ranger`, and suppression of redundant OK responses on `a=d` to eliminate UI hangs and screen flicker.
+
 | ID | Feature Under Test | Execution Procedure | Expected Result | Type |
 | :--- | :--- | :--- | :--- | :--- |
 | **TC-KITTY-01** | APC Sequence Parsing & 0ms Stream Separation | Run `fastfetch --logo-type kitty` or `timg -pk`. | Base64 image payload extracts before xterm; terminal exhibits 0ms lag and zero frame drops. | Manual |
@@ -164,6 +170,11 @@ This document provides a comprehensive, end-to-end test plan for **Waddle**, cov
 ---
 
 ### Suite 8: Security Policy & Multi-Layer Safety Guardrails
+
+> [!NOTE]
+> **Suite 8 Extended Scope (TC-SEC-20 & TC-SEC-21 Background & Specifications)**:
+> - **TC-SEC-20 (Embedded Editor Zero-Mutation Visual Masking)**: Added to ensure that secrets opened in the embedded editor (`Ctrl+E`) are visually masked via overlays without mutating the buffer content on disk upon saving (`Ctrl+S`).
+> - **TC-SEC-21 (Session History & AI Copilot Storage Sanitization)**: Added to guarantee defense-in-depth sanitization of sensitive tokens (`SecretMasker`) before persisting session state to `localStorage` and before streaming context to Ollama LLMs.
 
 | ID | Feature Under Test | Execution Procedure | Expected Result | Type |
 | :--- | :--- | :--- | :--- | :--- |

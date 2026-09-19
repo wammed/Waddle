@@ -1075,6 +1075,37 @@ npm run tauri dev
       - Rust 単体テスト 2 件追加（`test_git_get_diff_untracked_synthetic`, `test_format_commitlint_message`、Rust 計 62 テスト全パス）。
       - 実機 Ollama + `npx commitlint` パス確認。
 
+49. **セキュリティ境界の Rust 集約 & QA/CI 厳格化スプリント (P0 & P1)**:
+    - **背景と目的**:
+      - 新機能追加を凍結し、フロントエンド依存のセキュリティ判定を排除して **Rust バックエンドを絶対的なセキュリティ境界（Trust Boundary）へ昇格**。
+      - あわせて CI/CD におけるツール欠落 PASS 偽装の完全排除、Vitest カバレッジ閾値の多角化（4項目 80%）、Kitty 実プロトコル結合テスト、PTY 1,000 回ストレステスト、および Waddle 規定 8 ドキュメント（日英セット）の完全同期を実施。
+    - **実施内容**:
+      1. **Rust 側 CommandPolicy エンジン新設 & IPC 境界強制 (P0-1)**:
+         - [`src-tauri/src/command_policy.rs`](file:///home/susie/GitHUB/wammed/Waddle/src-tauri/src/command_policy.rs): `Safe`, `Review`, `Block` の 3 段階評価エンジンを新設。単体テスト全パス。
+         - [`src-tauri/src/lib.rs`](file:///home/susie/GitHUB/wammed/Waddle/src-tauri/src/lib.rs): `write_pty` に `confirmed: Option<bool>` を追加。`Block` は原則強制遮断（`Err`）、`Review` は `confirmed == Some(true)` なき場合遮断。`evaluate_command_policy` IPC コマンドを新設。
+         - [`src/services/tauriApi.ts`](file:///home/susie/GitHUB/wammed/Waddle/src/services/tauriApi.ts), [`src/App.tsx`](file:///home/susie/GitHUB/wammed/Waddle/src/App.tsx), 各モーダル/コンポーネント: モーダル承認を経て `confirmed: true` を渡す安全フローを確立。
+      2. **SSRF / DNS Rebinding / Redirect 防御強化 (P0-2)**:
+         - [`src-tauri/src/ai.rs`](file:///home/susie/GitHUB/wammed/Waddle/src-tauri/src/ai.rs): 事前同期実 DNS 名前解決（`ToSocketAddrs`）により、解決された全 IP がリンクローカル/クラウドメタデータ（`169.254.0.0/16`, `[fd00:ec2::254]`, `fe80::/10`）でないことを検証。
+         - `reqwest::redirect::Policy::none()` を強制し、302 リダイレクトによるメタデータ窃取を遮断。
+      3. **Project Rules (`.waddle/rules.md`) Untrusted Context 化 (P0-3)**:
+         - [`src-tauri/src/ai.rs`](file:///home/susie/GitHUB/wammed/Waddle/src-tauri/src/ai.rs): ルールを `<untrusted_project_rules>` タグで隔離しプロンプトガードレールを注入。AI 出力コマンドを Rust `CommandPolicy` で決定論的に強制上書き。
+      4. **Security CI PASS 偽装の完全排除 (P0-4)**:
+         - [`scripts/test-security.sh`](file:///home/susie/GitHUB/wammed/Waddle/scripts/test-security.sh): Gitleaks, Secretlint, cargo-audit, cargo-deny 未インストール時に即座に FAIL（exit 1）で終了させ、未実行 PASS を根絶。
+      5. **テスト計画書 & エビデンスレポート整合性同期 (P1-5)**:
+         - [`docs/TEST_PLAN.md`](file:///home/susie/GitHUB/wammed/Waddle/docs/TEST_PLAN.md) & [`docs/TEST_PLAN.ja.md`](file:///home/susie/GitHUB/wammed/Waddle/docs/TEST_PLAN.ja.md): 全 108 項目（11 スイート）に完全同期。Suite 7（`TC-KITTY-18`, `TC-KITTY-20`）、Suite 8（`TC-SEC-20`, `TC-SEC-21`）の追加背景・仕様を明記。
+         - [`docs/Waddle_Test_Execution_Evidence_ja.md`](file:///home/susie/GitHUB/wammed/Waddle/docs/Waddle_Test_Execution_Evidence_ja.md): ステータスを `[TEST EXECUTION COMPLETED / RELEASE APPROVAL PENDING]` に更新。
+      6. **Vitest カバレッジ閾値の多角化 (P1-6)**:
+         - [`vitest.config.ts`](file:///home/susie/GitHUB/wammed/Waddle/vitest.config.ts): `statements: 80, branches: 80, functions: 80, lines: 80` を設定。
+         - 分岐テスト拡充により、Statements: 90.32%, Branches: 85.71%, Functions: 88.67%, Lines: 93.39% を達成。
+      7. **Kitty Graphics 実プロトコル結合テスト (P1-7)**:
+         - [`src/services/kittyGraphics/manager.ts`](file:///home/susie/GitHUB/wammed/Waddle/src/services/kittyGraphics/manager.ts): `flush(): Promise<void>` 追加。
+         - [`tests/visual/harness.ts`](file:///home/susie/GitHUB/wammed/Waddle/tests/visual/harness.ts): cache.set 直代入を廃止し、実 APC シーケンスを送信してデコード・配置・描画させる方式へ改修。結合テスト PASS。
+      8. **PTY 子プロセスゾンビ回収 & 1,000 回ストレステスト (P1-8)**:
+         - [`src-tauri/src/pty.rs`](file:///home/susie/GitHUB/wammed/Waddle/src-tauri/src/pty.rs): `libc::waitpid(pid, &mut status, libc::WNOHANG)` によるゾンビ完全回収ループ配備。
+         - [`src-tauri/tests/pty_stress.rs`](file:///home/susie/GitHUB/wammed/Waddle/src-tauri/tests/pty_stress.rs): 1,000 回の create/destroy サイクルを実行し、FD リーク 0、ゾンビ 0、RSS 増加 100KB（3.07s 完了）を実証。
+      9. **8 ドキュメント（日英セット）の完全同期**:
+         - `README.md` & `README.ja.md`（ルート実体）および `docs/README.md` & `docs/README.ja.md`（docs実体）、`docs/FEATURES.md` & `docs/FEATURES.ja.md`、`docs/ARCHITECTURE.md` & `docs/ARCHITECTURE.ja.md`、`docs/SECURITY.md` & `docs/SECURITY.ja.md`、`docs/SESSION_HANDOVER.md` を完全対称同期。
+
 ---
 
 ## 6. 次回再開時の検討・作業候補（Next Steps）

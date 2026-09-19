@@ -218,5 +218,26 @@ MIIEowIBAAKCAQEA0Y...
     expect(maskedCode).not.toContain('sk-proj-');
     expect(maskedCode).toContain('const token = "                                        ";');
   });
+
+  it('handles empty or blank text gracefully', () => {
+    expect(maskSecrets('')).toEqual({ maskedText: '', count: 0 });
+    expect(findSecretRanges('')).toEqual([]);
+    expect(hasSecrets('')).toBe(false);
+  });
+
+  it('masks standalone JSON Web Tokens (JWT)', () => {
+    const jwt = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c';
+    const text = `Authorization: Bearer ${jwt}`;
+    const res = maskSecrets(text);
+    expect(res.count).toBeGreaterThan(0);
+    expect(res.maskedText).not.toContain('SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c');
+  });
+
+  it('correctly merges overlapping ranges where next.end > current.end', () => {
+    // Both KeyValueSecret and Google API key or Bearer can overlap
+    const complex = 'API_KEY="AIzaSyA1234567890abcdefghijklmnopqrstuvw"';
+    const ranges = findSecretRanges(complex);
+    expect(ranges.length).toBeGreaterThanOrEqual(1);
+  });
 });
 

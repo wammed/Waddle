@@ -22,6 +22,12 @@ export const isTauri = () => {
   return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 };
 
+export interface CommandPolicyEvaluation {
+  action: 'Safe' | 'Review' | 'Block';
+  reason: string;
+  matched_pattern?: string | null;
+}
+
 export const TauriApi = {
   // PTY Operations
   async createPty(
@@ -73,9 +79,16 @@ export const TauriApi = {
     }
   },
 
-  async writePty(sessionId: string, data: string): Promise<void> {
+  async writePty(sessionId: string, data: string, confirmed?: boolean): Promise<void> {
     if (!isTauri()) return;
-    return await invoke('write_pty', { sessionId, data });
+    return await invoke('write_pty', { sessionId, data, confirmed });
+  },
+
+  async evaluateCommandPolicy(command: string): Promise<CommandPolicyEvaluation> {
+    if (!isTauri()) {
+      return { action: 'Safe', reason: 'Non-Tauri fallback' };
+    }
+    return await invoke<CommandPolicyEvaluation>('evaluate_command_policy', { command });
   },
 
   async resizePty(

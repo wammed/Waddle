@@ -22,7 +22,7 @@ interface AiErrorBannerProps {
   autoAnalyze?: boolean;
   onDismiss: () => void;
   onInsertCommand: (command: string) => void;
-  onExecuteCommand: (command: string) => void;
+  onExecuteCommand: (command: string, confirmed?: boolean) => void;
 }
 
 export const AiErrorBanner: React.FC<AiErrorBannerProps> = ({
@@ -270,7 +270,7 @@ export const AiErrorBanner: React.FC<AiErrorBannerProps> = ({
           isOpen={true}
           command={confirmCmd}
           onConfirmExecute={() => {
-            onExecuteCommand(confirmCmd);
+            onExecuteCommand(confirmCmd, true);
             setConfirmCmd(null);
             onDismiss();
           }}

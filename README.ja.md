@@ -58,6 +58,7 @@
 - 📂 **高機能ファイルツリー**: `/proc/<pid>/cwd` によるカレントディレクトリ自動追跡、巨大フォルダ 500 件制限と動的オンデマンド展開（`+ さらに読み込む`）、言語別カラーバッジ、ブレッドクラム、インデントガイド、右クリックメニュー。([詳細](docs/FEATURES.ja.md#3--左側ファイルツリーサイドバー-ctrl--b))
 - 🐙 **Git & GitHub 統合ハブ**: ステータスバー連動ポップオーバー、1クリック Push/Pull、ローカル AI による Conventional Commit 自動生成、GUI Diff ビューワー。([詳細](docs/FEATURES.ja.md#14--git--github-連携ローカル-ai-コミット生成--pushpull-ポリシー))
 - 🖼️ **Kitty 画像プロトコル完全対応 & 全 TUI / CLI エコシステム連携**: `yazi`, `ranger`, `lf`, `fastfetch`, `kitten icat`, `chafa`, `timg`, `viu`, Neovim (`image.nvim`) などの全 CLI/TUI ツールからのターミナル直接画像・アニメーション描画に完全対応。通常テキスト（ファイル一覧・枠線・コード等）の 100% 描画保証、CUP 絶対座標追従、Alternate Screen ゼロアロケーション（TUI 固定グリッド保護）、カーネル協調のピクセル解像度報告（`TIOCGWINSZ`）、XTVERSION 応答（`timg` 自動検出）、DA1 Sixel 排除 & DSR 5n 同期、PTY レベル一時ファイル即時 Base64 インライン化（`viu` の一時ファイル削除レースコンディション根絶）、明示的 ID による描画 OK 応答同期（`ranger` 初回フリーズ解消）および削除コマンド（`a=d`）の公式サイレント準拠（`ranger` 2枚目選択時のキー誤爆・画面点滅・ハング根絶）、`TERM=xterm-kitty`（`ranger` ハードコードチェック通過）、0ms 即時プローブ応答（`a=q` 大文字 `OK` / DA1 / CSI プローブ）を完備。※セキュリティ上の要請（`/dev/shm` 共有メモリ汚染・OOM DoS 防御）から共有メモリ（`t=s`）を意図的に無効化し、堅牢なサンドボックス保護を最優先（動画の超高速ストリーミングは安全のため割り切り）。([詳細](docs/FEATURES.ja.md#16--kitty-画像プロトコル-kitty-graphics-protocol-完全対応--厳格なセキュリティサンドボックス))
+- 🛡️ **Rust コア集約セキュリティ境界 (`CommandPolicy`)**: フロントエンドの UI 判定に依存せず、Rust バックエンドを絶対的な Trust Boundary へ昇格。全コマンドを `Safe`, `Review`, `Block` の3段階で機械的評価し、`rm -rf /` やフォーマット等の破壊的コマンドをカーネル PTY 入力直前で完全遮断、ハイリスク操作には明示的確認を強制。([詳細](docs/FEATURES.ja.md#24--rust-コア集約セキュリティ境界--commandpolicy-エンジン))
 - 🛡️ **リアルタイム機密情報マスク (`SecretMasker`)**: 多層防御シークレット保護エンジン（GitHub Fine-Grained & クラシック PAT、OpenAI/Anthropic/Google AIキー、Slackトークン、AWSキー、プレフィックス付き環境変数等）により、ライブターミナル、エディタ非破壊マスク、セッション履歴、AIコンテキストを完全防護。([詳細](docs/FEATURES.ja.md#17--リアルタイム機密情報マスク-secret-masking))
 - ⏳ **セッション タイムトラベル & 履歴復元 (`Ctrl + Shift + H`)**: 過去の実行コマンド、終了コード、CWD、出力をタイムライン形式でビジュアル化し、1クリックで状態復元やコマンド再実行。([詳細](docs/FEATURES.ja.md#18--セッション-タイムトラベル--スナップショット履歴-ctrl--shift--h))
 - 📊 **リッチデータ ビジュアライザ (Markdown / CSV / JSON)**: Markdown 組版、CSV ソート・検索テーブル、JSON 折りたたみツリーをエディタおよびツリーから1クリックで瞬時プレビュー。([詳細](docs/FEATURES.ja.md#19--リッチデータ-ビジュアライザ-markdown--csv--json-プレビュー))
@@ -179,9 +180,11 @@ npx lefthook run pre-commit
 
 Waddle は **100% 完全オフライン・ローカルファースト** で動作します：
 - **ゼロクラウド流出**: テレメトリ、外部クラウド API、トラッキングは一切ありません。プロンプトもターミナルログもすべて PC 内で処理されます。
-- **多層防御ガードレール**: システムディレクトリ（`/etc`, `/usr` 等）および仮想ファイルシステム（`/proc`, `/sys`, `/dev`）のトラバーサル遮断、GPG/Keyring/SSH秘密鍵の絶対保護、Ollama SSRF防御（クラウドメタデータ `169.254.169.254` 遮断）、Git Branch Ref 厳格サニタイズ、XMLタグ境界エスケープ、単語境界による破壊的コマンド検知を完備。
-- **機密情報保護 (Secret Masking)**: ターミナル出力中の API キーやアクセストークンを正規表現で即時マスクし、画面共有や録画での意図せぬ資格情報露出を防止。
-- **堅牢な POSIX PTY**: 32KB 出力コアレッシング、UTF-8 マルチバイト境界繰り越し、およびプロセスグループ（`-pid`）の安全なシグナル終了。
+- **Rust コア集約セキュリティ境界 (`CommandPolicy`)**: セキュリティ判定をフロントエンドの JS から Rust ネイティブへ完全集約。全コマンドを `Safe`, `Review`, `Block` に分類し、IPC や AI インジェクション経由の破壊的操作（`rm -rf /`、`mkfs`、フォーク爆弾等）を PTY 入力直前で完全遮断。
+- **SSRF・DNS リバインディング・リダイレクト防御**: Ollama エンドポイントに対し、事前同期 DNS 名前解決を実施して全解決先 IP がリンクローカルやクラウドメタデータ（`169.254.0.0/16`, `[fd00:ec2::254]`, `fe80::/10`）でないことを検証。HTTP リダイレクト追従は強制無効化。
+- **プロジェクト規約 (`.waddle/rules.md`) の不信入力隔離**: プロジェクトルールを `<untrusted_project_rules>` タグで隔離し、プロンプトインジェクション防御ガードレールを注入。AI 生成コマンドは Rust `CommandPolicy` で決定論的に上書き判定。
+- **多層防御ガードレール**: システム重要ディレクトリ（`/etc`, `/usr` 等）および仮想ファイルシステム（`/proc`, `/sys`, `/dev`）の遮断、SSH秘密鍵・GPG鍵・Keyring の絶対保護、Git Branch Ref 厳格サニタイズ、リアルタイム機密情報マスク（`SecretMasker`）。
+- **堅牢な POSIX PTY & ゾンビ完全回収保証**: 32KB 出力コアレッシング、UTF-8 マルチバイト境界繰り越し、プロセスグループ（`-pid`）シグナル終了に加え、`libc::waitpid(..., WNOHANG)` によるゾンビ回収ループを完備（1,000 回ストレスサイクルで FD リーク 0、ゾンビ 0 を実証）。
 
 > 📐 システム全体の構造設計は [アーキテクチャ解説 (docs/ARCHITECTURE.ja.md)](docs/ARCHITECTURE.ja.md) をご覧ください。  
 > 🛡️ 網羅的なセキュリティ仕様は [セキュリティポリシー (docs/SECURITY.ja.md)](docs/SECURITY.ja.md) をご覧ください。

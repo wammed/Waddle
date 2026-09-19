@@ -158,7 +158,7 @@ interface EditorPaneProps {
   cwd: string;
   config: AppConfig;
   context: TerminalContext;
-  onExecuteInTerminal: (command: string) => void;
+  onExecuteInTerminal: (command: string, confirmed?: boolean) => void;
   onInsertInTerminal?: (command: string) => void;
   targetFilePath?: string | null;
   onRichPreview?: (filePath: string, fileName: string, content: string) => void;
@@ -2386,7 +2386,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
           isOpen={!!confirmDangerousCmd}
           command={confirmDangerousCmd}
           onConfirmExecute={() => {
-            if (confirmDangerousCmd) onExecuteInTerminal(confirmDangerousCmd);
+            if (confirmDangerousCmd) onExecuteInTerminal(confirmDangerousCmd, true);
             setConfirmDangerousCmd(null);
           }}
           onSafeInsert={() => {
