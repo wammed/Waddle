@@ -1,0 +1,155 @@
+<svg width="1650" height="1600" xmlns="http://www.w3.org/2000/svg">
+
+  <!-- Background -->
+  <rect width="100%" height="100%" fill="#0d1117"/>
+
+  <!-- Title -->
+  <text x="50%" y="70" fill="#ffffff" font-size="48" font-family="sans-serif" text-anchor="middle">
+    Waddle Security Architecture — Detailed View
+  </text>
+
+  <!-- User Layer -->
+  <rect x="100" y="120" width="1450" height="130" rx="14" fill="#1f6feb" opacity="0.85"/>
+  <text x="825" y="195" fill="#ffffff" font-size="32" font-family="sans-serif" text-anchor="middle">
+    User Actions (Terminal / Editor / File Tree / Git / AI)
+  </text>
+
+  <!-- Flow Arrow -->
+  <line x1="825" y1="250" x2="825" y2="290" stroke="#ffffff" stroke-width="3"/>
+  <polygon points="825,290 815,275 835,275" fill="#ffffff"/>
+
+  <!-- Backend Layer -->
+  <rect x="100" y="300" width="1450" height="130" rx="14" fill="#238636" opacity="0.85"/>
+  <text x="825" y="375" fill="#ffffff" font-size="32" font-family="sans-serif" text-anchor="middle">
+    Waddle Backend (Rust / Tauri Core)
+  </text>
+
+  <!-- Horizontal Divider -->
+  <line x1="100" y1="450" x2="1550" y2="450" stroke="#ffffff" stroke-width="2" opacity="0.3"/>
+
+  <!-- FS Guardrail -->
+  <rect x="100" y="480" width="450" height="430" rx="14" fill="#30363d"/>
+  <text x="325" y="520" fill="#ffffff" font-size="28" font-family="sans-serif" text-anchor="middle">
+    FileSystem Guardrails
+  </text>
+
+  <text x="120" y="570" fill="#c9d1d9" font-size="22" font-family="sans-serif">
+    • System Dir Block: /etc, /usr, /bin, /proc, /sys, /dev, /root, /run
+  </text>
+  <text x="120" y="610" fill="#c9d1d9" font-size="22" font-family="sans-serif">
+    • $HOME-only Write Boundary (UID match required)
+  </text>
+  <text x="120" y="650" fill="#c9d1d9" font-size="22" font-family="sans-serif">
+    • SSH/GPG/Keyring Full Deny (read/write/delete)
+  </text>
+  <text x="120" y="690" fill="#c9d1d9" font-size="22" font-family="sans-serif">
+    • Dangerous Symlink Detection (escape → deny)
+  </text>
+  <text x="120" y="730" fill="#c9d1d9" font-size="22" font-family="sans-serif">
+    • 500-entry Pagination (DOM/DoS defense)
+  </text>
+  <text x="120" y="770" fill="#c9d1d9" font-size="22" font-family="sans-serif">
+    • Atomic Save for Config Files
+  </text>
+
+  <!-- Editor -->
+  <rect x="580" y="480" width="450" height="430" rx="14" fill="#30363d"/>
+  <text x="805" y="520" fill="#ffffff" font-size="28" font-family="sans-serif" text-anchor="middle">
+    Hardened Editor (Config-file Focused)
+  </text>
+
+  <text x="600" y="570" fill="#c9d1d9" font-size="22" font-family="sans-serif">
+    • No Root Editing / No Priv Escalation
+  </text>
+  <text x="600" y="610" fill="#c9d1d9" font-size="22" font-family="sans-serif">
+    • No Regex Search (ReDoS Defense)
+  </text>
+  <text x="600" y="650" fill="#c9d1d9" font-size="22" font-family="sans-serif">
+    • No Smart Indent (Syntax Safety)
+  </text>
+  <text x="600" y="690" fill="#c9d1d9" font-size="22" font-family="sans-serif">
+    • AutoSave 6 Generations (0700)
+  </text>
+  <text x="600" y="730" fill="#c9d1d9" font-size="22" font-family="sans-serif">
+    • Secret Masking (visual-only, non-destructive)
+  </text>
+  <text x="600" y="770" fill="#c9d1d9" font-size="22" font-family="sans-serif">
+    • Max 5 Tabs (Memory Safety)
+  </text>
+
+  <!-- PTY -->
+  <rect x="1060" y="480" width="450" height="430" rx="14" fill="#30363d"/>
+  <text x="1285" y="520" fill="#ffffff" font-size="28" font-family="sans-serif" text-anchor="middle">
+    PTY / Terminal Defense
+  </text>
+
+  <text x="1080" y="570" fill="#c9d1d9" font-size="22" font-family="sans-serif">
+    • Kernel-cooperative Flow Control (pause/resume)
+  </text>
+  <text x="1080" y="610" fill="#c9d1d9" font-size="22" font-family="sans-serif">
+    • Memory Cap ~300MB (yes / spam)
+  </text>
+  <text x="1080" y="650" fill="#c9d1d9" font-size="22" font-family="sans-serif">
+    • 0ms Ctrl+C Queue Purge
+  </text>
+  <text x="1080" y="690" fill="#c9d1d9" font-size="22" font-family="sans-serif">
+    • Dangerous Command Detection (rm, mkfs, dd...)
+  </text>
+  <text x="1080" y="730" fill="#c9d1d9" font-size="22" font-family="sans-serif">
+    • UTF-8 Boundary Safe Parser
+  </text>
+  <text x="1080" y="770" fill="#c9d1d9" font-size="22" font-family="sans-serif">
+    • Alternate Screen Zero Allocation
+  </text>
+
+  <!-- AI Safety -->
+  <rect x="100" y="940" width="700" height="500" rx="14" fill="#30363d"/>
+  <text x="450" y="980" fill="#ffffff" font-size="28" font-family="sans-serif" text-anchor="middle">
+    AI Safety Layer (Ollama Local)
+  </text>
+
+  <text x="120" y="1030" fill="#c9d1d9" font-size="22" font-family="sans-serif">
+    • 100% Local AI (Zero Cloud Leakage)
+  </text>
+  <text x="120" y="1070" fill="#c9d1d9" font-size="22" font-family="sans-serif">
+    • Prompt Injection Guard (XML Escape)
+  </text>
+  <text x="120" y="1110" fill="#c9d1d9" font-size="22" font-family="sans-serif">
+    • Sanitized Context (Git/CWD/History)
+  </text>
+  <text x="120" y="1150" fill="#c9d1d9" font-size="22" font-family="sans-serif">
+    • AI Rules: Project (.waddle) & Global (~/.config/waddle)
+  </text>
+  <text x="120" y="1190" fill="#c9d1d9" font-size="22" font-family="sans-serif">
+    • Autonomous Watchdog (Error Diagnosis)
+  </text>
+
+  <!-- Kitty Graphics -->
+  <rect x="860" y="940" width="690" height="500" rx="14" fill="#30363d"/>
+  <text x="1205" y="980" fill="#ffffff" font-size="28" font-family="sans-serif" text-anchor="middle">
+    Kitty Graphics Sandbox
+  </text>
+
+  <text x="880" y="1030" fill="#c9d1d9" font-size="22" font-family="sans-serif">
+    • t=f: $HOME/Pictures Only (Canonicalized)
+  </text>
+  <text x="880" y="1070" fill="#c9d1d9" font-size="22" font-family="sans-serif">
+    • t=t: Immediate Delete → Base64 Inline
+  </text>
+  <text x="880" y="1110" fill="#c9d1d9" font-size="22" font-family="sans-serif">
+    • t=s Disabled (Shared Memory Attack Defense)
+  </text>
+  <text x="880" y="1150" fill="#c9d1d9" font-size="22" font-family="sans-serif">
+    • Resolution Limit: 4096×4096 px
+  </text>
+  <text x="880" y="1190" fill="#c9d1d9" font-size="22" font-family="sans-serif">
+    • Payload Limit: 16MB (Base64)
+  </text>
+  <text x="880" y="1230" fill="#c9d1d9" font-size="22" font-family="sans-serif">
+    • VRAM Limit: 256MB (LRU Eviction)
+  </text>
+  <text x="880" y="1270" fill="#c9d1d9" font-size="22" font-family="sans-serif">
+    • Ranger / Yazi Sync (OK / Silent Mode)
+  </text>
+
+</svg>

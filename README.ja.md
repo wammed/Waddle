@@ -177,6 +177,8 @@ npx lefthook run pre-commit
 
 ## 🔒 セキュリティ & アーキテクチャ (概要)
 
+![Security Architecture](images/security_architecture.svg)
+
 Waddle は **100% 完全オフライン・ローカルファースト** で動作します：
 - **ゼロクラウド流出**: テレメトリ、外部クラウド API、トラッキングは一切ありません。プロンプトもターミナルログもすべて PC 内で処理されます。
 - **多層防御ガードレール**: システムディレクトリ（`/etc`, `/usr` 等）および仮想ファイルシステム（`/proc`, `/sys`, `/dev`）のトラバーサル遮断、GPG/Keyring/SSH秘密鍵の絶対保護、Ollama SSRF防御（クラウドメタデータ `169.254.169.254` 遮断）、Git Branch Ref 厳格サニタイズ、XMLタグ境界エスケープ、単語境界による破壊的コマンド検知を完備。
