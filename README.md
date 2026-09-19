@@ -188,6 +188,7 @@ Waddle operates under a strict **100% offline, local-first** model:
 
 > 📐 Explore the system design in the [Architecture Guide (docs/ARCHITECTURE.md)](docs/ARCHITECTURE.md).  
 > 🛡️ Review our comprehensive safety policies in [docs/SECURITY.md](docs/SECURITY.md).
+> 🔍 View the latest pre-release security assessment in [docs/SECURITY_STATUS.md](docs/SECURITY_STATUS.md).
 
 ---
 

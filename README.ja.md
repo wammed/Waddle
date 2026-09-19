@@ -188,6 +188,7 @@ Waddle は **100% 完全オフライン・ローカルファースト** で動�
 
 > 📐 システム全体の構造設計は [アーキテクチャ解説 (docs/ARCHITECTURE.ja.md)](docs/ARCHITECTURE.ja.md) をご覧ください。  
 > 🛡️ 網羅的なセキュリティ仕様は [セキュリティポリシー (docs/SECURITY.ja.md)](docs/SECURITY.ja.md) をご覧ください。
+> 🔍 最新のリリース前セキュリティ評価については [セキュリティステータス (docs/SECURITY_STATUS_ja.md)](docs/SECURITY_STATUS_ja.md) をご覧ください。
 
 ---
 
