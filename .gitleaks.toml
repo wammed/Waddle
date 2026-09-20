@@ -1,13 +1,23 @@
 # Gitleaks configuration for Waddle
+title = "Waddle Gitleaks Configuration"
+
+[extend]
+useDefault = true
 
 [allowlist]
-description = "Allowlist for test fixtures and false positives"
+description = "Allowlist for test fixtures, mock data, and test files"
 paths = [
     '''node_modules''',
     '''target''',
     '''dist''',
     '''src/services/__tests__/secretMasker\.test\.ts''',
     '''scratch/test_secret_masker\.mjs''',
+    '''src-tauri/tests/command_policy_corpus\.rs''',
+    '''src-tauri/tests/security_regression\.rs''',
+    '''src/data/testPlanData\.ts''',
+]
+stopwords = [
+    '''waddle_test_plan_results_v1''',
 ]
 regexes = [
     '''STORAGE_KEY\s*=\s*['"]waddle_test_plan_results_v1['"]''',

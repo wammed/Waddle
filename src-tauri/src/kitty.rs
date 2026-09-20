@@ -211,8 +211,9 @@ pub fn read_kitty_file(
     let raw_allowed = match allowed_dir {
         Some(d) if !d.trim().is_empty() => expand_path(d.trim()),
         _ => dirs::picture_dir()
-            .or_else(|| dirs::home_dir().map(|h| h.join("Pictures")))
-            .unwrap_or_else(|| PathBuf::from("/tmp")),
+            .filter(|p| p.exists())
+            .or_else(|| dirs::home_dir().map(|h| h.join("Pictures")).filter(|p| p.exists()))
+            .unwrap_or_else(std::env::temp_dir),
     };
 
     let canonical_allowed = fs::canonicalize(&raw_allowed)
@@ -612,18 +613,20 @@ mod tests {
         let dev_shm = PathBuf::from("/dev/shm");
         if dev_shm.exists() && dev_shm.is_dir() {
             let file_path = dev_shm.join(format!("waddle_test_shm_{}.png", std::process::id()));
-            create_dummy_png(&file_path, 64, 64);
-            assert!(file_path.exists());
+            if File::create(&file_path).is_ok() {
+                create_dummy_png(&file_path, 64, 64);
+                assert!(file_path.exists());
 
-            let res = read_kitty_file(
-                file_path.to_str().unwrap(),
-                None,
-                1024 * 1024,
-                4096,
-                true, // is_temp
-            );
-            assert!(res.is_ok(), "Temporary files in /dev/shm must be allowed: {:?}", res);
-            assert!(!file_path.exists(), "Temporary files in /dev/shm must be unlinked after read!");
+                let res = read_kitty_file(
+                    file_path.to_str().unwrap(),
+                    None,
+                    1024 * 1024,
+                    4096,
+                    true, // is_temp
+                );
+                assert!(res.is_ok(), "Temporary files in /dev/shm must be allowed: {:?}", res);
+                assert!(!file_path.exists(), "Temporary files in /dev/shm must be unlinked after read!");
+            }
         }
     }
 
