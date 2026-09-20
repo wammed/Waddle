@@ -105,9 +105,9 @@ describe('sessionHistory', () => {
     const { sessionHistory } = await import('../sessionHistory');
     sessionHistory.clearRecords();
 
-    const sensitiveToken = 'ghp_' + 'AbCdEfGhIjKlMnOpQrStUvWxYz0123456789';
-    const awsKey = 'AKIA' + 'IOSFODNN7EXAMPLE';
-
+    const sensitiveToken = 'ghp_' + 'AbCdEfGhIjKlMnOpQrStUvWxYz0123456789'; // gitleaks:allow
+    const awsKey = 'AKIA' + 'IOSFODNN7EXAMPLE'; // gitleaks:allow
+ 
     const rec = sessionHistory.addRecord({
       command: `export GITHUB_TOKEN=${sensitiveToken}`,
       cwd: '~',
