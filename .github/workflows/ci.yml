@@ -57,7 +57,7 @@ jobs:
         with:
           tool: cargo-audit,cargo-deny
 
-        name: Install Gitleaks
+      - name: Install Gitleaks
         run: |
           GITLEAKS_VERSION="8.18.4"
           wget -q https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz
