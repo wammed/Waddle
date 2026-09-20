@@ -2,3 +2,6 @@
 # Fingerprints for historical test fixtures and false positives
 a494305fc994c6b2f40a2639a87aceb0bd4548cb:src/components/TestPlanModal.tsx:generic-api-key:32
 a494305fc994c6b2f40a2639a87aceb0bd4548cb:tools/test_form.html:generic-api-key:915
+16f6bfe6a1898ad5e69436d558761dc6ff914f69:src/services/__tests__/sessionHistory.test.ts:aws-access-token:109
+16f6bfe6a1898ad5e69436d558761dc6ff914f69:src/services/__tests__/sessionHistory.test.ts:github-pat:108
+

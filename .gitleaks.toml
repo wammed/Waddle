@@ -11,6 +11,7 @@ paths = [
     '''target''',
     '''dist''',
     '''src/services/__tests__/secretMasker\.test\.ts''',
+    '''src/services/__tests__/sessionHistory\.test\.ts''',
     '''scratch/test_secret_masker\.mjs''',
     '''src-tauri/tests/command_policy_corpus\.rs''',
     '''src-tauri/tests/security_regression\.rs''',
