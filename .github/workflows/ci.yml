@@ -51,10 +51,18 @@ jobs:
             libayatana-appindicator3-dev \
             librsvg2-dev
 
-      - name: Install Security Tools (gitleaks, cargo-audit, cargo-deny)
+      - name: Install Security Tools (cargo-audit, cargo-deny)
         uses: taiki-e/install-action@v2
         with:
-          tool: cargo-audit,cargo-deny,gitleaks
+          tool: cargo-audit,cargo-deny
+
+        name: Install Gitleaks
+        run: |
+          GITLEAKS_VERSION="8.18.4"
+          wget -q https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz
+          tar -xzf gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz
+          sudo mv gitleaks /usr/local/bin/
+          rm -f gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz
 
       - name: Install Frontend Dependencies
         run: npm ci
