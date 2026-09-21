@@ -206,6 +206,26 @@ Waddle operates under a strict **100% offline, local-first** model:
 
 This project is licensed under the [MIT License](LICENSE).
 
+### Fonts & Licensing
+
+Waddle **does not bundle or redistribute font files**.
+
+The application uses fonts installed on the user's host operating system through local font-family references. Supported presets include:
+
+* JetBrains Mono / JetBrainsMono Nerd Font
+* MesloLGS NF / MesloLGS Nerd Font
+* Fira Code / FiraCode Nerd Font
+* Hack / Hack Nerd Font
+* Cascadia Code / CaskaydiaCove Nerd Font
+* Source Code Pro / SauceCodePro Nerd Font
+* Symbols Nerd Font Mono / Symbols Nerd Font
+
+Waddle also supports standard system UI font stacks such as `Inter`, `Outfit`, `system-ui`, and platform-provided sans-serif/monospace fonts.
+
+These font files are **not included in the Waddle source repository or distribution packages**. Users who install third-party fonts are responsible for obtaining and using them in accordance with their respective licenses.
+
+Because Waddle does not redistribute these font binaries, their individual font licenses are not incorporated into the Waddle distribution.
+
 <p align="center">
   Crafted via <strong>AI Vibe Coding</strong> 🐧⚡ · Built with ❤️ for Linux Developers
 </p>
