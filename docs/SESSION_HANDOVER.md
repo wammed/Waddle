@@ -1153,6 +1153,30 @@ npm run tauri dev
          - 全 6 つの品質ゲート（Gate 1〜6）を明文化し、テスト総数を 110 項目に更新。
          - 日英ドキュメント全 8 点（`ARCHITECTURE`, `TEST_PLAN`, `SECURITY`, `README` ルート/docs、`Waddle_Test_Execution_Evidence_ja`）を完全同期。
 
+51. **超低負荷・独立オーバーレイスクロールバー実装スプリント**:
+    - **背景と目的**:
+      - xterm.js 標準の `.xterm-viewport` スクロールバーは、WebKitGTK (Linux) における CSS 衝突（`scrollbar-width: thin` と `::-webkit-scrollbar` の仕様衝突）や GTK テーマのオーバーレイ挙動により事実上不可視となっていた。
+      - また、ブラウザ標準スクロールバーを無理に表示させると文字グリッド（列幅・行数）や FitAddon の `cols` 計算を圧迫して PTY リサイズ（`SIGWINCH`）や画面チラつきの原因となり、かつスクロールバック 10,000〜20,000 行時の高速ストリーミングやドラッグ時にフレームドロップ（カクつき）を招く恐れがあった。
+      - そこで、文字グリッドや PTY セッションに一切干渉しない完全オーバーレイ形式の独立スクロールバーを設計・実装。
+    - **実施内容**:
+      1. **新規コンポーネント開発 (`src/components/TerminalOverlayScrollbar.tsx`)**:
+         - **$O(1)$ 幾何計算 (`calculateThumbGeometry`)**: バッファ全行の走査ループ（$O(N)$）を排除し、`term.buffer.active.length`, `term.rows`, `term.buffer.active.baseY`, `term.buffer.active.viewportY`, トラック高から四則演算のみで算出。
+         - **最小高さ 24px 保証 (`MIN_THUMB_HEIGHT`)**: 20,000行蓄積時でもつまみが操作不能な極小サイズに縮退しないよう下限高さを強制。
+         - **逆算マッピング (`calculateTargetLineFromThumbTop`)**: つまみの上端ピクセル座標からターミナル行番号を正確に導出。
+         - **ゼロ React 再レンダリング (Direct DOM Manipulation)**: つまみの座標・高さを `useState` で管理せず、DOM Ref（`thumbRef.current.style.transform = translate3d(0, Ypx, 0)`）を直接操作。大量出力ストリーミング中も React コンポーネントツリーの再描画負荷は 0 回。
+         - **3状態ステートマシン (`hidden` ⇄ `visible` ⇄ `fading_out`)**: ユーザー操作時（スクロール、ホバー、ドラッグ）に即座に `visible`（不透明度 100%）。操作停止から 700ms 経過で 250ms の滑らかなフェードアウトアニメーションを実行し、完了後に `hidden`（`pointer-events: none`、更新・タイマー完全停止、CPU/GPU使用率0%）へ遷移。
+         - **高速ストリーミング対策 & vsync フレーム集約 (Coalescing)**: `term.onScroll`, `term.onLineFeed`, `term.onWriteParsed` を `requestAnimationFrame` で画面リフレッシュレート（60/120Hz）に合わせて 1 フレーム 1 回に集約。画面最下部自動追従中（Auto-scroll）は前回座標と同一の場合に DOM スタイル代入を早期スキップ（Early Exit）。
+         - **マウス操作 & テキスト選択ブロック**: トラックおよび Thumb の `onPointerDown` / `onMouseDown` でイベント伝播を遮断し、ドラッグ時の文字選択誤爆を根絶。`setPointerCapture` による枠外シームレス追従、トラッククリック時のジャンプ移動を完備。
+      2. **スタイル定義 (`src/index.css`)**:
+         - `.xterm .xterm-viewport` のブラウザ標準スクロールバーを `scrollbar-width: none !important;` および `::-webkit-scrollbar { display: none !important; }` で完全非表示化。
+         - 半透明角丸カプセルデザイン、GPU 合成レイヤー（`will-change: transform; transform: translate3d(0, 0, 0);`）により文字グリッド（CanvasAddon / Kitty 画像キャンバス）の再ラスタライズを防止。
+      3. **ペイン統合 (`src/components/SingleTerminalView.tsx`)**:
+         - `.pane-terminal-viewport` 内に `<TerminalOverlayScrollbar term={terminalInstance} />` をオーバーレイ配置。
+      4. **包括的ユニットテスト整備 (`src/components/__tests__/TerminalOverlayScrollbar.test.tsx`)**:
+         - 11 件のテストケースを作成（スクロール不要時の非表示、20,000行時の 24px 最小高さ保証、Auto-scroll 時の最下部位置精度、中間スクロール比率、ゼロ除算安全対策、ドラッグ逆算精度、アクセシビリティ・初期マークアップ）。全 83 件のユニットテストが 100% PASS。
+      5. **Waddle 規定ドキュメントセットの完全同期**:
+         - `README.md` & `README.ja.md`（ルート実体）、`docs/README.md` & `docs/README.ja.md`（docs実体）、`docs/FEATURES.md` & `docs/FEATURES.ja.md`（セクション 23 新設）、`docs/ARCHITECTURE.md` & `docs/ARCHITECTURE.ja.md`（レンダリング層 & 技術スタック更新）、`docs/SESSION_HANDOVER.md` を完全同期。
+
 ---
 
 ## 6. 次回再開時の検討・作業候補（Next Steps）

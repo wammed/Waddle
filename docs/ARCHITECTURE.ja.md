@@ -62,6 +62,7 @@ Waddle は、高速・堅牢な **Rust バックエンド** と、最新の **Re
   - `@xterm/addon-search`: ログスクロールバックのリアルタイム検索。
   - `@xterm/addon-fit`: 親コンテナサイズへの自動文字枠再計算。
   - `@xterm/addon-web-links`: URL リンクの自動認識とクリックオープン。
+  - `TerminalOverlayScrollbar`: 超低負荷の独立オーバーレイスクロールバー。バッファ走査ゼロの $O(1)$ 幾何計算（20,000行蓄積時でも最小24px保証）、DOM Ref 直接更新（`style.transform = translate3d(0, Ypx, 0)`）による React 再レンダリング 0 回、GPU 合成レイヤー分離、vsync 描画集約（`requestAnimationFrame`）、および末尾追従中の早期スキップを実装。
 - **フロントエンドサービス & 拡張サブシステム**:
   - `src/services/secretMasker.ts`: ターミナル出力中の API キーやアクセストークンを正規表現でリアルタイム検知・マスク。
   - `src/services/sessionHistory.ts`: コマンド履歴、終了ステータス、CWD、ターミナル出力スナップショットの追跡と `localStorage` 永続化。
@@ -424,6 +425,7 @@ flowchart TD
 | | `@xterm/addon-search` | スクロールバックバッファ検索 |
 | | `@xterm/addon-fit` | DOM サイズへの自動フィッティング |
 | | `@xterm/addon-web-links` | ハイパーリンクの自動検出 |
+| | `TerminalOverlayScrollbar` | 影響ゼロの $O(1)$ GPU 合成オーバーレイスクロールバー |
 | **テスト & カバレッジ** | `vitest`, `@vitest/coverage-v8`, `cargo test` | フロント/バックエンドユニットテスト & V8 HTML カバレッジ計測 |
 | **視覚回帰 & CDP** | `@playwright/test` (Chromium CDP) | Canvas スナップショット比較 & 300MB メモリ/DOM リーク計測 |
 | **セキュリティ監査** | `gitleaks`, `secretlint`, `cargo-audit`, `cargo-deny` | 機密漏洩スキャン・脆弱性・ライセンス監査 |

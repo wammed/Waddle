@@ -14,6 +14,7 @@ import { useI18n } from '../i18n';
 import { KittyGraphicsManager } from '../services/kittyGraphics';
 import { maskSecrets } from '../services/secretMasker';
 import { sessionHistory } from '../services/sessionHistory';
+import { TerminalOverlayScrollbar } from './TerminalOverlayScrollbar';
 
 interface SingleTerminalViewProps {
   pane: TerminalPaneInfo;
@@ -63,6 +64,7 @@ export const SingleTerminalView: React.FC<SingleTerminalViewProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [caseSensitive, setCaseSensitive] = useState(false);
   const [useRegex, setUseRegex] = useState(false);
+  const [terminalInstance, setTerminalInstance] = useState<Terminal | null>(null);
   const kittyManagerRef = useRef<KittyGraphicsManager | null>(null);
 
   // Refs for callbacks to prevent re-triggering terminal recreation
@@ -230,6 +232,7 @@ export const SingleTerminalView: React.FC<SingleTerminalViewProps> = ({
     }
 
     termRef.current = term;
+    setTerminalInstance(term);
     fitAddonRef.current = fitAddon;
 
     // Initialize Kitty Graphics Protocol Manager
@@ -608,6 +611,7 @@ export const SingleTerminalView: React.FC<SingleTerminalViewProps> = ({
       } catch (e) {
         // ignore
       }
+      setTerminalInstance(null);
       if (containerRef.current) {
         containerRef.current.innerHTML = '';
       }
@@ -910,6 +914,9 @@ export const SingleTerminalView: React.FC<SingleTerminalViewProps> = ({
             overflow: 'hidden',
           }}
         />
+
+        {/* Overlay Scrollbar */}
+        <TerminalOverlayScrollbar term={terminalInstance} />
       </div>
     </div>
   );

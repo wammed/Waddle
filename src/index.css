@@ -295,8 +295,14 @@ body, html {
 
 .xterm .xterm-viewport {
   background-color: transparent !important;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none;
+}
+
+.xterm .xterm-viewport::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
 }
 
 .xterm-screen {
@@ -318,17 +324,49 @@ body, html {
   backface-visibility: hidden;
 }
 
-.xterm .xterm-viewport::-webkit-scrollbar {
+/* Terminal Overlay Scrollbar */
+.terminal-overlay-scrollbar-track {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 14px;
+  z-index: 25;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: opacity 250ms cubic-bezier(0.16, 1, 0.3, 1), background-color 150ms ease;
+  will-change: opacity;
+}
+
+.terminal-overlay-scrollbar-track:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.terminal-overlay-scrollbar-thumb {
+  position: absolute;
+  top: 0;
+  right: 3px;
+  width: 6px;
+  background-color: rgba(255, 255, 255, 0.35);
+  border-radius: 9999px;
+  cursor: pointer;
+  transition: width 150ms ease, background-color 150ms ease, right 150ms ease;
+  will-change: transform;
+  transform: translate3d(0, 0, 0);
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.6);
+}
+
+.terminal-overlay-scrollbar-track:hover .terminal-overlay-scrollbar-thumb,
+.terminal-overlay-scrollbar-thumb:hover {
   width: 8px;
+  right: 2px;
+  background-color: rgba(255, 255, 255, 0.55);
 }
 
-.xterm .xterm-viewport::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: 4px;
-}
-
-.xterm .xterm-viewport::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.3);
+.terminal-overlay-scrollbar-thumb:active {
+  width: 8px;
+  right: 2px;
+  background-color: rgba(255, 255, 255, 0.75);
 }
 
 /* Status Bar */

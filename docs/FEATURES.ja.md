@@ -28,7 +28,8 @@
 20. [🐕 自律型 AI エラー監視 & 1-Click クイック修正 (Autonomous Watchdog)](#20--自律型-ai-エラー監視--1-click-クイック修正-autonomous-watchdog)
 21. [🔗 ビジュアル パイプライン ビルダー (`Ctrl + Shift + P`)](#21--ビジュアル-パイプライン-ビルダー-ctrl--shift--p)
 22. [📜 プロジェクト個別 & グローバル共通 AI ルール連携 (`.waddle/` & `~/.config/waddle/`)](#22--プロジェクト個別--グローバル共通-ai-ルール連携-waddle--configwaddle)
-23. [⌨️ ショートカットキー一覧 完全版](#️-ショートカットキー一覧-完全版)
+23. [📜 超低負荷・高性能オーバーレイスクロールバー](#23--超低負荷高性能オーバーレイスクロールバー)
+24. [⌨️ ショートカットキー一覧 完全版](#️-ショートカットキー一覧-完全版)
 
 ---
 
@@ -750,9 +751,32 @@ flowchart TD
 
 ---
 
+### 23. 📜 超低負荷・高性能オーバーレイスクロールバー
+
+- **文字グリッドを圧迫しない完全オーバーレイ構造**:
+  - ターミナル描画領域の右端（`position: absolute; right: 2px;`）に重ねて配置。ターミナルの文字幅・列数計算（`fitAddon`）や PTY リサイズ（`SIGWINCH`）に 1 ピクセルも干渉しません。
+- **バッファ走査ゼロの $O(1)$ 幾何計算**:
+  - バッファ全行のループ探索を排除し、`term.buffer.active.length`、`term.rows`、`term.buffer.active.baseY`、`term.buffer.active.viewportY` から四則演算のみでつまみ（Thumb）の高さと Y 座標を算出。
+  - つまみの最小高さ 24px（`MIN_THUMB_HEIGHT`）を保証し、10,000〜20,000 行蓄積時でもつまみが小さくなりすぎて操作不能になる問題を防止。
+- **描画パイプラインの完全分離（React 再レンダリング 0 回 & GPU 合成）**:
+  - React の `useState` による状態管理を排除し、DOM Ref（`style.transform = translate3d(0, Ypx, 0)`）を直接書き換え。
+  - スクロール中や大量テキスト出力中も React コンポーネントツリーの再描画負荷は完全ゼロ。
+  - GPU ハードウェアアクセラレーション（`will-change: transform`）により、文字グリッド（CanvasAddon / Kitty 画像キャンバス）の再ラスタライズや Reflow を一切誘発しません。
+- **3状態ステートマシン (`hidden` ⇄ `visible` ⇄ `fading_out`)**:
+  - `hidden`: 完全非表示。`pointer-events: none` でタイマー・更新を全停止（CPU/GPU 使用率 0%）。
+  - `visible`: スクロール、トラックホバー、ドラッグ操作で即座に出現（不透明度 100%）。
+  - `fading_out`: 操作停止から 700ms 経過で 250ms の滑らかな減衰アニメーションを開始し、完了後に `hidden` へ遷移。
+- **高速ストリーミング対策 & vsync フレーム集約 (Coalescing)**:
+  - `cat` 等の高速出力による連続イベントを `requestAnimationFrame` で画面リフレッシュレート（60Hz/120Hz）に合わせて 1 フレーム 1 回に集約。
+  - Auto-scroll 早期スキップ: 画面末尾を自動追従中は、前回と同一座標であれば DOM スタイル代入自体をスキップ（Early Exit）。
+- **高精度マウス操作 & テキスト選択ブロック**:
+  - トラックおよび Thumb の `onPointerDown` / `onMouseDown` でイベント伝播を遮断し、ドラッグ時の文字選択（xterm SelectionHandler）の誤爆を根絶。
+  - `setPointerCapture` により、ドラッグ中にマウスがペイン外へ出ても滑らかに追従。
+  - トラックのクリックで瞬時にその位置へジャンプ移動。
+
 ---
 
-## ⌨️ ショートカットキー一覧 完全版
+## 24. ⌨️ ショートカットキー一覧 完全版
 
 | ショートカット | 対象コンテキスト | 動作 |
 | :--- | :--- | :--- |

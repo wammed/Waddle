@@ -28,7 +28,8 @@ Welcome to the comprehensive feature guide for **Waddle**, the AI-integrated, pr
 20. [🐕 Autonomous AI Error Watchdog & 1-Click Fix](#20--autonomous-ai-error-watchdog--1-click-fix)
 21. [🔗 Visual Pipeline Builder (`Ctrl + Shift + P`)](#21--visual-pipeline-builder-ctrl--shift--p)
 22. [📜 Project-Specific & Global Common AI Rules (`.waddle/` & `~/.config/waddle/`)](#22--project-specific--global-common-ai-rules-waddle--configwaddle)
-23. [⌨️ Complete Keybindings Reference](#️-complete-keybindings-reference)
+23. [📜 High-Performance Overlay Scrollbar](#23--high-performance-overlay-scrollbar)
+24. [⌨️ Complete Keybindings Reference](#️-complete-keybindings-reference)
 
 ---
 
@@ -752,7 +753,31 @@ flowchart TD
 
 ---
 
-## ⌨️ Complete Keybindings Reference
+### 23. 📜 High-Performance Overlay Scrollbar
+
+- **Zero-Impact Floating Architecture**:
+  - Floats cleanly above the terminal canvas via `position: absolute; right: 2px;` without consuming cell grid width or triggering PTY re-fits (`SIGWINCH`).
+- **O(1) Arithmetic Geometry**:
+  - Calculates thumb height and offset directly from `term.buffer.active.length`, `term.rows`, `term.buffer.active.baseY`, and `viewportY` with zero buffer array traversal.
+  - Enforces a minimum thumb height of 24px (`MIN_THUMB_HEIGHT`), preventing thumb collapse into an unclickable sliver even with 20,000+ lines of scrollback.
+- **Render Pipeline Isolation (Zero React Re-renders)**:
+  - Updates thumb geometry directly via DOM Refs using hardware-accelerated CSS transforms (`translate3d(0, Ypx, 0)`), bypassing the React virtual DOM lifecycle entirely.
+  - Generates zero re-renders of parent pane components and triggers no repainting or reflowing of underlying terminal text or Kitty graphics canvas layers.
+- **Three-State Lifecycle Machine**:
+  - `hidden`: Fully invisible with `pointer-events: none` and animation timers deactivated (0% CPU/GPU consumption).
+  - `visible`: Triggered instantly on scroll, track hover, or drag (100% opacity).
+  - `fading_out`: Initiated after 700ms of inactivity, smoothly transitioning opacity over 250ms before entering `hidden`.
+- **High-Throughput Streaming & Vsync Coalescing**:
+  - Gathers rapid output events (`onScroll`, `onLineFeed`, `onWriteParsed`) through `requestAnimationFrame` (rAF), capping updates to display refresh rate (60Hz/120Hz).
+  - Auto-Scroll Early-Exit: Skips style assignments entirely while auto-scrolling at the buffer tail with unchanged coordinates.
+- **Precise Mouse Control & Text Selection Shielding**:
+  - Intercepts `onPointerDown` / `onMouseDown` on track and thumb, completely preventing text selection leaks into the xterm buffer.
+  - Uses `setPointerCapture` for uninterrupted thumb dragging even when the cursor leaves the pane bounds.
+  - Track-click jumping centers the thumb and navigates directly to the corresponding scroll offset.
+
+---
+
+## 24. ⌨️ Complete Keybindings Reference
 
 | Shortcut | Context | Action |
 | :--- | :--- | :--- |

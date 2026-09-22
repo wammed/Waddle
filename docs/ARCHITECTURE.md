@@ -62,6 +62,7 @@ Waddle is built on a hybrid architecture combining a high-performance **Rust bac
   - `@xterm/addon-search`: Hardware-accelerated terminal scrollback buffer search.
   - `@xterm/addon-fit`: Responsive dimension calculation matching parent DOM geometry.
   - `@xterm/addon-web-links`: Automatic detection and click navigation for HTTP/HTTPS URLs.
+  - `TerminalOverlayScrollbar`: Ultra-low-overhead overlay scrollbar component. Implements $O(1)$ arithmetic geometry without buffer traversal (24px minimum thumb guarantee across 20,000 lines), direct DOM ref updates (`style.transform = translate3d(0, Ypx, 0)`) with zero React re-renders, GPU composited layer isolation, vsync render coalescing (`requestAnimationFrame`), and auto-scroll early-exit optimization.
 - **Frontend Services & Extended Subsystems**:
   - `src/services/secretMasker.ts`: Real-time regex pattern evaluator masking sensitive credentials (`ghp_...`, `sk-...`, `AKIA...`, JWT, private keys) in the terminal output stream.
   - `src/services/sessionHistory.ts`: Comprehensive command timeline tracking, exit code logging, CWD recording, and `localStorage` snapshot persistence.
@@ -444,6 +445,7 @@ Every test execution evidence document must include the following environment me
 | | `@xterm/addon-search` | Full-buffer scrollback search |
 | | `@xterm/addon-fit` | Automatic geometry fitting to pane DOM |
 | | `@xterm/addon-web-links` | URL link detection and external browser launching |
+| | `TerminalOverlayScrollbar` | Zero-impact $O(1)$ GPU-composited terminal overlay scrollbar |
 | **Testing & Coverage** | `vitest`, `@vitest/coverage-v8`, `cargo test` | Frontend/backend unit tests & V8 HTML coverage reporting |
 | **Visual Regression & CDP** | `@playwright/test` (Chromium CDP) | Canvas snapshot assertions & 300MB memory ceiling validation |
 | **Security Auditing** | `gitleaks`, `secretlint`, `cargo-audit`, `cargo-deny` | Secret leak scanning, dependency vulnerability and license auditing |
