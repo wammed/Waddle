@@ -318,8 +318,10 @@ Rather than building an all-encompassing heavyweight editor, Waddle intentionall
     - *Waddle Cyber (Default)*, *Tokyo Night*, *Catppuccin Mocha*, *Dracula*, *Nord (Arctic)*, *Gruvbox Dark*, *One Dark Pro*, *Rosé Pine*, *Monokai Pro*, *Solarized Dark*, *Midnight Abyss (OLED Pure Black #000000)*
 - **Dynamic Glow Synchronization**:
   - Terminal ANSI colors and window UI elements (titlebar, tab borders, status bar, modal borders) synchronize their glow aura via dynamic CSS variables (`--accent-rgb`, `--border-active`).
-- **Typography & Nerd Fonts**:
-  - Presets for JetBrainsMono Nerd Font, MesloLGS NF, FiraCode Nerd Font, and Hack Nerd Font, with custom local font support.
+- **Typography & Nerd Fonts (Local Font Integration)**:
+  - Waddle references locally installed fonts on the host OS and does not bundle font binaries.
+  - Comprehensive presets with automatic symbol fallback: *JetBrainsMono Nerd Font*, *MesloLGS NF*, *FiraCode Nerd Font*, *Hack Nerd Font*, *CaskaydiaCove Nerd Font*, *SauceCodePro Nerd Font*, and *Symbols Nerd Font Mono*.
+  - Full support for system monospace fallback and custom local font configurations.
 
 ---
 

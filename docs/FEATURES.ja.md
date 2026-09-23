@@ -310,8 +310,10 @@ Waddle の内蔵エディタは、「何でもできる巨大なエディタ」�
     - *Waddle Cyber (Default)*, *Tokyo Night*, *Catppuccin Mocha*, *Dracula*, *Nord (Arctic)*, *Gruvbox Dark*, *One Dark Pro*, *Rosé Pine*, *Monokai Pro*, *Solarized Dark*, *Midnight Abyss (OLED 純黒 #000000)*
 - **UI 全体の動的ネオン発光同期**:
   - ターミナルの文字色のみならず、タイトルバー、タブ枠線、ステータスバー、ダイアログの外枠までテーマのアクセントカラーに合わせてグロー発光。
-- **Nerd Fonts プリセット**:
-  - JetBrainsMono Nerd Font, MesloLGS NF, FiraCode Nerd Font, Hack Nerd Font や任意のローカルフォントに対応。
+- **Nerd Fonts プリセット (ローカルフォント連携)**:
+  - Waddle はフォントバイナリを同梱せず、ホスト OS にローカルインストールされたフォントを参照します。
+  - 記号フォールバック対応の網羅的なプリセット: *JetBrainsMono Nerd Font*, *MesloLGS NF*, *FiraCode Nerd Font*, *Hack Nerd Font*, *CaskaydiaCove Nerd Font*, *SauceCodePro Nerd Font*, *Symbols Nerd Font Mono*。
+  - システム等幅フォント（monospace）へのフォールバックおよび任意のローカルフォント設定に完全対応。
 
 ---
 

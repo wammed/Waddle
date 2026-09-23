@@ -66,7 +66,7 @@
 - 🐕 **自律型 AI エラー監視 (Autonomous Watchdog)**: コマンド失敗を自動検知し、AI が原因を即時診断してワンクリックで修正コマンドを提示・実行。([詳細](FEATURES.ja.md#20--自律型-ai-エラー監視--1-click-クイック修正-autonomous-watchdog))
 - 🔗 **ビジュアル パイプライン ビルダー (`Ctrl + Shift + P`)**: ビルド、テスト、デプロイなどの複数コマンドを視覚的にステップ構成し、条件付きで自動連続実行。([詳細](FEATURES.ja.md#21--ビジュアル-パイプライン-ビルダー-ctrl--shift--p))
 - 📜 **プロジェクト個別 & グローバル共通 AI ルール (`~/.config/waddle/` & `.waddle/`)**: リポジトリ内では上位ルートの個別規約（`.waddle/rules_ja.md` / `rules.md`）、リポジトリ外ではグローバル共通規約（`~/.config/waddle/`）を自動適用。選択言語（日本語/英語）に完全連動。([詳細](FEATURES.ja.md#22--プロジェクト個別--グローバル共通-ai-ルール連携-waddlerulesmd--configwaddlerulesmd))
-- 🎨 **全22種のネオン & 洗練テーマ**: UI 全体の動的ネオン発光同期、デスクトップからのドラッグ＆ドロップ壁紙設定と 60 FPS リアルタイムぼかし/透過プレビュー、Nerd Fonts タイポグラフィ。([詳細](FEATURES.ja.md#11--全22種類の洗練されたテーマ--高電圧ネオンコレクション))
+- 🎨 **全22種のネオン & 洗練テーマ**: UI 全体の動的ネオン発光同期、デスクトップからのドラッグ＆ドロップ壁紙設定と 60 FPS リアルタイムぼかし/透過プレビュー、**ローカルにインストールされた Nerd Fonts のサポート**。([詳細](FEATURES.ja.md#11--全22種類の洗練されたテーマ--高電圧ネオンコレクション))
 
 ### 📝 内蔵エディタの位置づけと機能制限（設定ファイル特化・安全設計）
 
@@ -95,6 +95,10 @@ Waddle の内蔵エディタは、VS Code や Neovim 等のフルスペック ID
 - [Rust (Cargo)](https://rustup.rs/) (1.70 以上)
 - [Node.js & npm](https://nodejs.org/) (Node 18 以上)
 - [Ollama](https://ollama.com/) (ローカル AI エンジン)
+- **Nerd Fonts (推奨・最適なUI/アイコン描画用)**:
+  - Waddle は **Nerd Font のフォントファイルを同梱・再配布しません**。
+  - 未インストール時でもシステム標準の等幅フォント（monospace）でアプリ自体は利用可能ですが、アイコンや Powerline、プロンプトの各種グリフを意図通りに美しく表示するには、ホスト OS への Nerd Font のローカルインストールが必要です。
+  - Waddle の事前設定（プリセット）と完全な互換性を確保するため、プリセットに登録されているフォントファミリ（**JetBrainsMono Nerd Font**、**MesloLGS NF**、**FiraCode Nerd Font**、**Hack Nerd Font**、**CaskaydiaCove Nerd Font**、**SauceCodePro Nerd Font**、または **Symbols Nerd Font Mono**）をホスト OS にインストールすることを推奨します。
 
 ### 2. Ollama のセットアップ
 
@@ -205,6 +209,26 @@ Waddle は **100% 完全オフライン・ローカルファースト** で動�
 ## 📄 ライセンス
 
 本プロジェクトは [MIT License](../LICENSE) のもとで公開されています。
+
+### フォントおよびライセンスについて (Fonts & Licensing)
+
+Waddle は **Nerd Fonts をサポートしていますが、フォントファイルの同梱・再配布は行っていません**。
+
+本アプリケーションは、ローカルの `font-family` 宣言を通じてユーザーのホスト OS にインストールされたフォントを参照します。Nerd Font プリセットやアイコン・グリフを利用する場合は、ユーザー自身でホスト OS にフォントをインストールしてください。設定との最適な互換性を得るため、Waddle のプリセットに登録されている以下のフォントファミリの利用を推奨します：
+
+* JetBrains Mono / JetBrainsMono Nerd Font
+* MesloLGS NF / MesloLGS Nerd Font
+* Fira Code / FiraCode Nerd Font
+* Hack / Hack Nerd Font
+* Cascadia Code / CaskaydiaCove Nerd Font
+* Source Code Pro / SauceCodePro Nerd Font
+* Symbols Nerd Font Mono / Symbols Nerd Font
+
+また、Waddle は `Inter`、`Outfit`、`system-ui`、プラットフォーム標準の sans-serif / monospace などの標準システム UI フォントスタックもサポートしています。
+
+これらのフォントファイルは **Waddle のソースリポジトリや配布パッケージには含まれていません**。サードパーティ製フォントをインストールするユーザーは、各フォントのライセンスに従って取得・使用する責任を負います。
+
+Waddle はこれらのフォントバイナリを再配布しないため、個別のフォントライセンスは Waddle の配布物には含まれません。
 
 <p align="center">
   Crafted via <strong>AI Vibe Coding</strong> 🐧⚡ · Built with ❤️ for Linux Developers

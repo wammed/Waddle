@@ -66,7 +66,7 @@
 - 🐕 **Autonomous AI Error Watchdog**: Monitors terminal failures in real time, auto-diagnoses root causes via local LLM, and provides a 1-click quick fix button. ([Details](docs/FEATURES.md#20--autonomous-ai-error-watchdog--1-click-fix))
 - 🔗 **Visual Pipeline Builder (`Ctrl + Shift + P`)**: Visually chain multi-step build, test, lint, and deploy workflows with stop-on-error control and live terminal stream execution. ([Details](docs/FEATURES.md#21--visual-pipeline-builder-ctrl--shift--p))
 - 📜 **Project-Specific & Global Common AI Rules (`~/.config/waddle/` & `.waddle/`)**: Automatically prioritizes project-level rules (`.waddle/rules.md` / `rules_ja.md`) within repositories and seamlessly falls back to global common guidelines under `~/.config/waddle/` outside repositories, fully synchronized with selected language. ([Details](docs/FEATURES.md#22--project-specific--global-common-ai-rules-waddlerulesmd--configwaddlerulesmd))
-- 🎨 **22 Cyberpunk & Neon Themes**: Vibrant UI glow synchronization, native drag-and-drop custom wallpapers with 60 FPS real-time blur/opacity preview, and built-in Nerd Font typography. ([Details](docs/FEATURES.md#11--22-premium-themes--high-voltage-neon-collection))
+- 🎨 **22 Cyberpunk & Neon Themes**: Vibrant UI glow synchronization, native drag-and-drop custom wallpapers with 60 FPS real-time blur/opacity preview, and **support for locally installed Nerd Fonts**. ([Details](docs/FEATURES.md#11--22-premium-themes--high-voltage-neon-collection))
 
 ### 📝 Embedded Editor Scope & Intentional Design Trade-offs (Config-Focused & Secure)
 
@@ -95,6 +95,10 @@ Features have been deliberately omitted to satisfy security requirements (elimin
 - [Rust (Cargo)](https://rustup.rs/) (1.70+)
 - [Node.js & npm](https://nodejs.org/) (Node 18+)
 - [Ollama](https://ollama.com/) (Local AI engine)
+- **Nerd Fonts (Recommended for optimal UI/glyph rendering)**:
+  - Waddle **does not bundle or redistribute Nerd Font files**.
+  - While Waddle operates normally using standard system monospace fonts, installing a [Nerd Font](https://www.nerdfonts.com/) locally on your host OS is required for intended icon, Powerline, and prompt glyph rendering.
+  - To ensure seamless compatibility with Waddle's font configurations, we recommend installing font families that match Waddle's presets (such as **JetBrainsMono Nerd Font**, **MesloLGS NF**, **FiraCode Nerd Font**, **Hack Nerd Font**, **CaskaydiaCove Nerd Font**, **SauceCodePro Nerd Font**, or **Symbols Nerd Font Mono**) so that the installed font names match the preset definitions.
 
 ### 2. Set Up Ollama
 
@@ -209,9 +213,9 @@ This project is licensed under the [MIT License](LICENSE).
 
 ### Fonts & Licensing
 
-Waddle **does not bundle or redistribute font files**.
+Waddle **supports Nerd Fonts** but **does not bundle or redistribute font files**.
 
-The application uses fonts installed on the user's host operating system through local font-family references. Supported presets include:
+The application references fonts installed on the user's host operating system through local `font-family` declarations. Users who wish to utilize Nerd Font presets or icon glyphs should install the corresponding fonts themselves on their host system. For the best compatibility with predefined settings, installing font families listed in Waddle's Presets is recommended:
 
 * JetBrains Mono / JetBrainsMono Nerd Font
 * MesloLGS NF / MesloLGS Nerd Font
