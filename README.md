@@ -211,6 +211,8 @@ Waddle operates under a strict **100% offline, local-first** model:
 
 This project is licensed under the [MIT License](LICENSE).
 
+For detailed information regarding our source-code-only distribution policy, third-party dependency compliance (`cargo-deny` permissive policy), dynamic linking of system libraries (GTK3, WebKitGTK), and guidance on extracting dependency notices for redistributable packaging, please see [LICENSES.md](LICENSES.md).
+
 ### Fonts & Licensing
 
 Waddle **supports Nerd Fonts** but **does not bundle or redistribute font files**.

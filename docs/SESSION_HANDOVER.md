@@ -482,7 +482,22 @@
       - `cargo test --all-targets`: 全 77 テスト（lib 69, corpus 1, pty_stress 1, security_regression 6）100% PASS。
       - `cargo clippy --all-targets -- -D warnings`: 0 warnings / 0 errors。
       - `npm run test:all`: 4大ステージ（Security, Unit & Coverage, Visual Regression, CDP Memory Leak）すべて 24 秒で完全 GREEN。
-      - `npm run build`: 0 エラー成功（2.45秒）。
+44. **Waddle リポジトリ向け `LICENSES.md` の作成およびドキュメント同期**:
+    - **ユーザー要望**: Waddle の「ソースコードのみ公開し、バイナリやパッケージのビルドはユーザー側に委ねる」配布方針に則り、プロジェクト本体のライセンス、サードパーティ製依存関係の扱い、フォント・アセットの取り扱い方針を体系的に明記した `LICENSES.md`（英語）を作成し、既存ドキュメント（日英README、引き継ぎ資料）との整合性を取ること。
+    - **実施内容**:
+      1. `LICENSES.md`（リポジトリルート）の新規作成：
+         - **Project License (Waddle)**: Waddle 本体ソースコードが MIT License で公開されている旨と `LICENSE` への参照を明記。
+         - **Distribution & Build Model**: ソースコードのみ提供しコンパイル済みバイナリは同梱・再配布しない方針、ローカルビルド時（`npm run tauri dev`, `npm run package` 等）に依存関係（crates.io, npm）が公式レジストリから直接取得される旨を記載。
+         - **Third-Party Dependencies & Compliance**: `src-tauri/deny.toml` の `[licenses]` ポリシー（MIT, Apache-2.0, BSD-2/3, ISC, Unicode, CC0, OpenSSL, Zlib, BSL, MPL-2.0 等）に準拠し GPL 等の強力な感染性コピーレフトを排除していること、CI/CD パイプライン（`cargo-deny`, `cargo-audit`, `secretlint`, `gitleaks`）による継続的監査、GTK3 / WebKitGTK などの LGPL システムライブラリはホスト OS 側の共有ライブラリとして動的リンク解決される旨を明記。
+         - **Fonts & Assets**: Nerd Fonts バイナリ（TTF/OTF等）はリポジトリ内に一切同梱せず、ホスト OS にインストールされたフォントを CSS `font-family` で参照する方針（SIL OFL 等の各ライセンスは利用者が遵守）、独自 SVG アセットおよび MIT 準拠の Lucide Icons の使用を明記。
+         - **How to Extract Dependency Licenses for Packaging**: 下流で再配布可能パッケージを作成する開発者向けに、`cargo-about`, `cargo-bundle-licenses`, `license-checker` を用いた依存ライセンス抽出・同梱コマンドの手順を提示。
+      2. 既存ドキュメントの同期更新：
+         - `README.md` & `README.ja.md` (リポジトリルート実体): ライセンスセクションに `LICENSES.md` への参照リンクと要約を追加。
+         - `docs/README.md` & `docs/README.ja.md`: ライセンスセクションに `../LICENSES.md` への参照リンクと要約を追加。
+         - `docs/SESSION_HANDOVER.md`: 本履歴（項目 44）を追記。
+    - **検証**:
+      - `npm run test:security`: Gitleaks, Secretlint, Cargo Audit, Cargo Deny, Security Regression Suite 6大防御すべて 100% PASS。
+      - `npm run build`: TypeScript 型検査および Vite クライアントビルド 0 エラー成功。
 
 ---
 
