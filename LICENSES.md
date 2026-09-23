@@ -1,5 +1,11 @@
 # Licensing & Third-Party Notice
 
+<p align="center">
+  <strong>English</strong> | <a href="LICENSES.ja.md">日本語</a>
+</p>
+
+---
+
 This document provides a comprehensive overview of the licensing policies, source code distribution model, third-party dependency governance, and asset clearance rules for the **Waddle** project.
 
 ---
