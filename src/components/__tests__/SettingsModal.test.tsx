@@ -129,4 +129,24 @@ describe('SettingsModal - About / Licenses Section', () => {
     expect(html).toContain('WaddleはローカルにインストールされたNerd Fontsをサポートしていますが、Nerd Fontファイルをバンドルまたは再配布していません');
     expect(html).toContain('ユーザー自身がシステムにインストールするフォントの取得およびライセンスについて責任を負います');
   });
+
+  it('renders the Waddle brand icon in both the modal top header and About hero card', () => {
+    const html = renderToStaticMarkup(
+      <SettingsModal
+        isOpen={true}
+        onClose={() => {}}
+        config={mockConfigEn}
+        onSaveConfig={() => {}}
+      />
+    );
+
+    // Verify modal top header has the Waddle icon
+    expect(html).toContain('class="ai-modal-header"');
+    expect(html).toContain('alt="Waddle"');
+
+    // Count occurrences of alt="Waddle" (one in top header, one in About hero card)
+    const iconMatches = html.match(/alt="Waddle"/g);
+    expect(iconMatches).not.toBeNull();
+    expect(iconMatches?.length).toBeGreaterThanOrEqual(2);
+  });
 });

@@ -520,6 +520,21 @@
       - `npm run test`: 単体テスト 11 ファイル / 全 86 テストすべて 100% PASS。
       - `npm run test:security`: Gitleaks, Secretlint, Cargo Audit, Cargo Deny, Security Regression Suite 6大防御すべて 100% PASS。
       - `npm run build`: TypeScript 型検査 & Vite 本番ビルド 0 エラー成功。
+46. **Waddle 設定画面 Top ヘッダーおよび About カードへの Waddle ブランドアイコン表示（Toodle 風 UI 統合）**:
+    - **ユーザー要望**: Toodle の設定画面スクリーンショットを参考に、Waddle の設定画面（`SettingsModal`）の Top ヘッダーにも Waddle のアイコンを表示すること。
+    - **実施内容**:
+      1. **Top ヘッダーへのアイコンバッジコンテナ配置 (`src/components/SettingsModal.tsx`)**:
+         - 既存の汎用 `<Settings />` アイコンを、Toodle 風の角丸ボーダーコンテナ（32x32px、ダーク半透明背景、微細ボーダー、ネオンシアンのグロー効果）で囲まれた Waddle 公式ブランドアイコン（`src/assets/waddle-icon.svg`）にアップグレード。
+         - モーダルタイトル（`t.settings.modalTitle`）を等幅フォント（`var(--font-mono)`）でスタイリングし、右側の閉じるボタン（`X`）との間に十分なスペースと視覚的階層を確立。
+      2. **About Waddle ヒーローカードへのブランドアイコン統合 (`src/components/SettingsModal.tsx`)**:
+         - Toodle の About タブのレイアウトを踏襲し、About ヒーローカード（`#card-about-waddle-hero`）の左上にも 40x40px のブランドアイコンコンテナを配置。
+         - アプリ名（`Waddle`）、バージョン & ライセンスバッジ（`v0.1.0 · MIT License`）、タグライン、説明文と美しく調和するサイバーパンク/ネオン調のヘッダー構成を確立。
+      3. **単体テスト拡充 (`src/components/__tests__/SettingsModal.test.tsx`)**:
+         - Top ヘッダーおよび About カードの双方で `alt="Waddle"` のブランドアイコンが正しくレンダリングされていることを検証するテストケースを追加。
+    - **検証**:
+      - `npm run test`: 全 11 テストファイル / 87 テストすべて 100% PASS。
+      - `npm run test:security`: Gitleaks, Secretlint, Cargo Audit, Cargo Deny, Security Regression Suite 全て PASS。
+      - `npm run build`: TypeScript 型検査 & Vite 本番ビルド 0 エラー。
 
 ---
 

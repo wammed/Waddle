@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  Settings,
   X,
   Terminal as TermIcon,
   Save,
@@ -30,6 +29,7 @@ import { TauriApi } from '../services/tauriApi';
 import { useI18n, translations } from '../i18n';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
 import { openUrl } from '@tauri-apps/plugin-opener';
+import waddleIcon from '../assets/waddle-icon.svg';
 
 const ACKNOWLEDGED_PROJECTS = [
   {
@@ -479,15 +479,69 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         style={{ width: '660px', backgroundColor: '#131722', color: '#f8fafc' }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="ai-modal-header" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-          <div className="ai-modal-title" style={{ color: 'var(--fg-main)' }}>
-            <Settings size={16} />
-            <span>{t.settings.modalTitle}</span>
+        <div
+          className="ai-modal-header"
+          style={{
+            borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '12px 16px',
+          }}
+        >
+          <div
+            className="ai-modal-title"
+            style={{
+              color: 'var(--fg-main)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+            }}
+          >
+            <div
+              style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '8px',
+                background: 'rgba(255, 255, 255, 0.04)',
+                border: '1px solid rgba(255, 255, 255, 0.14)',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3), 0 0 10px rgba(56, 189, 248, 0.12)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              <img
+                src={waddleIcon}
+                alt="Waddle"
+                style={{
+                  width: '22px',
+                  height: '22px',
+                  borderRadius: '4px',
+                  objectFit: 'contain',
+                  filter: 'drop-shadow(0 0 5px var(--accent-glow))',
+                }}
+              />
+            </div>
+            <span
+              style={{
+                fontFamily: 'var(--font-mono, monospace)',
+                fontSize: '16px',
+                fontWeight: 600,
+                letterSpacing: '0.4px',
+                color: '#f8fafc',
+              }}
+            >
+              {t.settings.modalTitle}
+            </span>
           </div>
           <button
             onClick={onClose}
             className="action-btn"
             style={{ padding: '2px 6px', border: 'none', background: 'transparent' }}
+            title={t.common.close}
+            aria-label={t.common.close}
           >
             <X size={16} />
           </button>
@@ -1848,26 +1902,56 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <span style={{ fontSize: '16px', fontWeight: 700, color: '#f8fafc', letterSpacing: '0.5px' }}>
-                    {t.settings.aboutAppName}
-                  </span>
-                  <span
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div
                     style={{
-                      fontSize: '11px',
-                      background: 'rgba(56, 189, 248, 0.15)',
+                      width: '40px',
+                      height: '40px',
+                      borderRadius: '8px',
+                      background: 'rgba(255, 255, 255, 0.05)',
                       border: '1px solid rgba(56, 189, 248, 0.3)',
-                      color: '#38bdf8',
-                      padding: '2px 8px',
-                      borderRadius: '12px',
-                      fontWeight: 600,
+                      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3), 0 0 10px rgba(56, 189, 248, 0.15)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
                     }}
                   >
-                    v0.1.0 · MIT License
-                  </span>
-                </div>
-                <div style={{ fontSize: '12px', fontWeight: 500, color: '#a5b4fc' }}>
-                  {t.settings.aboutTagline}
+                    <img
+                      src={waddleIcon}
+                      alt="Waddle"
+                      style={{
+                        width: '28px',
+                        height: '28px',
+                        borderRadius: '4px',
+                        objectFit: 'contain',
+                        filter: 'drop-shadow(0 0 6px var(--accent-glow))',
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{ fontSize: '16px', fontWeight: 700, color: '#f8fafc', letterSpacing: '0.5px' }}>
+                        {t.settings.aboutAppName}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: '11px',
+                          background: 'rgba(56, 189, 248, 0.15)',
+                          border: '1px solid rgba(56, 189, 248, 0.3)',
+                          color: '#38bdf8',
+                          padding: '2px 8px',
+                          borderRadius: '12px',
+                          fontWeight: 600,
+                        }}
+                      >
+                        v0.1.0 · MIT License
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '12px', fontWeight: 500, color: '#a5b4fc', marginTop: '2px' }}>
+                      {t.settings.aboutTagline}
+                    </div>
+                  </div>
                 </div>
               </div>
               <div style={{ fontSize: '12px', color: '#94a3b8', lineHeight: 1.6 }}>
