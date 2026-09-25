@@ -1232,6 +1232,41 @@ npm run tauri dev
       5. **Waddle 規定ドキュメントセットの完全同期**:
          - `README.md` & `README.ja.md`（ルート実体）、`docs/README.md` & `docs/README.ja.md`（docs実体）、`docs/FEATURES.md` & `docs/FEATURES.ja.md`（セクション 23 新設）、`docs/ARCHITECTURE.md` & `docs/ARCHITECTURE.ja.md`（レンダリング層 & 技術スタック更新）、`docs/SESSION_HANDOVER.md` を完全同期。
 
+52. **エディタ内外・ターミナル・外部アプリ間 双方向コピー＆ペースト・カット・全選択 実装スプリント**:
+    - **背景と目的**:
+      - 内蔵コードエディタ（`Ctrl+E`）において、エディタ内での全選択（`Ctrl-A`）、コピー（`Ctrl-C`）、貼り付け（`Ctrl-V`）、切り取り（`Ctrl-X`）のショートカットキー操作が未実装であった。
+      - ターミナル（xterm.js）側では `Ctrl-C` が通常プロセス中断（SIGINT）に固定されており、ターミナルで選択したテキストをエディタへコピーしたり、エディタや外部アプリからターミナルへペーストする連携が困難であった。
+      - これらを解決し、**「エディタ内」「ターミナル ⇔ エディタ間」「外部アプリ ⇔ Waddle間」** の双方向クリップボード操作を極めて直感的かつ安全に実行できるように拡張。
+    - **実施内容**:
+      1. **ショートカットキーの競合精査**:
+         - エディタコンポーネント内において `Ctrl-A`, `Ctrl-C`, `Ctrl-V`, `Ctrl-X` は既存のグローバルショートカット（`useGlobalShortcuts.ts`）やエディタ内機能（検索 `Ctrl+F`、置換 `Ctrl+H`、保存 `Ctrl+S`、Undo `Ctrl+Z`、AI編集 `Ctrl+Shift+K` 等）と一切競合しないことを確認。
+         - ターミナル側では、シェルの操作感を損なわないよう「テキスト選択範囲が存在するときのみ `Ctrl-C` でコピーを実行し、非選択時は通常の SIGINT（`^C`）をシェルへ通す」というインテリジェントな協調ロジックを採用。
+      2. **エディタ内編集・ショートカット実装 (`src/components/EditorPane.tsx`)**:
+         - **`Ctrl-A` (Select All)**: エディタ内の全テキストを選択（ReadOnly 時でも許可）。
+         - **`Ctrl-C` (Copy)**: 選択範囲のテキストをOSクリップボードへコピー（ReadOnly 時でも許可）。
+         - **`Ctrl-X` (Cut)**: 選択テキストをクリップボードにコピーした上でバッファから削除し、カーソルを移動してUndo/Redoスタックに即時プッシュ。
+         - **`Ctrl-V` (Paste)**: クリップボードのテキストをカーソル位置（または選択範囲を置換して）挿入し、カーソルを末尾へ進め、Undo/Redoスタックに即時プッシュ。
+         - **イベントフック**: `<textarea>` の `onCopy`, `onCut`, `onPaste` イベントも捕捉し、OSメニューやマウス操作からの編集時にもステートおよびUndoスタックが完全同期するよう防御。
+         - **エディタ右クリックコンテキストメニュー**: 「切り取り (Ctrl+X)」「コピー (Ctrl+C)」「貼り付け (Ctrl+V)」「すべて選択 (Ctrl+A)」「ターミナルで実行」を展開するダークグラスモーフィズムUIを実装。
+      3. **ターミナル連携・ショートカット実装 (`src/components/SingleTerminalView.tsx`)**:
+         - 選択時の `Ctrl-C` および Linux標準 `Ctrl-Shift-C` によるクリップボードコピー。
+         - `Ctrl-V` および `Ctrl-Shift-V` によるクリップボードからターミナルPTYへのペースト送信。
+         - `Ctrl-Shift-A` によるターミナル内全選択。
+         - ターミナル右クリックコンテキストメニュー（Copy, Paste, Select All, Clear Terminal）の設置。
+      4. **堅牢なクリップボードサービス開発 (`src/services/clipboardService.ts`)**:
+         - `navigator.clipboard.writeText` / `readText` に加え、制限環境下でも確実に動作するフォールバック（一時 textarea + `execCommand('copy')`）を完備。
+      5. **純粋関数分離 & 包括的ユニットテスト整備**:
+         - `src/services/editorService.ts`: `handleCutText` および `handlePasteText` を純粋関数として実装。インデックス逆順選択や空文字等の境界値を含めて `editorService.test.ts` で 100% 検証。
+         - `src/services/__tests__/clipboardService.test.ts`: クリップボード読み書きとフォールバックの動作を検証。
+         - `src/components/__tests__/EditorPane.test.tsx`: エディタの初期レンダリングとコンテキスト整合性を検証。
+      6. **ドキュメント類の完全同期**:
+         - `README.md`, `README.ja.md`, `docs/README.md`, `docs/README.ja.md`, `docs/FEATURES.md`, `docs/FEATURES.ja.md`, `docs/SESSION_HANDOVER.md` を完全同期。
+      7. **全テスト・セキュリティ検証**:
+         - TypeScript 型チェック (`npx tsc --noEmit`): 0 エラー
+         - ビルド (`npm run build`): 成功
+         - ユニットテスト (`npm run test:unit`): 全 13 テストファイル（102 テスト）および Rust ユニットテスト（69 テスト）すべて PASS
+         - セキュリティテスト (`npm run test:security`): Cargo Deny、脆弱性監査、セキュリティ回帰テスト全 6 柱すべて PASS
+
 ---
 
 ## 6. 次回再開時の検討・作業候補（Next Steps）

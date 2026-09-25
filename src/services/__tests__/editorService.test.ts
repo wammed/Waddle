@@ -8,6 +8,8 @@ import {
   replaceAllExactMatches,
   EditorHistoryManager,
   AutosaveScheduler,
+  handleCutText,
+  handlePasteText,
 } from '../editorService';
 
 describe('editorService', () => {
@@ -365,6 +367,62 @@ describe('editorService', () => {
 
       const canSave = !tab.isReadOnly;
       expect(canSave).toBe(false);
+    });
+  });
+
+  describe('handleCutText', () => {
+    it('returns empty cutText and unchanged content when start === end', () => {
+      const content = 'hello world';
+      const result = handleCutText(content, 5, 5);
+      expect(result.cutText).toBe('');
+      expect(result.newContent).toBe('hello world');
+      expect(result.newCursor).toBe(5);
+    });
+
+    it('cuts selected range and moves cursor to cut point', () => {
+      const content = 'hello beautiful world';
+      const result = handleCutText(content, 6, 16);
+      expect(result.cutText).toBe('beautiful ');
+      expect(result.newContent).toBe('hello world');
+      expect(result.newCursor).toBe(6);
+    });
+
+    it('handles inverted start/end indices gracefully', () => {
+      const content = 'hello world';
+      const result = handleCutText(content, 5, 0);
+      expect(result.cutText).toBe('hello');
+      expect(result.newContent).toBe(' world');
+      expect(result.newCursor).toBe(0);
+    });
+  });
+
+  describe('handlePasteText', () => {
+    it('inserts text at single cursor position without replacing', () => {
+      const content = 'hello world';
+      const result = handlePasteText(content, 5, 5, ' beautiful');
+      expect(result.newContent).toBe('hello beautiful world');
+      expect(result.newCursor).toBe(15);
+    });
+
+    it('replaces selected range with pasted text', () => {
+      const content = 'hello small world';
+      const result = handlePasteText(content, 6, 11, 'huge');
+      expect(result.newContent).toBe('hello huge world');
+      expect(result.newCursor).toBe(10);
+    });
+
+    it('handles empty textToPaste gracefully', () => {
+      const content = 'hello world';
+      const result = handlePasteText(content, 5, 5, '');
+      expect(result.newContent).toBe('hello world');
+      expect(result.newCursor).toBe(5);
+    });
+
+    it('handles inverted start/end indices gracefully on paste replacement', () => {
+      const content = 'hello world';
+      const result = handlePasteText(content, 5, 0, 'Hi');
+      expect(result.newContent).toBe('Hi world');
+      expect(result.newCursor).toBe(2);
     });
   });
 });

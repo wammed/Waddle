@@ -143,6 +143,8 @@ sudo pacman -U src-tauri/target/release/bundle/pacman/waddle-0.1.0-1-x86_64.pkg.
 | :--- | :--- |
 | `Ctrl + K` | Open **AI Command Generator** |
 | `Ctrl + E` | Toggle **Hardened Embedded Code Editor** (Multi-tab, Soft Tab, AutoSave) |
+| `Ctrl + A` / `C` / `V` / `X` (Editor) | **Select All / Copy / Paste / Cut** (Synchronized with OS Clipboard & Undo history) |
+| `Ctrl + C` / `V` (Terminal) | **Seamless Copy & Paste across Terminal ⇔ Editor ⇔ External Apps** |
 | `Ctrl + F` / `Ctrl + H` (Editor) | Open **Exact Match Search / Replace Mini-bar** (ReDoS-free) |
 | `Ctrl + Shift + F` | Toggle **In-Terminal Log Search** |
 | `Ctrl + Shift + H` | Open **Session Timeline & History Restoration** modal |

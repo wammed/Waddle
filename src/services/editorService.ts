@@ -354,3 +354,46 @@ export class AutosaveScheduler {
   }
 }
 
+/**
+ * Handle Cut text from selection.
+ * Returns cutText, newContent, and new cursor position.
+ */
+export function handleCutText(
+  content: string,
+  selectionStart: number,
+  selectionEnd: number
+): { cutText: string; newContent: string; newCursor: number } {
+  if (selectionStart === selectionEnd) {
+    return { cutText: '', newContent: content, newCursor: selectionStart };
+  }
+  const start = Math.min(selectionStart, selectionEnd);
+  const end = Math.max(selectionStart, selectionEnd);
+  const cutText = content.slice(start, end);
+  const newContent = content.slice(0, start) + content.slice(end);
+  return {
+    cutText,
+    newContent,
+    newCursor: start,
+  };
+}
+
+/**
+ * Handle Paste text at cursor or replacing selection.
+ * Returns newContent and new cursor position (at the end of inserted text).
+ */
+export function handlePasteText(
+  content: string,
+  selectionStart: number,
+  selectionEnd: number,
+  textToPaste: string
+): { newContent: string; newCursor: number } {
+  const start = Math.min(selectionStart, selectionEnd);
+  const end = Math.max(selectionStart, selectionEnd);
+  const newContent = content.slice(0, start) + textToPaste + content.slice(end);
+  const newCursor = start + textToPaste.length;
+  return {
+    newContent,
+    newCursor,
+  };
+}
+

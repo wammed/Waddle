@@ -190,7 +190,20 @@ Rather than building an all-encompassing heavyweight editor, Waddle intentionall
     - `Ctrl + F`: Opens/closes Find mini-bar (suppresses terminal log search).
     - `Ctrl + H`: Opens/closes Replace mini-bar (suppresses timeline modal).
     - `Ctrl + S`: Atomically saves active tab (disabled when Read-Only).
+    - `Ctrl + A`: Selects all text inside the editor (Select All).
+    - `Ctrl + C`: Copies selected text to OS clipboard (also allowed in Read-Only mode).
+    - `Ctrl + X`: Cuts selected text to OS clipboard with immediate Undo stack update.
+    - `Ctrl + V`: Pastes text from clipboard, replacing selection and recording to Undo stack.
     - `Esc`: Closes Find/Replace mini-bar if open; otherwise closes editor (with unsaved confirmation).
+- **Bidirectional Clipboard Integration (Editor ⇔ Terminal ⇔ External Apps)**:
+  - **OS Clipboard Service (`clipboardService`)**: Seamlessly bridges text transfer between external applications (browsers, IDEs) and Waddle with safe fallback.
+  - **Terminal ⇔ Editor Workflow**:
+    - Select text in terminal + `Ctrl + C` (or `Ctrl + Shift + C`) → Paste into editor via `Ctrl + V`.
+    - Select code in editor + `Ctrl + C` → Paste into terminal via `Ctrl + V` (or `Ctrl + Shift + V`).
+    - Terminal `Ctrl + C` intelligently copies if text is selected, while cleanly passing through standard SIGINT (`^C`) when nothing is selected.
+  - **Dedicated Context Menus**:
+    - **Editor**: Right-clicking anywhere opens a dark glassmorphic menu with **Cut (`Ctrl+X`)**, **Copy (`Ctrl+C`)**, **Paste (`Ctrl+V`)**, **Select All (`Ctrl+A`)**, and **Run in Terminal**.
+    - **Terminal**: Right-clicking opens actions for **Copy (`Ctrl+Shift+C`)**, **Paste (`Ctrl+V`)**, **Select All (`Ctrl+Shift+A`)**, and **Clear Terminal**.
 - **Visual Secret Protection (Zero-Mutation Guarantee)**:
   - Real-time scanning for API keys, tokens, and credentials via `findSecretRanges()`.
   - Header displays `[🛡️ N Secrets Detected]` with an interactive Eye / Eye-Off toggle button.
@@ -807,7 +820,16 @@ flowchart TD
 | `Ctrl + B` | Global | Toggle **File Tree Sidebar** |
 | `Ctrl + E` | Global | Toggle **Embedded Code Editor** |
 | `Ctrl + S` | Editor | Save currently open file |
+| `Ctrl + A` | Editor | **Select all text in editor (Select All)** |
+| `Ctrl + C` | Editor | **Copy selection to clipboard** |
+| `Ctrl + X` | Editor | **Cut selection to clipboard** (with immediate Undo history) |
+| `Ctrl + V` | Editor | **Paste from clipboard** (replaces selection, records Undo history) |
+| `Ctrl + Z` / `Ctrl + Y` | Editor | **Undo / Redo** |
 | `Ctrl + Shift + K` | Editor | Open **AI Code Edit / Refactor** |
+| `Ctrl + C` (with selection) | Terminal | **Copy selected text** (passes through SIGINT `^C` when unselected) |
+| `Ctrl + Shift + C` | Terminal | **Copy selected text to clipboard** |
+| `Ctrl + V` / `Ctrl + Shift + V` | Terminal | **Paste from clipboard into terminal** |
+| `Ctrl + Shift + A` | Terminal | **Select all text in terminal** |
 | `Ctrl + Shift + F` / `Ctrl + F` | Terminal | Toggle **In-Terminal Log Search** |
 | `Ctrl + Shift + H` | Global | Open **Session Timeline & History Restoration** modal |
 | `Ctrl + Shift + P` | Global | Open **Visual Pipeline Builder** modal |

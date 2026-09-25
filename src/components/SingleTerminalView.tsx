@@ -6,7 +6,19 @@ import { Unicode11Addon } from '@xterm/addon-unicode11';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { CanvasAddon } from '@xterm/addon-canvas';
 import { SearchAddon } from '@xterm/addon-search';
-import { Maximize2, Minimize2, X, GitBranch, Search, ChevronUp, ChevronDown } from 'lucide-react';
+import {
+  Maximize2,
+  Minimize2,
+  X,
+  GitBranch,
+  Search,
+  ChevronUp,
+  ChevronDown,
+  Copy,
+  Clipboard,
+  CheckSquare,
+  Trash2,
+} from 'lucide-react';
 import { THEMES } from '../theme';
 import { AppConfig, TerminalPaneInfo, GitStatus } from '../types';
 import { TauriApi } from '../services/tauriApi';
@@ -15,6 +27,7 @@ import { KittyGraphicsManager } from '../services/kittyGraphics';
 import { maskSecrets } from '../services/secretMasker';
 import { sessionHistory } from '../services/sessionHistory';
 import { TerminalOverlayScrollbar } from './TerminalOverlayScrollbar';
+import { writeClipboardText, readClipboardText } from '../services/clipboardService';
 
 interface SingleTerminalViewProps {
   pane: TerminalPaneInfo;
@@ -66,6 +79,48 @@ export const SingleTerminalView: React.FC<SingleTerminalViewProps> = ({
   const [useRegex, setUseRegex] = useState(false);
   const [terminalInstance, setTerminalInstance] = useState<Terminal | null>(null);
   const kittyManagerRef = useRef<KittyGraphicsManager | null>(null);
+
+  const [terminalContextMenu, setTerminalContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const terminalContextMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (terminalContextMenuRef.current && !terminalContextMenuRef.current.contains(e.target as Node)) {
+        setTerminalContextMenu(null);
+      }
+    };
+    if (terminalContextMenu) {
+      window.addEventListener('mousedown', handleClickOutside);
+      return () => window.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [terminalContextMenu]);
+
+  const handleTerminalCopy = useCallback(() => {
+    if (termRef.current && termRef.current.hasSelection()) {
+      const selection = termRef.current.getSelection();
+      if (selection) writeClipboardText(selection);
+    }
+  }, []);
+
+  const handleTerminalPaste = useCallback(async () => {
+    const text = await readClipboardText();
+    if (text) {
+      TauriApi.writePty(pane.sessionId, text);
+    }
+  }, [pane.sessionId]);
+
+  const handleTerminalSelectAll = useCallback(() => {
+    if (termRef.current) {
+      termRef.current.selectAll();
+    }
+  }, []);
+
+  const handleTerminalClear = useCallback(() => {
+    if (termRef.current) {
+      termRef.current.clear();
+      TauriApi.writePty(pane.sessionId, 'clear\n');
+    }
+  }, [pane.sessionId]);
 
   // Refs for callbacks to prevent re-triggering terminal recreation
   const onUpdatePaneRef = useRef(onUpdatePane);
@@ -358,6 +413,51 @@ export const SingleTerminalView: React.FC<SingleTerminalViewProps> = ({
         if (event.shiftKey && (keyLower === 'p' || code === 'KeyP')) return false;
         // Settings: Ctrl+,
         if (event.key === ',' || code === 'Comma') return false;
+
+        // Ctrl+Shift+C: Copy selection to clipboard
+        if (event.shiftKey && !event.altKey && (keyLower === 'c' || code === 'KeyC')) {
+          if (event.type === 'keydown' && term.hasSelection()) {
+            const selection = term.getSelection();
+            if (selection) writeClipboardText(selection);
+          }
+          return false;
+        }
+
+        // Ctrl+C with active selection: Copy selection to clipboard instead of SIGINT
+        if (!event.shiftKey && !event.altKey && (keyLower === 'c' || code === 'KeyC')) {
+          if (term.hasSelection()) {
+            if (event.type === 'keydown') {
+              const selection = term.getSelection();
+              if (selection) {
+                writeClipboardText(selection);
+                term.clearSelection();
+              }
+            }
+            return false;
+          }
+          // If no selection, allow standard SIGINT (\x03) to pass to shell
+          return true;
+        }
+
+        // Ctrl+Shift+V or Ctrl+V: Paste from clipboard into terminal PTY
+        if (!event.altKey && (keyLower === 'v' || code === 'KeyV')) {
+          if (event.type === 'keydown') {
+            readClipboardText().then((text) => {
+              if (text) {
+                TauriApi.writePty(pane.sessionId, text);
+              }
+            });
+          }
+          return false;
+        }
+
+        // Ctrl+Shift+A: Select all in terminal
+        if (event.shiftKey && !event.altKey && (keyLower === 'a' || code === 'KeyA')) {
+          if (event.type === 'keydown') {
+            term.selectAll();
+          }
+          return false;
+        }
       }
 
       return true;
@@ -907,6 +1007,10 @@ export const SingleTerminalView: React.FC<SingleTerminalViewProps> = ({
         <div
           ref={containerRef}
           id={`terminal-pane-${pane.id}`}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            setTerminalContextMenu({ x: e.clientX, y: e.clientY });
+          }}
           style={{
             width: '100%',
             height: '100%',
@@ -917,6 +1021,69 @@ export const SingleTerminalView: React.FC<SingleTerminalViewProps> = ({
 
         {/* Overlay Scrollbar */}
         <TerminalOverlayScrollbar term={terminalInstance} />
+
+        {/* Terminal Context Menu */}
+        {terminalContextMenu && (
+          <div
+            ref={terminalContextMenuRef}
+            className="filetree-context-menu"
+            style={{
+              position: 'fixed',
+              left: `${Math.min(terminalContextMenu.x, window.innerWidth - 190)}px`,
+              top: `${Math.min(terminalContextMenu.y, window.innerHeight - 200)}px`,
+              zIndex: 10000,
+            }}
+          >
+            <div className="context-menu-header">
+              Terminal ({pane.title || 'bash'})
+            </div>
+            <button
+              className="context-menu-item"
+              disabled={!termRef.current || !termRef.current.hasSelection()}
+              onClick={() => {
+                handleTerminalCopy();
+                setTerminalContextMenu(null);
+              }}
+            >
+              <Copy size={13} />
+              <span>Copy</span>
+              <span className="context-menu-shortcut">Ctrl+Shift+C</span>
+            </button>
+            <button
+              className="context-menu-item"
+              onClick={() => {
+                handleTerminalPaste();
+                setTerminalContextMenu(null);
+              }}
+            >
+              <Clipboard size={13} />
+              <span>Paste</span>
+              <span className="context-menu-shortcut">Ctrl+V</span>
+            </button>
+            <div className="context-menu-sep" />
+            <button
+              className="context-menu-item"
+              onClick={() => {
+                handleTerminalSelectAll();
+                setTerminalContextMenu(null);
+              }}
+            >
+              <CheckSquare size={13} />
+              <span>Select All</span>
+              <span className="context-menu-shortcut">Ctrl+Shift+A</span>
+            </button>
+            <button
+              className="context-menu-item"
+              onClick={() => {
+                handleTerminalClear();
+                setTerminalContextMenu(null);
+              }}
+            >
+              <Trash2 size={13} />
+              <span>Clear Terminal</span>
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -19,6 +19,10 @@ import {
   ShieldAlert,
   EyeOff,
   RotateCcw,
+  Copy,
+  Scissors,
+  Clipboard,
+  CheckSquare,
 } from 'lucide-react';
 import { AppConfig, TerminalContext, EditorTab, AutosaveEntry } from '../types';
 import { TauriApi } from '../services/tauriApi';
@@ -29,6 +33,8 @@ import { findSecretRanges, type SecretRange } from '../services/secretMasker';
 import {
   handleTabIndentation,
   handleAutoClosePair,
+  handleCutText,
+  handlePasteText,
   findExactMatches,
   replaceSingleMatch,
   replaceAllExactMatches,
@@ -36,6 +42,7 @@ import {
   AutosaveScheduler,
   TextMatch,
 } from '../services/editorService';
+import { writeClipboardText, readClipboardText } from '../services/clipboardService';
 
 import Prism from 'prismjs';
 import 'prismjs/components/prism-typescript';
@@ -813,10 +820,105 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
     }
   };
 
+  // Context menu state for Editor
+  const [editorContextMenu, setEditorContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const editorContextMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (editorContextMenuRef.current && !editorContextMenuRef.current.contains(e.target as Node)) {
+        setEditorContextMenu(null);
+      }
+    };
+    if (editorContextMenu) {
+      window.addEventListener('mousedown', handleClickOutside);
+      return () => window.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [editorContextMenu]);
+
+  // Select All text in editor
+  const handleSelectAll = useCallback(() => {
+    if (textareaRef.current) {
+      textareaRef.current.focus();
+      textareaRef.current.setSelectionRange(0, textareaRef.current.value.length);
+    }
+  }, []);
+
+  // Copy selection from active tab to clipboard
+  const handleCopySelection = useCallback(async () => {
+    if (!textareaRef.current) return;
+    const el = textareaRef.current;
+    const start = Math.min(el.selectionStart, el.selectionEnd);
+    const end = Math.max(el.selectionStart, el.selectionEnd);
+    if (start === end) return;
+    const selectedText = el.value.substring(start, end);
+    const ok = await writeClipboardText(selectedText);
+    if (ok) {
+      showToast(language === 'ja' ? '選択範囲をコピーしました' : 'Selection copied to clipboard', 'info');
+    }
+  }, [language, showToast]);
+
+  // Cut selection from active tab to clipboard
+  const handleCutSelection = useCallback(async () => {
+    if (!activeTab || activeTab.isReadOnly || !textareaRef.current) return;
+    const el = textareaRef.current;
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    if (start === end) return;
+    const { cutText, newContent, newCursor } = handleCutText(activeTab.content, start, end);
+    if (cutText) {
+      await writeClipboardText(cutText);
+      updateActiveTabContent(newContent);
+      pushImmediateHistory(activeTab.id, newContent);
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.setSelectionRange(newCursor, newCursor);
+          textareaRef.current.focus();
+        }
+      }, 0);
+      showToast(language === 'ja' ? '選択範囲を切り取りました' : 'Selection cut to clipboard', 'info');
+    }
+  }, [activeTab, language, showToast, updateActiveTabContent, pushImmediateHistory]);
+
+  // Paste from clipboard into active tab
+  const handlePasteSelection = useCallback(async (pastedText?: string) => {
+    if (!activeTab || activeTab.isReadOnly || !textareaRef.current) return;
+    const el = textareaRef.current;
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const textToInsert = pastedText !== undefined ? pastedText : await readClipboardText();
+    if (!textToInsert) return;
+    const { newContent, newCursor } = handlePasteText(activeTab.content, start, end, textToInsert);
+    updateActiveTabContent(newContent);
+    pushImmediateHistory(activeTab.id, newContent);
+    setTimeout(() => {
+      if (textareaRef.current) {
+        textareaRef.current.setSelectionRange(newCursor, newCursor);
+        textareaRef.current.focus();
+      }
+    }, 0);
+  }, [activeTab, updateActiveTabContent, pushImmediateHistory]);
+
   // Focus-exclusive shortcut controller (onKeyDownCapture on container)
   const handleContainerKeyDownCapture = (e: React.KeyboardEvent<HTMLElement>) => {
     const isCtrlOrMeta = e.ctrlKey || e.metaKey;
     const keyLower = e.key.toLowerCase();
+    const code = e.code;
+
+    // Shortcuts for Input elements (e.g. search / replace box) should be skipped so input box retains standard behavior
+    const target = e.target as HTMLElement;
+    const isInsideInput =
+      target && (target.tagName === 'INPUT' || (target.tagName === 'TEXTAREA' && target !== textareaRef.current));
+
+    if (!isInsideInput) {
+      // Ctrl+A: Select All
+      if (isCtrlOrMeta && !e.shiftKey && (keyLower === 'a' || code === 'KeyA')) {
+        e.preventDefault();
+        e.stopPropagation();
+        handleSelectAll();
+        return;
+      }
+    }
 
     // Ctrl+F: Open/toggle Find
     if (isCtrlOrMeta && !e.shiftKey && keyLower === 'f') {
@@ -886,13 +988,55 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
     }
   };
 
-  // Handle keys in textarea (Tab soft indent, Bracket auto pair)
+  // Handle keys in textarea (Tab soft indent, Bracket auto pair, Cut, Copy, Paste, Select All)
   const handleTextareaKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (!activeTab || activeTab.isReadOnly) return;
+    if (!activeTab) return;
 
     const el = e.currentTarget;
     const start = el.selectionStart;
     const end = el.selectionEnd;
+    const isCtrlOrMeta = e.ctrlKey || e.metaKey;
+    const keyLower = e.key.toLowerCase();
+    const code = e.code;
+
+    // Ctrl+A: Select All (supported even if read-only)
+    if (isCtrlOrMeta && !e.shiftKey && (keyLower === 'a' || code === 'KeyA')) {
+      e.preventDefault();
+      e.stopPropagation();
+      handleSelectAll();
+      return;
+    }
+
+    // Ctrl+C: Copy (supported even if read-only)
+    if (isCtrlOrMeta && !e.shiftKey && (keyLower === 'c' || code === 'KeyC')) {
+      if (start !== end) {
+        e.preventDefault();
+        e.stopPropagation();
+        handleCopySelection();
+      }
+      return;
+    }
+
+    // If read-only, disallow modifying operations
+    if (activeTab.isReadOnly) return;
+
+    // Ctrl+X: Cut
+    if (isCtrlOrMeta && !e.shiftKey && (keyLower === 'x' || code === 'KeyX')) {
+      if (start !== end) {
+        e.preventDefault();
+        e.stopPropagation();
+        handleCutSelection();
+      }
+      return;
+    }
+
+    // Ctrl+V: Paste
+    if (isCtrlOrMeta && !e.shiftKey && (keyLower === 'v' || code === 'KeyV')) {
+      e.preventDefault();
+      e.stopPropagation();
+      handlePasteSelection();
+      return;
+    }
 
     // Soft Tab (4 spaces) / Shift+Tab (Unindent)
     if (e.key === 'Tab') {
@@ -1975,6 +2119,37 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
                 readOnly={activeTab.isReadOnly}
                 onChange={(e) => updateActiveTabContent(e.target.value)}
                 onKeyDown={handleTextareaKeyDown}
+                onCopy={(e) => {
+                  const el = textareaRef.current;
+                  if (el && el.selectionStart !== el.selectionEnd) {
+                    const text = el.value.substring(el.selectionStart, el.selectionEnd);
+                    e.clipboardData.setData('text/plain', text);
+                    e.preventDefault();
+                    writeClipboardText(text);
+                    showToast(language === 'ja' ? '選択範囲をコピーしました' : 'Selection copied to clipboard', 'info');
+                  }
+                }}
+                onCut={(e) => {
+                  if (activeTab.isReadOnly) {
+                    e.preventDefault();
+                    return;
+                  }
+                  e.preventDefault();
+                  handleCutSelection();
+                }}
+                onPaste={(e) => {
+                  if (activeTab.isReadOnly) {
+                    e.preventDefault();
+                    return;
+                  }
+                  e.preventDefault();
+                  const text = e.clipboardData.getData('text/plain');
+                  handlePasteSelection(text);
+                }}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  setEditorContextMenu({ x: e.clientX, y: e.clientY });
+                }}
                 onScroll={handleScroll}
                 spellCheck={false}
                 style={{
@@ -2401,6 +2576,87 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
           }}
           onClose={() => setConfirmDangerousCmd(null)}
         />
+      )}
+
+      {/* Editor Context Menu */}
+      {editorContextMenu && (
+        <div
+          ref={editorContextMenuRef}
+          className="filetree-context-menu"
+          style={{
+            position: 'fixed',
+            left: `${Math.min(editorContextMenu.x, window.innerWidth - 190)}px`,
+            top: `${Math.min(editorContextMenu.y, window.innerHeight - 240)}px`,
+            zIndex: 10000,
+          }}
+        >
+          <div className="context-menu-header">
+            {activeTab ? activeTab.fileName : 'Editor'}
+          </div>
+          <button
+            className="context-menu-item"
+            disabled={!textareaRef.current || textareaRef.current.selectionStart === textareaRef.current.selectionEnd || activeTab?.isReadOnly}
+            onClick={() => {
+              handleCutSelection();
+              setEditorContextMenu(null);
+            }}
+          >
+            <Scissors size={13} />
+            <span>{language === 'ja' ? '切り取り' : 'Cut'}</span>
+            <span className="context-menu-shortcut">Ctrl+X</span>
+          </button>
+          <button
+            className="context-menu-item"
+            disabled={!textareaRef.current || textareaRef.current.selectionStart === textareaRef.current.selectionEnd}
+            onClick={() => {
+              handleCopySelection();
+              setEditorContextMenu(null);
+            }}
+          >
+            <Copy size={13} />
+            <span>{language === 'ja' ? 'コピー' : 'Copy'}</span>
+            <span className="context-menu-shortcut">Ctrl+C</span>
+          </button>
+          <button
+            className="context-menu-item"
+            disabled={activeTab?.isReadOnly}
+            onClick={() => {
+              handlePasteSelection();
+              setEditorContextMenu(null);
+            }}
+          >
+            <Clipboard size={13} />
+            <span>{language === 'ja' ? '貼り付け' : 'Paste'}</span>
+            <span className="context-menu-shortcut">Ctrl+V</span>
+          </button>
+          <div className="context-menu-sep" />
+          <button
+            className="context-menu-item"
+            onClick={() => {
+              handleSelectAll();
+              setEditorContextMenu(null);
+            }}
+          >
+            <CheckSquare size={13} />
+            <span>{language === 'ja' ? 'すべて選択' : 'Select All'}</span>
+            <span className="context-menu-shortcut">Ctrl+A</span>
+          </button>
+          {activeTab && (
+            <>
+              <div className="context-menu-sep" />
+              <button
+                className="context-menu-item"
+                onClick={() => {
+                  handleRun();
+                  setEditorContextMenu(null);
+                }}
+              >
+                <Play size={13} color="#10b981" />
+                <span>{language === 'ja' ? 'ターミナルで実行' : t.editor.runTooltip}</span>
+              </button>
+            </>
+          )}
+        </div>
       )}
     </aside>
   );
