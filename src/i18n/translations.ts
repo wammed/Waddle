@@ -309,6 +309,30 @@ export interface Translations {
     editorSectionTitle: string;
     editorAutosaveLabel: string;
     editorAutosaveDesc: string;
+    aboutSectionTitle: string;
+    aboutAppName: string;
+    aboutTagline: string;
+    aboutDescription: string;
+    aboutWaddleLicense: string;
+    acknowledgementsTitle: string;
+    acknowledgementsIntro: string;
+    projectTauriDesc: string;
+    projectReactDesc: string;
+    projectRustDesc: string;
+    projectViteDesc: string;
+    projectXtermDesc: string;
+    projectPrismDesc: string;
+    projectLucideDesc: string;
+    licensesSectionTitle: string;
+    licensesWaddleDesc: string;
+    licensesThirdPartyDesc: string;
+    licensesAuthoritativeDesc: string;
+    fontsPolicyTitle: string;
+    fontsPolicyDesc: string;
+    assetsPolicyDesc: string;
+    viewLicensesDocBtn: string;
+    viewLicenseFileBtn: string;
+    viewRepoBtn: string;
   };
   errorBoundary: {
     fallbackTitle: string;
@@ -644,6 +668,37 @@ export const translations: Record<Language, Translations> = {
       editorSectionTitle: 'Editor Settings',
       editorAutosaveLabel: 'Auto-backup (AutoSave)',
       editorAutosaveDesc: 'Automatically backup uncommitted changes to ~/.cache/waddle/autosave/ every 120 seconds',
+      aboutSectionTitle: 'About / Licenses',
+      aboutAppName: 'Waddle',
+      aboutTagline: 'AI-native Linux terminal environment',
+      aboutDescription:
+        'Waddle is an open-source, AI-integrated terminal emulator for Linux, providing local AI assistance, high-performance PTY streaming, an embedded config editor, and strict security isolation.',
+      aboutWaddleLicense: 'Waddle itself is open-source software released under the MIT License.',
+      acknowledgementsTitle: 'Acknowledgements',
+      acknowledgementsIntro:
+        'Waddle is built with and inspired by open-source projects including Tauri, React, Prism.js, xterm.js, Lucide Icons, Rust, and Vite.',
+      projectTauriDesc: 'Application framework bridging Rust and modern web technologies.',
+      projectReactDesc: 'Declarative component-based UI library powering Waddle’s interface.',
+      projectRustDesc: 'Fast, memory-safe systems programming language powering the terminal core.',
+      projectViteDesc: 'Next-generation high-performance frontend build tooling and dev server.',
+      projectXtermDesc: 'Full-featured terminal front-end component in the browser.',
+      projectPrismDesc: 'Lightweight, extensible syntax highlighting engine for the embedded editor.',
+      projectLucideDesc: 'Clean, consistent open-source iconography library.',
+      licensesSectionTitle: 'Licenses & Third-Party Compliance',
+      licensesWaddleDesc:
+        'Waddle’s source code is licensed under the MIT License. The full license text is available in the root LICENSE file.',
+      licensesThirdPartyDesc:
+        'All third-party Rust crates and Node.js dependencies are governed by permissive open-source licenses (MIT, Apache-2.0, BSD, etc.) and continuously validated against strict license policies via cargo-deny in CI/CD. System desktop libraries (GTK 3, WebKitGTK) are dynamically linked from the host operating system and are not bundled.',
+      licensesAuthoritativeDesc:
+        'The in-app information is provided for convenience and does not replace the authoritative license files and licensing documentation distributed with the source tree. For complete licensing policies and dependency license extraction instructions, refer to LICENSES.md.',
+      fontsPolicyTitle: 'Fonts & Visual Assets',
+      fontsPolicyDesc:
+        'Waddle supports locally installed Nerd Fonts but does not bundle or redistribute Nerd Font files. Users are responsible for obtaining and licensing fonts installed on their system.',
+      assetsPolicyDesc:
+        'Custom SVG artwork and wallpapers in Waddle are original project assets released under the MIT License. UI icons are provided by Lucide Icons under the MIT License.',
+      viewLicensesDocBtn: 'View LICENSES.md',
+      viewLicenseFileBtn: 'View LICENSE (MIT)',
+      viewRepoBtn: 'GitHub Repository',
     },
     errorBoundary: {
       fallbackTitle: 'An error occurred in the component',
@@ -978,6 +1033,37 @@ export const translations: Record<Language, Translations> = {
       editorSectionTitle: 'Editor Settings',
       editorAutosaveLabel: 'Auto-backup (AutoSave)',
       editorAutosaveDesc: 'Automatically backup uncommitted changes to ~/.cache/waddle/autosave/ every 120 seconds',
+      aboutSectionTitle: 'About / Licenses',
+      aboutAppName: 'Waddle',
+      aboutTagline: 'AI-native Linux terminal environment',
+      aboutDescription:
+        'Waddle is an open-source, AI-integrated terminal emulator for Linux, providing local AI assistance, high-performance PTY streaming, an embedded config editor, and strict security isolation.',
+      aboutWaddleLicense: 'Waddle itself is open-source software released under the MIT License.',
+      acknowledgementsTitle: 'Acknowledgements',
+      acknowledgementsIntro:
+        'Waddle is built with and inspired by open-source projects including Tauri, React, Prism.js, xterm.js, Lucide Icons, Rust, and Vite.',
+      projectTauriDesc: 'Application framework bridging Rust and modern web technologies.',
+      projectReactDesc: 'Declarative component-based UI library powering Waddle’s interface.',
+      projectRustDesc: 'Fast, memory-safe systems programming language powering the terminal core.',
+      projectViteDesc: 'Next-generation high-performance frontend build tooling and dev server.',
+      projectXtermDesc: 'Full-featured terminal front-end component in the browser.',
+      projectPrismDesc: 'Lightweight, extensible syntax highlighting engine for the embedded editor.',
+      projectLucideDesc: 'Clean, consistent open-source iconography library.',
+      licensesSectionTitle: 'Licenses & Third-Party Compliance',
+      licensesWaddleDesc:
+        'Waddle’s source code is licensed under the MIT License. The full license text is available in the root LICENSE file.',
+      licensesThirdPartyDesc:
+        'All third-party Rust crates and Node.js dependencies are governed by permissive open-source licenses (MIT, Apache-2.0, BSD, etc.) and continuously validated against strict license policies via cargo-deny in CI/CD. System desktop libraries (GTK 3, WebKitGTK) are dynamically linked from the host operating system and are not bundled.',
+      licensesAuthoritativeDesc:
+        'The in-app information is provided for convenience and does not replace the authoritative license files and licensing documentation distributed with the source tree. For complete licensing policies and dependency license extraction instructions, refer to LICENSES.md.',
+      fontsPolicyTitle: 'Fonts & Visual Assets',
+      fontsPolicyDesc:
+        'Waddle supports locally installed Nerd Fonts but does not bundle or redistribute Nerd Font files. Users are responsible for obtaining and licensing fonts installed on their system.',
+      assetsPolicyDesc:
+        'Custom SVG artwork and wallpapers in Waddle are original project assets released under the MIT License. UI icons are provided by Lucide Icons under the MIT License.',
+      viewLicensesDocBtn: 'View LICENSES.md',
+      viewLicenseFileBtn: 'View LICENSE (MIT)',
+      viewRepoBtn: 'GitHub Repository',
     },
     errorBoundary: {
       fallbackTitle: 'An error occurred in the component',
@@ -1312,6 +1398,37 @@ export const translations: Record<Language, Translations> = {
       editorSectionTitle: 'エディタ設定',
       editorAutosaveLabel: 'エディタの自動バックアップ（AutoSave）',
       editorAutosaveDesc: '未保存の変更を 120 秒ごとに ~/.cache/waddle/autosave/ へ自動退避します',
+      aboutSectionTitle: 'About / ライセンス',
+      aboutAppName: 'Waddle',
+      aboutTagline: 'AIネイティブなLinuxターミナル環境',
+      aboutDescription:
+        'Waddleは、ローカルAI支援、高性能PTYストリーミング、内蔵設定エディタ、および厳格なセキュリティ分離を提供するLinux向けオープンソースターミナルエミュレータです。',
+      aboutWaddleLicense: 'Waddle本体はMIT Licenseのもとで公開されているオープンソースソフトウェアです。',
+      acknowledgementsTitle: 'Acknowledgements (謝辞)',
+      acknowledgementsIntro:
+        'Waddleは、Tauri、React、Prism.js、xterm.js、Lucide Icons、Rust、Viteなどのオープンソースプロジェクトによって構築され、インスピレーションを受けています。',
+      projectTauriDesc: 'RustとWeb技術を統合する次世代デスクトップアプリケーションフレームワーク。',
+      projectReactDesc: 'Waddleのユーザーインターフェースを駆動する宣言型UIライブラリ。',
+      projectRustDesc: 'ターミナルコアとセキュリティ制御を支える高速・安全なシステムプログラミング言語。',
+      projectViteDesc: '高速なフロントエンドビルドツールおよび開発サーバー環境。',
+      projectXtermDesc: '高い互換性と描画性能を備えたブラウザ向けターミナルフロントエンド。',
+      projectPrismDesc: '内蔵エディタで利用されている軽量・高機能な構文ハイライトエンジン。',
+      projectLucideDesc: '一貫性のある高品質なオープンソースアイコンライブラリ。',
+      licensesSectionTitle: 'ライセンスとサードパーティ適合性',
+      licensesWaddleDesc:
+        'WaddleのソースコードはMIT Licenseのもとでライセンスされています。全文はリポジトリのLICENSEファイルで確認できます。',
+      licensesThirdPartyDesc:
+        'すべてのサードパーティ製RustクレートおよびNode.js依存パッケージは、パーミッシブなオープンソースライセンス（MIT、Apache-2.0、BSD等）に準拠しており、CI/CDにおいてcargo-denyを通じて厳格なライセンスポリシーに適合していることが継続的に検証されています。システムデスクトップライブラリ（GTK 3、WebKitGTK）はホストOSから動的リンクされており、バンドルされていません。',
+      licensesAuthoritativeDesc:
+        'アプリ内に表示される情報は利便性のために提供されるものであり、ソースツリーに含まれる正式なライセンスファイルおよびライセンス関連ドキュメントに代わるものではありません。完全なライセンス方針および依存ライセンスの抽出手順については LICENSES.ja.md を参照してください。',
+      fontsPolicyTitle: 'フォントおよびビジュアルアセット方針',
+      fontsPolicyDesc:
+        'WaddleはローカルにインストールされたNerd Fontsをサポートしていますが、Nerd Fontファイルをバンドルまたは再配布していません。ユーザー自身がシステムにインストールするフォントの取得およびライセンスについて責任を負います。',
+      assetsPolicyDesc:
+        'Waddle内の独自SVGアートワークおよび壁紙は、MIT Licenseのもとで提供されるオリジナル成果物です。UIアイコンはMIT LicenseのLucide Iconsを採用しています。',
+      viewLicensesDocBtn: 'LICENSES.ja.md を開く',
+      viewLicenseFileBtn: 'LICENSE (MIT) を開く',
+      viewRepoBtn: 'GitHubリポジトリ',
     },
     errorBoundary: {
       fallbackTitle: 'コンポーネントでエラーが発生しました',

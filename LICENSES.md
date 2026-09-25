@@ -104,6 +104,16 @@ npx license-checker --production --markdown > THIRD_PARTY_LICENSES_NPM.md
 
 ---
 
+## 6. In-App About & License Information
+
+Waddle provides an About / Licenses section in the application Settings UI.
+
+The About section acknowledges major open-source projects used by Waddle. The Licenses section provides a convenient entry point to Waddle's license and third-party licensing information.
+
+The in-app information is provided for convenience and does not replace the authoritative license files and licensing documentation distributed with the source tree.
+
+---
+
 ## Summary
 
 | Component | License / Policy | Notes |

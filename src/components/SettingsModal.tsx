@@ -19,12 +19,62 @@ import {
   Zap,
   ClipboardCheck,
   FileCode,
+  Info,
+  ExternalLink,
+  Heart,
+  Scale,
 } from 'lucide-react';
 import { AppConfig, Language, OllamaStatus } from '../types';
 import { THEMES } from '../theme';
 import { TauriApi } from '../services/tauriApi';
 import { useI18n, translations } from '../i18n';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
+import { openUrl } from '@tauri-apps/plugin-opener';
+
+const ACKNOWLEDGED_PROJECTS = [
+  {
+    name: 'Tauri',
+    descKey: 'projectTauriDesc' as const,
+    url: 'https://tauri.app/',
+    license: 'Apache-2.0 / MIT',
+  },
+  {
+    name: 'React',
+    descKey: 'projectReactDesc' as const,
+    url: 'https://react.dev/',
+    license: 'MIT',
+  },
+  {
+    name: 'Rust',
+    descKey: 'projectRustDesc' as const,
+    url: 'https://www.rust-lang.org/',
+    license: 'MIT / Apache-2.0',
+  },
+  {
+    name: 'Vite',
+    descKey: 'projectViteDesc' as const,
+    url: 'https://vite.dev/',
+    license: 'MIT',
+  },
+  {
+    name: 'xterm.js',
+    descKey: 'projectXtermDesc' as const,
+    url: 'https://xtermjs.org/',
+    license: 'MIT',
+  },
+  {
+    name: 'Prism.js',
+    descKey: 'projectPrismDesc' as const,
+    url: 'https://prismjs.com/',
+    license: 'MIT',
+  },
+  {
+    name: 'Lucide Icons',
+    descKey: 'projectLucideDesc' as const,
+    url: 'https://lucide.dev/',
+    license: 'MIT',
+  },
+] as const;
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -369,6 +419,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         setWallpaperError(errMsg);
       }
     }
+  };
+
+  const handleOpenExternalUrl = (url: string) => {
+    openUrl(url).catch((err) => {
+      console.warn('Failed to open external url:', err);
+      if (typeof window !== 'undefined') {
+        window.open(url, '_blank', 'noopener,noreferrer');
+      }
+    });
   };
 
   const handleSave = async () => {
@@ -1768,6 +1827,278 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
             </div>
           )}
+
+          {/* About / Licenses Section */}
+          <div className="settings-section" id="settings-about-licenses-section">
+            <div className="section-title">
+              <Info size={14} style={{ display: 'inline', marginRight: 6, color: '#38bdf8' }} />
+              {t.settings.aboutSectionTitle}
+            </div>
+
+            {/* About Waddle Hero Card */}
+            <div
+              style={{
+                padding: '14px 16px',
+                background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.08), rgba(99, 102, 241, 0.05))',
+                border: '1px solid rgba(56, 189, 248, 0.25)',
+                borderRadius: '8px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ fontSize: '16px', fontWeight: 700, color: '#f8fafc', letterSpacing: '0.5px' }}>
+                    {t.settings.aboutAppName}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: '11px',
+                      background: 'rgba(56, 189, 248, 0.15)',
+                      border: '1px solid rgba(56, 189, 248, 0.3)',
+                      color: '#38bdf8',
+                      padding: '2px 8px',
+                      borderRadius: '12px',
+                      fontWeight: 600,
+                    }}
+                  >
+                    v0.1.0 · MIT License
+                  </span>
+                </div>
+                <div style={{ fontSize: '12px', fontWeight: 500, color: '#a5b4fc' }}>
+                  {t.settings.aboutTagline}
+                </div>
+              </div>
+              <div style={{ fontSize: '12px', color: '#94a3b8', lineHeight: 1.6 }}>
+                {t.settings.aboutDescription}
+              </div>
+              <div style={{ fontSize: '12px', color: '#cbd5e1', lineHeight: 1.5 }}>
+                {t.settings.aboutWaddleLicense}
+              </div>
+            </div>
+
+            {/* Acknowledgements Sub-section */}
+            <div style={{ marginTop: '6px' }}>
+              <div style={{ fontSize: '13px', fontWeight: 600, color: '#f8fafc', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Heart size={13} style={{ color: '#f43f5e' }} />
+                <span>{t.settings.acknowledgementsTitle}</span>
+              </div>
+              <div style={{ fontSize: '12px', color: '#94a3b8', lineHeight: 1.5, marginBottom: '10px' }}>
+                {t.settings.acknowledgementsIntro}
+              </div>
+
+              {/* Project Cards Grid */}
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+                  gap: '8px',
+                }}
+              >
+                {ACKNOWLEDGED_PROJECTS.map((project) => (
+                  <div
+                    key={project.name}
+                    id={`card-acknowledgement-${project.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}`}
+                    style={{
+                      padding: '10px 12px',
+                      background: 'rgba(255, 255, 255, 0.02)',
+                      border: '1px solid rgba(255, 255, 255, 0.06)',
+                      borderRadius: '6px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                      gap: '6px',
+                    }}
+                  >
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                        <span style={{ fontSize: '13px', fontWeight: 600, color: '#f8fafc' }}>
+                          {project.name}
+                        </span>
+                        <span
+                          style={{
+                            fontSize: '10px',
+                            background: 'rgba(255, 255, 255, 0.06)',
+                            color: '#cbd5e1',
+                            padding: '1px 6px',
+                            borderRadius: '4px',
+                          }}
+                        >
+                          {project.license}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '11px', color: '#94a3b8', lineHeight: 1.4 }}>
+                        {t.settings[project.descKey]}
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '2px' }}>
+                      <button
+                        type="button"
+                        id={`btn-oss-${project.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}`}
+                        onClick={() => handleOpenExternalUrl(project.url)}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          background: 'transparent',
+                          border: 'none',
+                          color: '#38bdf8',
+                          fontSize: '11px',
+                          cursor: 'pointer',
+                          padding: '2px 4px',
+                          borderRadius: '4px',
+                        }}
+                        title={project.url}
+                      >
+                        <span>{project.url.replace(/^https?:\/\//, '').replace(/\/$/, '')}</span>
+                        <ExternalLink size={11} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Licenses & Third-Party Notice Sub-section */}
+            <div style={{ marginTop: '8px' }}>
+              <div style={{ fontSize: '13px', fontWeight: 600, color: '#f8fafc', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Scale size={13} style={{ color: '#38bdf8' }} />
+                <span>{t.settings.licensesSectionTitle}</span>
+              </div>
+
+              <div
+                style={{
+                  padding: '12px 14px',
+                  background: 'rgba(255, 255, 255, 0.02)',
+                  border: '1px solid rgba(255, 255, 255, 0.06)',
+                  borderRadius: '8px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '10px',
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: '12px', fontWeight: 600, color: '#e2e8f0', marginBottom: '3px' }}>
+                    Waddle (MIT License)
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#94a3b8', lineHeight: 1.5 }}>
+                    {t.settings.licensesWaddleDesc}
+                  </div>
+                </div>
+
+                <div style={{ borderTop: '1px solid rgba(255, 255, 255, 0.04)', paddingTop: '8px' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 600, color: '#e2e8f0', marginBottom: '3px' }}>
+                    Third-Party Dependencies & Compliance
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#94a3b8', lineHeight: 1.5 }}>
+                    {t.settings.licensesThirdPartyDesc}
+                  </div>
+                </div>
+
+                <div style={{ borderTop: '1px solid rgba(255, 255, 255, 0.04)', paddingTop: '8px' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 600, color: '#e2e8f0', marginBottom: '3px' }}>
+                    {t.settings.fontsPolicyTitle}
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#94a3b8', lineHeight: 1.5, marginBottom: '4px' }}>
+                    {t.settings.fontsPolicyDesc}
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#94a3b8', lineHeight: 1.5 }}>
+                    {t.settings.assetsPolicyDesc}
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    borderTop: '1px solid rgba(255, 255, 255, 0.04)',
+                    paddingTop: '8px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px',
+                  }}
+                >
+                  <div style={{ fontSize: '11px', color: '#64748b', fontStyle: 'italic', lineHeight: 1.4 }}>
+                    {t.settings.licensesAuthoritativeDesc}
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      id="btn-view-licenses-doc"
+                      onClick={() =>
+                        handleOpenExternalUrl(
+                          selectedLang === 'ja'
+                            ? 'https://github.com/wammed/Waddle/blob/main/LICENSES.ja.md'
+                            : 'https://github.com/wammed/Waddle/blob/main/LICENSES.md'
+                        )
+                      }
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '6px 12px',
+                        fontSize: '12px',
+                        background: 'rgba(56, 189, 248, 0.1)',
+                        border: '1px solid rgba(56, 189, 248, 0.3)',
+                        color: '#38bdf8',
+                        cursor: 'pointer',
+                        borderRadius: '6px',
+                        fontWeight: 500,
+                      }}
+                    >
+                      <Scale size={13} />
+                      <span>{t.settings.viewLicensesDocBtn}</span>
+                      <ExternalLink size={11} />
+                    </button>
+
+                    <button
+                      type="button"
+                      id="btn-view-license-file"
+                      onClick={() => handleOpenExternalUrl('https://github.com/wammed/Waddle/blob/main/LICENSE')}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '6px 12px',
+                        fontSize: '12px',
+                        background: 'rgba(255, 255, 255, 0.04)',
+                        border: '1px solid rgba(255, 255, 255, 0.12)',
+                        color: '#f8fafc',
+                        cursor: 'pointer',
+                        borderRadius: '6px',
+                        fontWeight: 500,
+                      }}
+                    >
+                      <span>{t.settings.viewLicenseFileBtn}</span>
+                      <ExternalLink size={11} />
+                    </button>
+
+                    <button
+                      type="button"
+                      id="btn-view-github-repo"
+                      onClick={() => handleOpenExternalUrl('https://github.com/wammed/Waddle')}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '6px 12px',
+                        fontSize: '12px',
+                        background: 'rgba(255, 255, 255, 0.04)',
+                        border: '1px solid rgba(255, 255, 255, 0.12)',
+                        color: '#f8fafc',
+                        cursor: 'pointer',
+                        borderRadius: '6px',
+                        fontWeight: 500,
+                      }}
+                    >
+                      <span>{t.settings.viewRepoBtn}</span>
+                      <ExternalLink size={11} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div className="modal-footer" style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>

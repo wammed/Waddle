@@ -499,6 +499,27 @@
     - **検証**:
       - `npm run test:security`: Gitleaks, Secretlint, Cargo Audit, Cargo Deny, Security Regression Suite 6大防御すべて 100% PASS。
       - `npm run build`: TypeScript 型検査および Vite クライアントビルド 0 エラー成功。
+45. **Waddle 設定画面への「About / Licenses」セクション追加・オープンソース謝辞 (Acknowledgements) 実装 & 全ドキュメント同期**:
+    - **ユーザー要望**: Waddle の Settings モーダル内に「About / Licenses」セクションを追加・整備し、主要 OSS プロジェクトへの謝辞（Acknowledgements）を表示しつつ、Waddle 自身および第三者依存の正式ライセンス情報（`LICENSES.md` / `LICENSES.ja.md`）へ到達できるようにすること。React 側へのライセンス手動重複管理を避け、英語・日本語で完全同期した内容・情報量を提供すること。
+    - **実施内容**:
+      1. **Settings モーダル内の「About / Licenses」セクション新設 (`src/components/SettingsModal.tsx`)**:
+         - **About Waddle**: アプリ名、バージョンおよびライセンスバッジ（`v0.1.0 · MIT License`）、タグライン（`AI-native Linux terminal environment` / `AIネイティブなLinuxターミナル環境`）、および Waddle 本体の MIT License オープンソース説明をサイバーパンク調グラデーションヒーローカードで表示。
+         - **Acknowledgements (謝辞)**: 実際に Waddle の依存関係（`package.json`, `Cargo.toml`）に存在する主要基盤プロジェクト（**Tauri**, **React**, **Rust**, **Vite**, **xterm.js**, **Prism.js**, **Lucide Icons**）へ謝辞を明記。各カードにライセンスバッジ、簡潔な役割説明、および各公式サイトを開く 1 クリック外部リンク導線（`openUrl`）を完備（依存関係のない `libcosmic` は方針通り除外）。
+         - **Licenses & Third-Party Compliance**: Waddle の MIT License、`cargo-deny` による全推移的クレート・パッケージのパーミッシブライセンス監査、Linux デスクトップシステム共有ライブラリ（GTK 3, WebKitGTK）の動的リンク解決、および Nerd Fonts の非同梱・非再配布（ホスト OS ローカル参照）方針を明記。
+         - **Authoritative Documentation 案内 & 導線ボタン**: アプリ内情報は利便性のための導線であり、ソースツリーの正式なライセンス文書に代わるものではない旨を明記。`LICENSES.md` / `LICENSES.ja.md`、`LICENSE` (MIT)、および GitHub リポジトリを開くボタンを提供。
+      2. **完全同期された多言語対応 (`src/i18n/translations.ts`)**:
+         - 英語（`en-US`, `en-GB`）および日本語（`ja`）の辞書に About / Licenses 関連の全キーを追加。文体・用語・項目数・構成を 100% 完全同期。
+      3. **ライセンス文書および全関連ドキュメントの同期更新**:
+         - `LICENSES.md` & `LICENSES.ja.md`: セクション 6「In-App About & License Information」/「アプリ内のAbout / License情報」を追加し内容を完全同期。
+         - `README.md` & `README.ja.md`: キーバインディング表（`Ctrl + ,`）に About / Licenses を追記、ライセンスセクションにアプリ内設定画面への言及を追加。
+         - `docs/README.md` & `docs/README.ja.md`: キーバインディング表およびライセンスセクションをルート README と同期。
+         - `docs/FEATURES.md` & `docs/FEATURES.ja.md`: セクション 26「In-App About, Open-Source Acknowledgements & Licensing (`Ctrl + ,`)」/「アプリ内のAbout / License情報とオープンソース謝辞 (`Ctrl + ,`)」を新設し、設定画面の機能詳細を解説。
+         - `src/i18n/__tests__/translations.test.ts`: 全言語でのキー存在・文字列長・主要ポリシー文言のテストを追加。
+         - `src/components/__tests__/SettingsModal.test.tsx`: 英語・日本語両ロケールでの About / Licenses 描画、各 OSS 謝辞、Nerd Fonts 方針のレンダリングを検証する単体テストを新規作成。
+    - **検証**:
+      - `npm run test`: 単体テスト 11 ファイル / 全 86 テストすべて 100% PASS。
+      - `npm run test:security`: Gitleaks, Secretlint, Cargo Audit, Cargo Deny, Security Regression Suite 6大防御すべて 100% PASS。
+      - `npm run build`: TypeScript 型検査 & Vite 本番ビルド 0 エラー成功。
 
 ---
 

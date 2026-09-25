@@ -104,6 +104,16 @@ npx license-checker --production --markdown > THIRD_PARTY_LICENSES_NPM.md
 
 ---
 
+## 6. アプリ内のAbout / License情報 (In-App About & License Information)
+
+Waddleは、アプリケーションのSettings UIにAbout / Licensesセクションを提供しています。
+
+Aboutセクションでは、Waddleで使用している主要なオープンソースプロジェクトへの謝辞を掲載しています。Licensesセクションでは、Waddle自身のライセンスおよび第三者ライセンス情報を確認するための導線を提供しています。
+
+アプリ内に表示される情報は利便性のために提供されるものであり、ソースツリーに含まれる正式なライセンスファイルおよびライセンス関連ドキュメントに代わるものではありません。
+
+---
+
 ## サマリー (Summary)
 
 | 構成要素 | ライセンス / 適用方針 | 補足 |

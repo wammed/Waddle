@@ -42,4 +42,55 @@ describe('translations', () => {
       expect(keys).toEqual(enSettingsKeys);
     }
   });
+
+  it('contains consistent About and Licenses information across all supported languages', () => {
+    const requiredAboutKeys = [
+      'aboutSectionTitle',
+      'aboutAppName',
+      'aboutTagline',
+      'aboutDescription',
+      'aboutWaddleLicense',
+      'acknowledgementsTitle',
+      'acknowledgementsIntro',
+      'projectTauriDesc',
+      'projectReactDesc',
+      'projectRustDesc',
+      'projectViteDesc',
+      'projectXtermDesc',
+      'projectPrismDesc',
+      'projectLucideDesc',
+      'licensesSectionTitle',
+      'licensesWaddleDesc',
+      'licensesThirdPartyDesc',
+      'licensesAuthoritativeDesc',
+      'fontsPolicyTitle',
+      'fontsPolicyDesc',
+      'assetsPolicyDesc',
+      'viewLicensesDocBtn',
+      'viewLicenseFileBtn',
+      'viewRepoBtn',
+    ] as const;
+
+    for (const lang of languages) {
+      for (const key of requiredAboutKeys) {
+        const val = translations[lang].settings[key];
+        expect(typeof val).toBe('string');
+        expect(val.length).toBeGreaterThan(0);
+      }
+    }
+
+    // Verify key policy details in English
+    const en = translations['en-US'].settings;
+    expect(en.fontsPolicyDesc).toContain('does not bundle or redistribute Nerd Font files');
+    expect(en.fontsPolicyDesc).toContain('Users are responsible for obtaining and licensing fonts installed on their system');
+    expect(en.licensesAuthoritativeDesc).toContain('LICENSES.md');
+    expect(en.acknowledgementsIntro).toContain('Tauri, React, Prism.js, xterm.js, Lucide Icons, Rust, and Vite');
+
+    // Verify key policy details in Japanese
+    const ja = translations['ja'].settings;
+    expect(ja.fontsPolicyDesc).toContain('Nerd Fontファイルをバンドルまたは再配布していません');
+    expect(ja.fontsPolicyDesc).toContain('ユーザー自身がシステムにインストールするフォントの取得およびライセンスについて責任を負います');
+    expect(ja.licensesAuthoritativeDesc).toContain('LICENSES.ja.md');
+    expect(ja.acknowledgementsIntro).toContain('Tauri、React、Prism.js、xterm.js、Lucide Icons、Rust、Vite');
+  });
 });

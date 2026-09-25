@@ -152,7 +152,7 @@ sudo pacman -U src-tauri/target/release/bundle/pacman/waddle-0.1.0-1-x86_64.pkg.
 | `Ctrl + Shift + S` | **Swap panes** in current split tab |
 | `Alt + 1 ~ 4` | Switch layout (**Single, 2-Split, 3-Split, 4-Split Grid**) |
 | `Ctrl + Enter` | **Execute Git Commit** / **Run AI Command Immediately** |
-| `Ctrl + ,` | Open **Settings** (Themes, Fonts, Ollama, Wallpapers, Git) |
+| `Ctrl + ,` | Open **Settings** (Themes, Fonts, Ollama, Wallpapers, Git, About / Licenses) |
 | `Esc` | Close active modal, search overlay, or popover |
 
 > 💡 For the complete keybindings list, see [docs/FEATURES.md](docs/FEATURES.md#️-complete-keybindings-reference).
@@ -211,7 +211,7 @@ Waddle operates under a strict **100% offline, local-first** model:
 
 This project is licensed under the [MIT License](LICENSE).
 
-For detailed information regarding our source-code-only distribution policy, third-party dependency compliance (`cargo-deny` permissive policy), dynamic linking of system libraries (GTK3, WebKitGTK), and guidance on extracting dependency notices for redistributable packaging, please see [LICENSES.md](LICENSES.md).
+For detailed information regarding our source-code-only distribution policy, third-party dependency compliance (`cargo-deny` permissive policy), dynamic linking of system libraries (GTK3, WebKitGTK), and guidance on extracting dependency notices for redistributable packaging, please see [LICENSES.md](LICENSES.md). An in-app **About / Licenses** section is also available directly in the application Settings (`Ctrl + ,`).
 
 ### Fonts & Licensing
 

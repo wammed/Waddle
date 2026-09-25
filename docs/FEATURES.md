@@ -755,7 +755,7 @@ flowchart TD
 
 ---
 
-### 23. 📜 High-Performance Overlay Scrollbar
+### 25. 📜 High-Performance Overlay Scrollbar
 
 - **Zero-Impact Floating Architecture**:
   - Floats cleanly above the terminal canvas via `position: absolute; right: 2px;` without consuming cell grid width or triggering PTY re-fits (`SIGWINCH`).
@@ -779,7 +779,27 @@ flowchart TD
 
 ---
 
-## 24. ⌨️ Complete Keybindings Reference
+### 26. ℹ️ In-App About, Open-Source Acknowledgements & Licensing (`Ctrl + ,`)
+
+- **Dedicated Settings Section**:
+  - Integrated directly into the Settings modal (`Ctrl + ,`), presenting core application identity, version details, and open-source acknowledgements.
+- **Acknowledgements for Core Foundations**:
+  - Displays explicit acknowledgements to the verified open-source projects powering Waddle: **Tauri**, **React**, **Rust**, **Vite**, **xterm.js**, **Prism.js**, and **Lucide Icons**.
+  - Each project card features its upstream license badge, brief functional role within Waddle, and direct 1-click external navigation to its official project homepage.
+- **License Compliance & Authoritative Documentation Navigation**:
+  - Outlines Waddle's MIT License alongside permissive third-party crate and package governance strictly validated via `cargo-deny` in CI/CD.
+  - Clarifies dynamic linking boundaries for Linux desktop system libraries (GTK 3, WebKitGTK).
+  - Explicitly states that in-app UI information is provided for user convenience and directs users to the authoritative source repository documentation ([LICENSES.md](../LICENSES.md)).
+  - Provides instant buttons to open `LICENSES.md`, the root `LICENSE`, and the official GitHub repository.
+- **Fonts & Visual Assets Clearance**:
+  - Reaffirms Waddle's policy: Nerd Fonts are not bundled or redistributed; users leverage locally installed fonts on their host operating system and maintain responsibility for licensing.
+  - Affirms original SVG assets and wallpapers are provided under the MIT License, and UI icons via Lucide Icons under MIT.
+- **100% Synchronized Multilingual Support**:
+  - Fully translated with identical depth, structure, and parity across English (`en-US`, `en-GB`) and Japanese (`ja`).
+
+---
+
+## 27. ⌨️ Complete Keybindings Reference
 
 | Shortcut | Context | Action |
 | :--- | :--- | :--- |
@@ -804,7 +824,7 @@ flowchart TD
 | `Alt + 4` | Global | Switch to **4-Split Grid (2×2グリッド)** layout |
 | `Alt + Z` | Split Tab | Toggle **Zoom / Maximize active pane** |
 | `Alt + ↑ / ↓ / ← / →` | Split Tab | Navigate focus across directional split panes |
-| `Ctrl + ,` | Global | Open **Settings** (Theme, Font, Ollama, Wallpaper, Language, Git) |
+| `Ctrl + ,` | Global | Open **Settings** (Theme, Font, Ollama, Wallpaper, Language, Git, About / Licenses) |
 | `Git Badge (Status Bar)` | Status Bar | Toggle **Git Quick Popover** |
 | `Ctrl + Enter` | Git Popover | Commit staged changes |
 | `Enter` | AI Modal | Insert generated command into terminal prompt |
