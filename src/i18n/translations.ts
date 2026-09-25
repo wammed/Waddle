@@ -604,7 +604,7 @@ export const translations: Record<Language, Translations> = {
       noDiff: 'No diff available or file is identical.',
     },
     settings: {
-      modalTitle: 'Waddle Settings (Ollama Local AI & Appearance)',
+      modalTitle: 'Waddle Settings & Licenses',
       languageSectionTitle: 'Language / 言語',
       languageLabel: 'Interface & Message Language',
       languages: {
@@ -969,7 +969,7 @@ export const translations: Record<Language, Translations> = {
       noDiff: 'No diff available or file is identical.',
     },
     settings: {
-      modalTitle: 'Waddle Settings (Ollama Local AI & Appearance)',
+      modalTitle: 'Waddle Settings & Licenses',
       languageSectionTitle: 'Language / 言語',
       languageLabel: 'Interface & Message Language',
       languages: {
@@ -1334,7 +1334,7 @@ export const translations: Record<Language, Translations> = {
       noDiff: '差分はありません、またはファイルの内容は一致しています。',
     },
     settings: {
-      modalTitle: 'Waddle 設定 (Ollama Local AI & Appearance)',
+      modalTitle: 'Waddle 設定 & ライセンス',
       languageSectionTitle: 'Language / 言語',
       languageLabel: 'UI およびメッセージの表示言語',
       languages: {

@@ -476,7 +476,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     <div className="modal-backdrop" onClick={onClose}>
       <div
         className="ai-modal"
-        style={{ width: '660px', backgroundColor: '#131722', color: '#f8fafc' }}
+        style={{ width: '700px', maxWidth: '92vw', backgroundColor: '#131722', color: '#f8fafc' }}
         onClick={(e) => e.stopPropagation()}
       >
         <div
@@ -486,7 +486,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '12px 16px',
+            padding: '18px 22px',
           }}
         >
           <div
@@ -495,17 +495,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               color: 'var(--fg-main)',
               display: 'flex',
               alignItems: 'center',
-              gap: '12px',
+              gap: '16px',
             }}
           >
             <div
               style={{
-                width: '32px',
-                height: '32px',
-                borderRadius: '8px',
-                background: 'rgba(255, 255, 255, 0.04)',
-                border: '1px solid rgba(255, 255, 255, 0.14)',
-                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3), 0 0 10px rgba(56, 189, 248, 0.12)',
+                width: '60px',
+                height: '60px',
+                borderRadius: '14px',
+                background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.07), rgba(56, 189, 248, 0.05))',
+                border: '1px solid rgba(255, 255, 255, 0.16)',
+                boxShadow: '0 4px 20px rgba(0, 0, 0, 0.4), 0 0 20px rgba(56, 189, 248, 0.2)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -516,20 +516,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 src={waddleIcon}
                 alt="Waddle"
                 style={{
-                  width: '22px',
-                  height: '22px',
-                  borderRadius: '4px',
+                  width: '46px',
+                  height: '46px',
+                  borderRadius: '6px',
                   objectFit: 'contain',
-                  filter: 'drop-shadow(0 0 5px var(--accent-glow))',
+                  filter: 'drop-shadow(0 0 8px var(--accent-glow))',
                 }}
               />
             </div>
             <span
               style={{
                 fontFamily: 'var(--font-mono, monospace)',
-                fontSize: '16px',
-                fontWeight: 600,
-                letterSpacing: '0.4px',
+                fontSize: '26px',
+                fontWeight: 700,
+                letterSpacing: '0.5px',
                 color: '#f8fafc',
               }}
             >
@@ -539,11 +539,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           <button
             onClick={onClose}
             className="action-btn"
-            style={{ padding: '2px 6px', border: 'none', background: 'transparent' }}
+            style={{ padding: '6px 8px', border: 'none', background: 'transparent' }}
             title={t.common.close}
             aria-label={t.common.close}
           >
-            <X size={16} />
+            <X size={22} />
           </button>
         </div>
 

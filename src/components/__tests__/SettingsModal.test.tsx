@@ -140,13 +140,27 @@ describe('SettingsModal - About / Licenses Section', () => {
       />
     );
 
-    // Verify modal top header has the Waddle icon
+    // Verify modal top header has the Waddle icon and updated title
     expect(html).toContain('class="ai-modal-header"');
     expect(html).toContain('alt="Waddle"');
+    expect(html).toContain('Waddle Settings &amp; Licenses');
 
     // Count occurrences of alt="Waddle" (one in top header, one in About hero card)
     const iconMatches = html.match(/alt="Waddle"/g);
     expect(iconMatches).not.toBeNull();
     expect(iconMatches?.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('renders Waddle 設定 &amp; ライセンス in modal top header when language is ja', () => {
+    const html = renderToStaticMarkup(
+      <SettingsModal
+        isOpen={true}
+        onClose={() => {}}
+        config={mockConfigJa}
+        onSaveConfig={() => {}}
+      />
+    );
+
+    expect(html).toContain('Waddle 設定 &amp; ライセンス');
   });
 });
