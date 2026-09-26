@@ -19,10 +19,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 20
           cache: npm
@@ -38,16 +38,23 @@ jobs:
             libappindicator3-dev \
             librsvg2-dev
 
-      - name: Install Node.js dependencies
+      - name: Install Node dependencies
         run: npm ci
 
-      - name: Install security tools
-        run: |
-          cargo install cargo-audit --locked
-          cargo install cargo-deny --locked
-
       - name: Install Gitleaks
-        uses: gitleaks/gitleaks-installer@v3
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          curl -sSfL \
+            https://raw.githubusercontent.com/gitleaks/gitleaks/master/install.sh \
+            | sh -s -- -b "$HOME/.local/bin" v8.30.1
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          gitleaks version
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+
+      - name: Install cargo-deny
+        run: cargo install cargo-deny --locked
 
       - name: Run security audit suite
         run: ./test-security.sh
@@ -58,7 +65,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -77,24 +84,27 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Check formatting
+        working-directory: src-tauri
         run: cargo fmt --all -- --check
 
       - name: Run Rust tests
+        working-directory: src-tauri
         run: cargo test --all-targets
 
       - name: Run Clippy
+        working-directory: src-tauri
         run: cargo clippy --all-targets -- -D warnings
 
   frontend:
-    name: Frontend Unit & Coverage Gate
+    name: Frontend Unit & Coverage
     runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 20
           cache: npm
@@ -111,10 +121,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 20
           cache: npm
@@ -137,4 +147,5 @@ jobs:
         run: npm run build
 
       - name: Verify release build
+        working-directory: src-tauri
         run: cargo check --release
