@@ -225,7 +225,8 @@ fn validate_image_data_and_filename(file_name: &str, data: &[u8]) -> Result<Stri
     } else if data.starts_with(b"BM") {
         "bmp"
     } else if data.starts_with(b"<svg")
-        || (data.starts_with(b"<?xml") && String::from_utf8_lossy(&data[..data.len().min(512)]).contains("<svg"))
+        || (data.starts_with(b"<?xml")
+            && String::from_utf8_lossy(&data[..data.len().min(512)]).contains("<svg"))
     {
         "svg"
     } else {
@@ -308,7 +309,8 @@ impl ConfigManager {
 
                     if let Ok(decoded_bytes) = BASE64_STANDARD.decode(base64_str.trim()) {
                         let file_name = format!("migrated_wallpaper.{}", ext);
-                        if let Ok(saved_path) = self.save_wallpaper_data(&file_name, &decoded_bytes) {
+                        if let Ok(saved_path) = self.save_wallpaper_data(&file_name, &decoded_bytes)
+                        {
                             cfg.terminal.background_image = Some(saved_path);
                             return true;
                         }
@@ -355,7 +357,11 @@ impl ConfigManager {
 
 pub fn validate_wallpaper_file_path(path_str: &str) -> Result<(), String> {
     let trimmed = path_str.trim();
-    if trimmed.is_empty() || trimmed == "none" || trimmed == "preset_cyberpunk" || trimmed == "preset_official" {
+    if trimmed.is_empty()
+        || trimmed == "none"
+        || trimmed == "preset_cyberpunk"
+        || trimmed == "preset_official"
+    {
         return Ok(());
     }
     let expanded = if let Some(rest) = trimmed.strip_prefix("~/") {
@@ -375,23 +381,38 @@ pub fn validate_wallpaper_file_path(path_str: &str) -> Result<(), String> {
     };
 
     if !expanded.is_file() {
-        return Err(format!("ENOENT: 指定された壁紙ファイルが存在しません: {} (Wallpaper file does not exist)", trimmed));
+        return Err(format!(
+            "ENOENT: 指定された壁紙ファイルが存在しません: {} (Wallpaper file does not exist)",
+            trimmed
+        ));
     }
 
     use std::io::Read;
-    let mut file = fs::File::open(&expanded)
-        .map_err(|e| format!("EACCES: 壁紙ファイルを開けませんでした: {} (Failed to open wallpaper file)", e))?;
+    let mut file = fs::File::open(&expanded).map_err(|e| {
+        format!(
+            "EACCES: 壁紙ファイルを開けませんでした: {} (Failed to open wallpaper file)",
+            e
+        )
+    })?;
     let mut buffer = [0u8; 512];
-    let bytes_read = file.read(&mut buffer)
-        .map_err(|e| format!("EIO: 壁紙ファイルの読み込みに失敗しました: {} (Failed to read wallpaper file)", e))?;
+    let bytes_read = file.read(&mut buffer).map_err(|e| {
+        format!(
+            "EIO: 壁紙ファイルの読み込みに失敗しました: {} (Failed to read wallpaper file)",
+            e
+        )
+    })?;
     if bytes_read == 0 {
         return Err("EINVAL: 壁紙ファイルが空です。 (Wallpaper file is empty)".to_string());
     }
 
     validate_image_data_and_filename(
-        expanded.file_name().and_then(|n| n.to_str()).unwrap_or("wallpaper.png"),
+        expanded
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("wallpaper.png"),
         &buffer[..bytes_read],
-    ).map(|_| ())
+    )
+    .map(|_| ())
 }
 
 #[cfg(test)]
@@ -434,7 +455,8 @@ mod tests {
 
     #[test]
     fn test_save_wallpaper_validation() {
-        let temp_dir = std::env::temp_dir().join(format!("waddle_wp_test_{}", uuid::Uuid::new_v4()));
+        let temp_dir =
+            std::env::temp_dir().join(format!("waddle_wp_test_{}", uuid::Uuid::new_v4()));
         let manager = ConfigManager {
             config_path: temp_dir.join("config.json"),
             config_dir: temp_dir.clone(),
@@ -450,10 +472,14 @@ mod tests {
 
         // 3. Invalid script or binary must be rejected
         let evil_script = b"#!/bin/bash\nrm -rf /";
-        assert!(manager.save_wallpaper_data("script.sh", evil_script).is_err());
+        assert!(manager
+            .save_wallpaper_data("script.sh", evil_script)
+            .is_err());
 
         let evil_png_named_script = b"#!/bin/bash\necho pwned";
-        assert!(manager.save_wallpaper_data("fake.png", evil_png_named_script).is_err());
+        assert!(manager
+            .save_wallpaper_data("fake.png", evil_png_named_script)
+            .is_err());
 
         let _ = fs::remove_dir_all(&temp_dir);
     }
@@ -515,7 +541,8 @@ mod tests {
 
     #[test]
     fn test_validate_wallpaper_file_path() {
-        let temp_dir = std::env::temp_dir().join(format!("waddle_val_test_{}", uuid::Uuid::new_v4()));
+        let temp_dir =
+            std::env::temp_dir().join(format!("waddle_val_test_{}", uuid::Uuid::new_v4()));
         let _ = fs::create_dir_all(&temp_dir);
 
         // Valid preset / none
@@ -531,7 +558,11 @@ mod tests {
 
         // Valid png must be accepted
         let real_png_path = temp_dir.join("real.png");
-        fs::write(&real_png_path, b"\x89PNG\r\n\x1a\nvalid_png_header_and_data").unwrap();
+        fs::write(
+            &real_png_path,
+            b"\x89PNG\r\n\x1a\nvalid_png_header_and_data",
+        )
+        .unwrap();
         assert!(validate_wallpaper_file_path(real_png_path.to_str().unwrap()).is_ok());
 
         let _ = fs::remove_dir_all(&temp_dir);

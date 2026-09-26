@@ -86,8 +86,12 @@ pub fn save_autosave_snapshot(canonical_path: &Path, content: &str) -> Result<()
     let new_filename = format!("{}.{}", base_name, now_millis);
     let new_file_path = dir.join(&new_filename);
 
-    fs::write(&new_file_path, content)
-        .map_err(|e| format!("自動バックアップスナップショットの保存に失敗しました: {}", e))?;
+    fs::write(&new_file_path, content).map_err(|e| {
+        format!(
+            "自動バックアップスナップショットの保存に失敗しました: {}",
+            e
+        )
+    })?;
 
     #[cfg(unix)]
     {
@@ -220,7 +224,9 @@ pub fn load_autosave_content(cache_id: &str) -> Result<String, String> {
 
 /// Remove autosave files in the given directory that are older than max_age_secs.
 pub fn clean_stale_autosaves_in_dir(dir: &Path, max_age_secs: u64) -> usize {
-    let Ok(entries) = fs::read_dir(dir) else { return 0 };
+    let Ok(entries) = fs::read_dir(dir) else {
+        return 0;
+    };
     let now = std::time::SystemTime::now();
     let mut removed = 0;
 
@@ -240,7 +246,9 @@ pub fn clean_stale_autosaves_in_dir(dir: &Path, max_age_secs: u64) -> usize {
 
 /// Remove autosave files that are older than max_age_secs (e.g. 7 days).
 pub fn clean_stale_autosaves(max_age_secs: u64) -> usize {
-    let Ok(dir) = get_autosave_dir() else { return 0 };
+    let Ok(dir) = get_autosave_dir() else {
+        return 0;
+    };
     clean_stale_autosaves_in_dir(&dir, max_age_secs)
 }
 
@@ -282,9 +290,20 @@ pub fn is_shell_config(canonical_path: &Path, home_dir: &Path) -> bool {
     // 2. $HOME direct children (known shell files)
     if rel_path.parent() == Some(Path::new("")) || rel_path == Path::new(file_name) {
         let known_home_shell_files = [
-            ".bashrc", ".bash_profile", ".bash_login", ".bash_logout", ".profile", ".shrc",
-            ".zshrc", ".zprofile", ".zshenv", ".zlogin", ".zlogout",
-            ".cshrc", ".tcshrc", ".kshrc",
+            ".bashrc",
+            ".bash_profile",
+            ".bash_login",
+            ".bash_logout",
+            ".profile",
+            ".shrc",
+            ".zshrc",
+            ".zprofile",
+            ".zshenv",
+            ".zlogin",
+            ".zlogout",
+            ".cshrc",
+            ".tcshrc",
+            ".kshrc",
         ];
         if known_home_shell_files.contains(&file_name) {
             return true;
@@ -316,9 +335,7 @@ pub fn validate_editor_security(canonical_path: &Path) -> Result<(), String> {
     let path_str = canonical_path.to_string_lossy();
 
     // 1. Virtual filesystems
-    if path_str.starts_with("/proc")
-        || path_str.starts_with("/sys")
-        || path_str.starts_with("/dev")
+    if path_str.starts_with("/proc") || path_str.starts_with("/sys") || path_str.starts_with("/dev")
     {
         return Err("[オープン拒否] システム仮想ディレクトリ（/proc, /sys, /dev 等）内のファイルは開くことができません。".to_string());
     }
@@ -413,7 +430,10 @@ pub fn editor_open_file(path: String) -> Result<EditorOpenResult, String> {
             .read(&mut probe_buf)
             .map_err(|e| format!("ファイル読み込み検査に失敗しました: {}", e))?;
         if probe_buf[..bytes_read].contains(&0u8) {
-            return Err("[バイナリ検出] バイナリファイル形式のためエディタで開くことができません。".to_string());
+            return Err(
+                "[バイナリ検出] バイナリファイル形式のためエディタで開くことができません。"
+                    .to_string(),
+            );
         }
     }
 
@@ -440,7 +460,10 @@ pub fn editor_open_file(path: String) -> Result<EditorOpenResult, String> {
             let process_euid = unsafe { libc::geteuid() };
             if file_uid != process_euid {
                 is_readonly = true;
-                readonly_reason = Some("[保存不可] 所有者が現在のユーザー ($USER) ではないため、変更できません。".to_string());
+                readonly_reason = Some(
+                    "[保存不可] 所有者が現在のユーザー ($USER) ではないため、変更できません。"
+                        .to_string(),
+                );
             }
         }
 
@@ -552,7 +575,10 @@ pub fn editor_save_file(path: String, content: String) -> Result<EditorSaveResul
             let file_uid = metadata.uid();
             let process_euid = unsafe { libc::geteuid() };
             if file_uid != process_euid {
-                return Err("[保存不可] 所有者が現在のユーザー ($USER) ではないため、変更できません。".to_string());
+                return Err(
+                    "[保存不可] 所有者が現在のユーザー ($USER) ではないため、変更できません。"
+                        .to_string(),
+                );
             }
             original_mode = Some(metadata.permissions().mode());
         }
@@ -626,7 +652,9 @@ pub fn editor_save_autosave(path: String, content: String) -> Result<(), String>
 pub fn editor_save_autosave_snapshot(path: String, content: String) -> Result<(), String> {
     let orig_p = Path::new(&path);
     let canonical_path = if orig_p.exists() {
-        orig_p.canonicalize().unwrap_or_else(|_| orig_p.to_path_buf())
+        orig_p
+            .canonicalize()
+            .unwrap_or_else(|_| orig_p.to_path_buf())
     } else {
         orig_p.to_path_buf()
     };
@@ -639,7 +667,9 @@ pub fn editor_save_autosave_snapshot(path: String, content: String) -> Result<()
 pub fn editor_get_autosave_history(path: String) -> Result<Vec<AutosaveEntry>, String> {
     let orig_p = Path::new(&path);
     let canonical_path = if orig_p.exists() {
-        orig_p.canonicalize().unwrap_or_else(|_| orig_p.to_path_buf())
+        orig_p
+            .canonicalize()
+            .unwrap_or_else(|_| orig_p.to_path_buf())
     } else {
         orig_p.to_path_buf()
     };
@@ -658,7 +688,9 @@ pub fn editor_load_autosave_content(cache_id: String) -> Result<String, String> 
 pub fn editor_remove_autosave(path: String) -> Result<(), String> {
     let orig_p = Path::new(&path);
     let canonical_path = if orig_p.exists() {
-        orig_p.canonicalize().unwrap_or_else(|_| orig_p.to_path_buf())
+        orig_p
+            .canonicalize()
+            .unwrap_or_else(|_| orig_p.to_path_buf())
     } else {
         orig_p.to_path_buf()
     };
@@ -698,7 +730,8 @@ mod tests {
 
     #[test]
     fn test_binary_detection() {
-        let temp_dir = std::env::temp_dir().join(format!("waddle_test_bin_{}", uuid::Uuid::new_v4()));
+        let temp_dir =
+            std::env::temp_dir().join(format!("waddle_test_bin_{}", uuid::Uuid::new_v4()));
         let _ = fs::create_dir_all(&temp_dir);
 
         let bin_file = temp_dir.join("test.bin");
@@ -715,7 +748,8 @@ mod tests {
 
     #[test]
     fn test_file_size_limit() {
-        let temp_dir = std::env::temp_dir().join(format!("waddle_test_size_{}", uuid::Uuid::new_v4()));
+        let temp_dir =
+            std::env::temp_dir().join(format!("waddle_test_size_{}", uuid::Uuid::new_v4()));
         let _ = fs::create_dir_all(&temp_dir);
 
         let big_file = temp_dir.join("big.txt");
@@ -742,7 +776,8 @@ mod tests {
 
     #[test]
     fn test_autosave_lifecycle() {
-        let temp_dir = std::env::temp_dir().join(format!("waddle_test_as_{}", uuid::Uuid::new_v4()));
+        let temp_dir =
+            std::env::temp_dir().join(format!("waddle_test_as_{}", uuid::Uuid::new_v4()));
         let _ = fs::create_dir_all(&temp_dir);
 
         let target = temp_dir.join("sample.conf");
@@ -769,7 +804,8 @@ mod tests {
 
     #[test]
     fn test_autosave_rotation_max_6() {
-        let temp_dir = std::env::temp_dir().join(format!("waddle_test_rot_{}", uuid::Uuid::new_v4()));
+        let temp_dir =
+            std::env::temp_dir().join(format!("waddle_test_rot_{}", uuid::Uuid::new_v4()));
         let _ = fs::create_dir_all(&temp_dir);
 
         let target = temp_dir.join("rotated.conf");
@@ -814,7 +850,8 @@ mod tests {
 
     #[test]
     fn test_autosave_stale_gc() {
-        let temp_dir = std::env::temp_dir().join(format!("waddle_test_gc_{}", uuid::Uuid::new_v4()));
+        let temp_dir =
+            std::env::temp_dir().join(format!("waddle_test_gc_{}", uuid::Uuid::new_v4()));
         let _ = fs::create_dir_all(&temp_dir);
 
         let old_file = temp_dir.join("test_stale_gc_file.1000");
@@ -856,11 +893,20 @@ mod tests {
                     assert!(save_res.is_ok());
                     let s_res = save_res.unwrap();
                     assert!(s_res.is_symlink);
-                    assert!(s_res.message.unwrap().contains("[注意] シンボリックリンク先のファイルを保存しました"));
+                    assert!(s_res
+                        .message
+                        .unwrap()
+                        .contains("[注意] シンボリックリンク先のファイルを保存しました"));
 
                     // Verify real file updated and symlink intact
-                    assert_eq!(fs::read_to_string(&real_file).unwrap(), "[settings]\nenabled = false\n");
-                    assert!(fs::symlink_metadata(&symlink_file).unwrap().file_type().is_symlink());
+                    assert_eq!(
+                        fs::read_to_string(&real_file).unwrap(),
+                        "[settings]\nenabled = false\n"
+                    );
+                    assert!(fs::symlink_metadata(&symlink_file)
+                        .unwrap()
+                        .file_type()
+                        .is_symlink());
                 }
             }
 
@@ -874,9 +920,20 @@ mod tests {
 
         // 1. $HOME direct shell files
         let direct_files = [
-            ".bashrc", ".bash_profile", ".bash_login", ".bash_logout", ".profile", ".shrc",
-            ".zshrc", ".zprofile", ".zshenv", ".zlogin", ".zlogout",
-            ".cshrc", ".tcshrc", ".kshrc",
+            ".bashrc",
+            ".bash_profile",
+            ".bash_login",
+            ".bash_logout",
+            ".profile",
+            ".shrc",
+            ".zshrc",
+            ".zprofile",
+            ".zshenv",
+            ".zlogin",
+            ".zlogout",
+            ".cshrc",
+            ".tcshrc",
+            ".kshrc",
         ];
         for f in &direct_files {
             assert!(
@@ -892,12 +949,24 @@ mod tests {
         assert!(is_shell_config(&home.join(".zsh_custom"), home));
 
         // 3. ~/.config/ standard shell config directories
-        assert!(is_shell_config(&home.join(".config/fish/config.fish"), home));
-        assert!(is_shell_config(&home.join(".config/fish/conf.d/alias.fish"), home));
-        assert!(is_shell_config(&home.join(".config/fish/functions/fish_prompt.fish"), home));
+        assert!(is_shell_config(
+            &home.join(".config/fish/config.fish"),
+            home
+        ));
+        assert!(is_shell_config(
+            &home.join(".config/fish/conf.d/alias.fish"),
+            home
+        ));
+        assert!(is_shell_config(
+            &home.join(".config/fish/functions/fish_prompt.fish"),
+            home
+        ));
         assert!(is_shell_config(&home.join(".config/zsh/.zshrc"), home));
         assert!(is_shell_config(&home.join(".config/bash/bashrc"), home));
-        assert!(is_shell_config(&home.join(".config/nushell/config.nu"), home));
+        assert!(is_shell_config(
+            &home.join(".config/nushell/config.nu"),
+            home
+        ));
 
         // 4. Negative cases (normal files and configs that should NOT match)
         assert!(!is_shell_config(&home.join("main.rs"), home));
@@ -916,7 +985,11 @@ mod tests {
             let _ = fs::write(&test_shell_file, "# test shell config\nexport FOO=bar\n");
 
             let open_res = editor_open_file(test_shell_file.to_string_lossy().to_string());
-            assert!(open_res.is_ok(), "Failed to open shell config: {:?}", open_res.err());
+            assert!(
+                open_res.is_ok(),
+                "Failed to open shell config: {:?}",
+                open_res.err()
+            );
 
             let res = open_res.unwrap();
             assert!(!res.is_readonly, "Shell config should NOT be read-only");
@@ -936,7 +1009,11 @@ mod tests {
                 test_shell_file.to_string_lossy().to_string(),
                 "# test shell config updated\nexport FOO=baz\n".to_string(),
             );
-            assert!(save_res.is_ok(), "Failed to save shell config: {:?}", save_res.err());
+            assert!(
+                save_res.is_ok(),
+                "Failed to save shell config: {:?}",
+                save_res.err()
+            );
 
             let updated = fs::read_to_string(&test_shell_file).unwrap();
             assert_eq!(updated, "# test shell config updated\nexport FOO=baz\n");

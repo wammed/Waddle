@@ -13,7 +13,7 @@ This document provides a comprehensive, end-to-end test plan for **Waddle**, cov
 ### 1.2 Testing Scope
 1. **PTY & Terminal Core** (10 Test Cases)
 2. **Tabs, 10-Split Layouts & Session Persistence** (8 Test Cases)
-3. **File Tree Sidebar & Embedded Editor** (13 Test Cases)
+3. **File Tree Sidebar & Embedded Editor** (14 Test Cases)
 4. **AI Assistant & Context Integration** (6 Test Cases)
 5. **Git Integration & Remote Guardrails** (8 Test Cases)
 6. **Theming, UI Glow, Wallpapers & Icons** (6 Test Cases)
@@ -22,7 +22,7 @@ This document provides a comprehensive, end-to-end test plan for **Waddle**, cov
 9. **Performance, Resource Bounds & Leak Prevention** (5 Test Cases)
 10. **Next-Gen Workflow & Productivity** (6 Test Cases)
 11. **Integrated Test Suite & Security/Regression** (5 Test Cases)
-**Total: 108 Comprehensive Test Cases (11 Suites)**
+**Total: 109 Comprehensive Test Cases (11 Suites)**
 
 ### 1.3 Prerequisites & Environment
 - **Operating System**: Linux (Ubuntu 22.04+, Debian 12+, Arch Linux, etc., WebKitGTK 4.1 / 4.0)
@@ -93,6 +93,7 @@ This document provides a comprehensive, end-to-end test plan for **Waddle**, cov
 | **TC-FILE-11** | AI Code Edit / Refactor (`Ctrl+Shift+K`) | Select code block in editor and press `Ctrl+Shift+K` with instructions. | AI diff viewer shows proposed additions/deletions; apply button updates code in-place. | Manual |
 | **TC-FILE-12** | Header Restore UI & Popover Modal (`復元 (N)`) | Open file with existing snapshots; observe editor toolbar and click `Restore (N)` / `復元 (N)`. | Button appears only when snapshots exist, showing count badge; clicking opens popover displaying newest-first snapshots with `[Latest]` badge, timestamps, relative time, and file size. | Manual |
 | **TC-FILE-13** | Snapshot Restoration & Non-Destructive Undo (`Ctrl+Z`) | Click `Restore` on an older snapshot in popover. Verify editor buffer updates and dirty flag activates. Press `Ctrl+Z`. | Target snapshot loads into buffer with `isDirty = true` (uncommitted dot `●`); toast appears; pressing `Ctrl+Z` safely undos restoration back to pre-restore content. | Manual |
+| **TC-FILE-14** | Bidirectional Clipboard Integration & Multi-App Sync (Wayland 5-MIME / Firefox / VS Code) | 1. Select all in editor (`Ctrl+A`), copy (`Ctrl+C`), and paste into Firefox and VS Code.<br>2. Copy text from Firefox/VS Code and paste into editor (`Ctrl+V`).<br>3. Select terminal text, copy (`Ctrl+Shift+C`), and paste into editor (`Ctrl+V`).<br>4. Select editor text and cut (`Ctrl+X`), then verify Undo (`Ctrl+Z`) restores content. | 1. 5 simultaneous Wayland MIME types ensure 100% reliable paste into Firefox and VS Code.<br>2. External text pastes into editor via WebKitGTK without drops and registers on Undo stack.<br>3. Bidirectional text transfer between terminal and editor functions smoothly.<br>4. Cut content updates clipboard and `Ctrl+Z` restores buffer instantly. | Manual / Automated |
 
 ---
 

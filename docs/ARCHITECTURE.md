@@ -16,7 +16,7 @@ graph TD
         Copilot["AI Copilot Sidebar: Context-Aware Chat + Session Export"]
         GitUI["Git Quick Popover & Diff Viewer: Push / Pull / Staging / Commits"]
         NextGenModals["Enhanced Modals: SessionHistory + PipelineBuilder + RichPreview + TestPlan"]
-        Services["Frontend Services: secretMasker + sessionHistory + kittyGraphics"]
+        Services["Frontend Services: secretMasker + sessionHistory + kittyGraphics + clipboardService"]
         Settings["Settings Modal: Ollama Model & Wallpaper & Git Config"]
         Hooks["Custom Hooks: useTerminalTabs + useGlobalShortcuts"]
     end
@@ -26,6 +26,7 @@ graph TD
         GitCore["Git Engine: Status / Stage / Commit / Push / Pull / Diff / Ref Validation"]
         AiCore["Ollama Client: Line-Buffered Streaming / Tags / SSRF Defense / Project Rules"]
         FileIO["File System: Read / Write / List with Virtual FS & Key Isolation"]
+        ClipCore["Clipboard Manager: clipboard_ops (Wayland Multi-MIME wl-clipboard-rs + GTK3 selection)"]
         ConfigMgr["Config Manager: ~/.config/waddle/config.json"]
     end
 
@@ -40,6 +41,7 @@ graph TD
     GitUI <-->|Git Commands| GitCore
     GitCore <--> GitRepo
     Editor <-->|File Commands| FileIO
+    Editor & TermView <-->|Clipboard IPC| ClipCore
     AIOverlay & Copilot & Editor & GitUI <-->|AI Commands| AiCore
     AiCore <-->|REST / SSE Stream| Ollama
     Hooks --> TermView
@@ -67,6 +69,7 @@ Waddle is built on a hybrid architecture combining a high-performance **Rust bac
   - `src/services/secretMasker.ts`: Real-time regex pattern evaluator masking sensitive credentials (`ghp_...`, `sk-...`, `AKIA...`, JWT, private keys) in the terminal output stream.
   - `src/services/sessionHistory.ts`: Comprehensive command timeline tracking, exit code logging, CWD recording, and `localStorage` snapshot persistence.
   - `src/services/kittyGraphics/`: Full Kitty Graphics Protocol subsystem (APC parser, texture manager, 256MB LRU cache, infinite/counted animation timers, Unicode placeholder tofu suppression).
+  - `src/services/clipboardService.ts`: Bidirectional clipboard abstraction layer featuring three-tier fallback across Rust IPC (`clipboard_write_text`, `clipboard_read_text`), `navigator.clipboard`, and DOM `execCommand`.
 - **Modals & Visual Tools**:
   - `SessionHistoryModal.tsx`: Time travel session replay and snapshot restoration (`Ctrl+Shift+H`).
   - `PipelineBuilderModal.tsx`: Visual multi-step command chaining and sequential execution (`Ctrl+Shift+P`).
@@ -89,6 +92,7 @@ Waddle is built on a hybrid architecture combining a high-performance **Rust bac
   - `ai.rs`: Ollama HTTP client, line-buffered SSE chunk assembly, prompt templates, SSRF/DNS-rebinding protection with synchronous IP verification, redirect prevention, untrusted project rules isolation, and two-tier hierarchical AI rules resolution.
   - `config.rs`: Atomic read/write operations for `~/.config/waddle/config.json`, wallpaper management, and legacy migration.
   - `kitty.rs`: Sandboxed local image reader with path canonicalization, symlink escape checks, decompression bomb defenses, Base64 encoder, and temporary file auto-unlinking.
+  - `clipboard_ops.rs`: Linux Wayland 5-MIME simultaneous advertisement (`wl-clipboard-rs`), GTK3 selection synchronization (`SELECTION_CLIPBOARD` & `SELECTION_PRIMARY`), and bidirectional IPC bridge.
   - `lib.rs`: Tauri command router, virtual filesystem traversal defense (`/proc`, `/sys`, `/dev`), private key isolation (`~/.ssh`, `~/.gnupg`, `~/.local/share/keyrings`), and Git CLI execution.
 
 ---
@@ -309,7 +313,76 @@ Waddle is built on a hybrid architecture combining a high-performance **Rust bac
 
 ---
 
-### 7. Integrated Quality & Security Pipeline Architecture
+### 7. Clipboard Subsystem & Wayland Multi-MIME / GTK3 Integration Architecture (`src-tauri/src/clipboard_ops.rs` & `src/services/clipboardService.ts`)
+
+Clipboard operations in modern Linux desktop environments—especially under Wayland sessions—involve strict protocol constraints including explicit MIME type negotiation, selection ownership transfers, and event dispatch restrictions. Waddle incorporates a dedicated clipboard subsystem engineered to guarantee 100% reliable bidirectional synchronization across the embedded editor, terminal panes, and external Wayland/X11 applications (such as Firefox and VS Code).
+
+#### 1. Wayland Multi-MIME Simultaneous Offering Architecture
+- **Root Cause of Prior Incompatibilities**:
+  - Conventional clipboard libraries (such as generic `arboard`) typically offer text using only the single `text/plain` MIME type.
+  - Wayland-native Firefox strictly requires `text/plain;charset=utf-8`, refusing to pull selections advertised solely as `text/plain`.
+  - VS Code (Electron / Chromium base) specifically requests `UTF8_STRING` or `text/plain;charset=utf-8`.
+  - As a result, text copied from terminals or editors would fail to paste into Firefox or VS Code on Wayland.
+- **Architectural Solution (`clipboard_ops.rs`)**:
+  - Leveraging the `wl-clipboard-rs` crate's `MimeType::Specific` API, Waddle simultaneously advertises **5 standard MIME types in a single copy operation**:
+    1. `text/plain;charset=utf-8` (Wayland native browsers: Firefox, Chromium)
+    2. `UTF8_STRING` (Electron, VS Code, XWayland compatibility layer)
+    3. `text/plain` (standard Wayland and Linux utilities)
+    4. `TEXT` (X11 legacy compatibility)
+    5. `STRING` (X11 legacy compatibility)
+  - Rather than spawning external shell processes (`wl-copy`) or daemon forks, selection serving threads are safely supervised in the asynchronous Tokio task pool within the Tauri native core.
+
+```mermaid
+flowchart TD
+    subgraph Frontend["Frontend (EditorPane / TerminalView)"]
+        UserCopy["Ctrl+C / Ctrl+X / ContextMenu"]
+        ClipSvc["clipboardService.ts\n(writeClipboardText)"]
+        UserCopy --> ClipSvc
+    end
+
+    subgraph Backend["Rust Backend (src-tauri/src/clipboard_ops.rs)"]
+        IPC["Tauri IPC Command: clipboard_write_text"]
+        WaylandDetect{"WAYLAND_DISPLAY\nDetected?"}
+        WLOffer["wl-clipboard-rs\nSimultaneous 5-MIME Offer\n- text/plain;charset=utf-8\n- UTF8_STRING\n- text/plain\n- TEXT\n- STRING"]
+        GTKSync["GTK3 Selection Sync\n- gdk::SELECTION_CLIPBOARD\n- gdk::SELECTION_PRIMARY"]
+        
+        ClipSvc -->|invoke| IPC
+        IPC --> WaylandDetect
+        WaylandDetect -->|Yes| WLOffer
+        WaylandDetect --> GTKSync
+    end
+
+    subgraph HostOS["Host OS & External Applications"]
+        FF["Firefox (Wayland Native)\n[Pulls text/plain;charset=utf-8]"]
+        VSC["VS Code / Electron\n[Pulls UTF8_STRING]"]
+        Term["External Terminal / XWayland\n[Pulls text/plain / TEXT]"]
+        Middle["Linux Middle-Click Paste\n[Pulls SELECTION_PRIMARY]"]
+
+        WLOffer -.-> FF
+        WLOffer -.-> VSC
+        WLOffer -.-> Term
+        GTKSync -.-> Middle
+    end
+```
+
+#### 2. GTK3 Native Selection Sync & Middle-Click Primary Selection
+- To ensure full synchronization with the GTK3 main event loop hosting WebKitGTK, the Rust backend writes synchronously to both `gtk::Clipboard::get(&gdk::SELECTION_CLIPBOARD)` and `gdk::SELECTION_PRIMARY` (the standard Linux middle-click paste buffer).
+- This guarantees that text copied in Waddle can be pasted into any terminal or application via middle-click or keyboard shortcuts immediately.
+
+#### 3. WebKitGTK Native Event Delegation & Direct `ClipboardEvent` Extraction
+- **Releasing `preventDefault()`**:
+  - In `EditorPane.tsx` (`handleTextareaKeyDown`), `Ctrl + V`, `Ctrl + C`, and `Ctrl + X` are allowed to propagate naturally into the native browser event loop rather than being intercepted and cancelled.
+- **Direct `ClipboardEvent` Extraction**:
+  - The `<textarea>` `onPaste` handler directly extracts `e.clipboardData.getData('text/plain')`. WebKitGTK resolves this directly from the OS/GTK clipboard buffer without truncation or dropping characters, immediately updating the editor buffer and pushing a clean snapshot to the Undo stack.
+- **Three-Tier Fallback Read Pipeline**:
+  - `clipboardService.readClipboardText()` implements a resilient 3-layer fallback:
+    1. Rust Backend IPC (`clipboard_read_text`) via `wl-paste` / GTK clipboard,
+    2. Web Standard `navigator.clipboard.readText()`,
+    3. Hidden DOM input element fallback (`execCommand('paste')`).
+
+---
+
+### 8. Integrated Quality & Security Pipeline Architecture
 
 Waddle employs an automated four-tier quality and security assurance pipeline orchestrated from local development to pre-push Git verification.
 
@@ -358,7 +431,7 @@ flowchart TD
 
 ---
 
-### 8. Rust Security Trust Boundary Architecture (`command_policy.rs`)
+### 9. Rust Security Trust Boundary Architecture (`command_policy.rs`)
 
 To guarantee absolute defense against UI bypasses, malicious IPC calls, and AI prompt injection escapes, Waddle decouples security policy enforcement from webview JavaScript and centralizes it inside the Rust backend core.
 
@@ -436,6 +509,7 @@ Every test execution evidence document must include the following environment me
 | **PTY Management** | `portable-pty` | Cross-platform pseudoterminal allocation |
 | **Async Runtime** | `tokio` (v1) | Multi-threaded asynchronous I/O and task scheduling |
 | **HTTP Client** | `reqwest` (v0.12) | Asynchronous HTTP client for local Ollama API |
+| **Clipboard Integration** | `wl-clipboard-rs`, `gtk`, `gdk` | Linux Wayland 5-MIME simultaneous advertisement & GTK3 selection sync |
 | **POSIX Interop** | `libc` | Process group signaling (`SIGHUP`, `SIGTERM`, `SIGKILL`) |
 | **Serialization** | `serde`, `serde_json` | Configuration and JSON stream serialization |
 | **Frontend Framework** | [React 19](https://react.dev/) + [TypeScript](https://www.typescriptlang.org/) | User interface and component state management |

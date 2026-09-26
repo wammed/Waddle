@@ -469,6 +469,19 @@ export const TEST_CASES: TestCase[] = [
     expectedJa: '対象スナップショットがエディタに展開され未保存（isDirty = true）となり完了通知が表示される。直前の内容は Undo スタックへ退避されており、Ctrl+Z で瞬時に復元前の状態へ巻き戻せる。',
     type: 'Manual',
   },
+  {
+    id: 'TC-FILE-14',
+    suiteId: 3,
+    suiteName: 'File Tree & Editor',
+    suiteNameJa: 'ファイルツリー & 簡易エディタ',
+    title: 'Bidirectional Clipboard Integration & Multi-App Sync (Wayland 5-MIME / Firefox / VS Code)',
+    titleJa: '双方向クリップボード統合 & 外部アプリ連携 (Wayland 5-MIME / Firefox / VS Code)',
+    procedure: '1. Select all in editor (Ctrl+A), copy (Ctrl+C), and paste into Firefox and VS Code.\n2. Copy text from Firefox/VS Code and paste into editor (Ctrl+V).\n3. Select terminal text and copy (Ctrl+Shift+C), then paste into editor (Ctrl+V).\n4. Select editor text and cut (Ctrl+X), then verify Undo (Ctrl+Z) restores content.',
+    procedureJa: '1. エディタで全選択（Ctrl+A）→ コピー（Ctrl+C）し、Firefox および VS Code に貼り付け。\n2. Firefox / VS Code からコピーしたテキストをエディタで Ctrl+V 貼り付け。\n3. ターミナルで選択した出力を Ctrl+Shift+C → エディタで Ctrl+V 貼り付け。\n4. エディタでコードを選択して Ctrl+X で切り取り、Undo（Ctrl+Z）で復元。',
+    expected: '1. 5 simultaneous Wayland MIME types ensure 100% reliable paste into Firefox and VS Code.\n2. External text pastes into editor via WebKitGTK without drops and registers on Undo stack.\n3. Bidirectional text transfer between terminal and editor functions smoothly.\n4. Cut content updates clipboard and Ctrl+Z restores the buffer instantly.',
+    expectedJa: '1. Wayland 5種多重 MIME 同時広告により、Firefox および VS Code へ 100% 確実に貼り付け可能。\n2. 外部アプリからのテキストが WebKitGTK 経由で欠落なくエディタにペーストされ、Undo 履歴に反映される。\n3. ターミナル ⇔ エディタ間でテキストが相互に送受信される。\n4. 切り取り内容がクリップボードへ保存され、Ctrl+Z で元のバッファが復元される。',
+    type: 'Manual',
+  },
 
   // Suite 4: AI & Context Integration (6)
   {

@@ -84,7 +84,9 @@ fn is_dangerous_path(path: &Path) -> bool {
         || normalized == "/lib64"
         || normalized.starts_with("/lib64/")
         || normalized == "/dev"
-        || (normalized.starts_with("/dev/") && !normalized.starts_with("/dev/shm/") && normalized != "/dev/shm")
+        || (normalized.starts_with("/dev/")
+            && !normalized.starts_with("/dev/shm/")
+            && normalized != "/dev/shm")
         || normalized == "/proc"
         || normalized.starts_with("/proc/")
         || normalized == "/sys"
@@ -189,7 +191,8 @@ fn inspect_image_dimensions(data: &[u8]) -> Result<(String, Option<u32>, Option<
 
     // 5. SVG check
     if data.starts_with(b"<svg")
-        || (data.starts_with(b"<?xml") && String::from_utf8_lossy(&data[..data.len().min(512)]).contains("<svg"))
+        || (data.starts_with(b"<?xml")
+            && String::from_utf8_lossy(&data[..data.len().min(512)]).contains("<svg"))
     {
         return Ok(("image/svg+xml".to_string(), None, None));
     }
@@ -212,12 +215,20 @@ pub fn read_kitty_file(
         Some(d) if !d.trim().is_empty() => expand_path(d.trim()),
         _ => dirs::picture_dir()
             .filter(|p| p.exists())
-            .or_else(|| dirs::home_dir().map(|h| h.join("Pictures")).filter(|p| p.exists()))
+            .or_else(|| {
+                dirs::home_dir()
+                    .map(|h| h.join("Pictures"))
+                    .filter(|p| p.exists())
+            })
             .unwrap_or_else(std::env::temp_dir),
     };
 
-    let canonical_allowed = fs::canonicalize(&raw_allowed)
-        .map_err(|e| format!("ENOENT: Allowed directory does not exist or cannot be resolved: {}", e))?;
+    let canonical_allowed = fs::canonicalize(&raw_allowed).map_err(|e| {
+        format!(
+            "ENOENT: Allowed directory does not exist or cannot be resolved: {}",
+            e
+        )
+    })?;
 
     if is_dangerous_dir(&canonical_allowed) {
         return Err("EACCES: Target directory is restricted by security policy".to_string());
@@ -280,8 +291,8 @@ pub fn read_kitty_file(
     }
 
     // 8. Read file contents into memory
-    let bytes = fs::read(&canonical_target)
-        .map_err(|e| format!("EIO: Failed to read file: {}", e))?;
+    let bytes =
+        fs::read(&canonical_target).map_err(|e| format!("EIO: Failed to read file: {}", e))?;
 
     // 9. If temporary file (t=t), automatically delete it immediately after reading to avoid disk leaks
     if is_temp {
@@ -316,7 +327,10 @@ pub fn read_kitty_file(
 /// strictly inside a system temporary directory, ensures its size does not exceed `max_bytes`,
 /// deletes the file immediately (Kitty protocol `t=t` requirement), and returns its contents
 /// as a Base64-encoded string.
-pub fn read_and_unlink_temp_file_base64(path_b64: &str, max_bytes: usize) -> Result<String, String> {
+pub fn read_and_unlink_temp_file_base64(
+    path_b64: &str,
+    max_bytes: usize,
+) -> Result<String, String> {
     // 1. Decode path from Base64
     let path_bytes = BASE64_STANDARD
         .decode(path_b64.trim().as_bytes())
@@ -348,7 +362,9 @@ pub fn read_and_unlink_temp_file_base64(path_b64: &str, max_bytes: usize) -> Res
 
     // 5. Enforce that file MUST be inside system temporary directories
     if !is_in_temp_dir(&canonical_target) {
-        return Err("EACCES: Temporary file (t=t) must reside inside a system temp directory".to_string());
+        return Err(
+            "EACCES: Temporary file (t=t) must reside inside a system temp directory".to_string(),
+        );
     }
 
     // 6. Must be a regular file
@@ -419,7 +435,11 @@ mod tests {
             4096,
             false,
         );
-        assert!(res.is_ok(), "Expected valid file read to succeed: {:?}", res);
+        assert!(
+            res.is_ok(),
+            "Expected valid file read to succeed: {:?}",
+            res
+        );
         let data = res.unwrap();
         assert_eq!(data.mime, "image/png");
         assert_eq!(data.width, Some(100));
@@ -437,7 +457,11 @@ mod tests {
         create_dummy_png(&outside_file, 50, 50);
 
         // Try accessing via relative `../` traversal
-        let traversal_path = format!("{}/../{}/secret.png", sandbox.to_str().unwrap(), outside.file_name().unwrap().to_str().unwrap());
+        let traversal_path = format!(
+            "{}/../{}/secret.png",
+            sandbox.to_str().unwrap(),
+            outside.file_name().unwrap().to_str().unwrap()
+        );
 
         let res = read_kitty_file(
             &traversal_path,
@@ -475,7 +499,10 @@ mod tests {
                     4096,
                     false,
                 );
-                assert!(res.is_err(), "Symlink escape outside sandbox must be rejected!");
+                assert!(
+                    res.is_err(),
+                    "Symlink escape outside sandbox must be rejected!"
+                );
                 let err = res.unwrap_err();
                 assert!(err.contains("EACCES"), "Expected EACCES error: {}", err);
             }
@@ -536,9 +563,15 @@ mod tests {
     #[test]
     fn test_temp_file_auto_deletion() {
         let temp_dir = std::env::temp_dir();
-        let file_path = temp_dir.join(format!("waddle_test_temp_autodel_{}.png", std::process::id()));
+        let file_path = temp_dir.join(format!(
+            "waddle_test_temp_autodel_{}.png",
+            std::process::id()
+        ));
         create_dummy_png(&file_path, 80, 80);
-        assert!(file_path.exists(), "Temp test file should exist before read");
+        assert!(
+            file_path.exists(),
+            "Temp test file should exist before read"
+        );
 
         let res = read_kitty_file(
             file_path.to_str().unwrap(),
@@ -553,7 +586,10 @@ mod tests {
         assert_eq!(data.height, Some(80));
 
         // CRITICAL: File must be deleted immediately after reading!
-        assert!(!file_path.exists(), "Temp file MUST be deleted after reading!");
+        assert!(
+            !file_path.exists(),
+            "Temp file MUST be deleted after reading!"
+        );
     }
 
     #[test]
@@ -570,7 +606,10 @@ mod tests {
         let temp_dir = std::env::temp_dir();
         let file_path = temp_dir.join(format!("waddle_test_temp_bomb_{}.png", std::process::id()));
         create_dummy_png(&file_path, 5000, 5000);
-        assert!(file_path.exists(), "Temp bomb file should exist before read");
+        assert!(
+            file_path.exists(),
+            "Temp bomb file should exist before read"
+        );
 
         let res = read_kitty_file(
             file_path.to_str().unwrap(),
@@ -583,7 +622,10 @@ mod tests {
         assert!(res.unwrap_err().contains("EBADMSG"));
 
         // File must still be deleted despite dimension check failure
-        assert!(!file_path.exists(), "Temp file MUST be deleted even if validation fails!");
+        assert!(
+            !file_path.exists(),
+            "Temp file MUST be deleted even if validation fails!"
+        );
     }
 
     #[test]
@@ -605,7 +647,10 @@ mod tests {
         assert!(res.unwrap_err().contains("EFBIG"));
 
         // File must be deleted even on EFBIG!
-        assert!(!file_path.exists(), "Temp file MUST be deleted even if EFBIG occurs!");
+        assert!(
+            !file_path.exists(),
+            "Temp file MUST be deleted even if EFBIG occurs!"
+        );
     }
 
     #[test]
@@ -624,8 +669,15 @@ mod tests {
                     4096,
                     true, // is_temp
                 );
-                assert!(res.is_ok(), "Temporary files in /dev/shm must be allowed: {:?}", res);
-                assert!(!file_path.exists(), "Temporary files in /dev/shm must be unlinked after read!");
+                assert!(
+                    res.is_ok(),
+                    "Temporary files in /dev/shm must be allowed: {:?}",
+                    res
+                );
+                assert!(
+                    !file_path.exists(),
+                    "Temporary files in /dev/shm must be unlinked after read!"
+                );
             }
         }
     }
@@ -647,7 +699,9 @@ mod tests {
         assert_eq!(decoded, dummy_data);
 
         // File must be deleted!
-        assert!(!file_path.exists(), "Temporary file must be deleted after inlining!");
+        assert!(
+            !file_path.exists(),
+            "Temporary file must be deleted after inlining!"
+        );
     }
 }
-

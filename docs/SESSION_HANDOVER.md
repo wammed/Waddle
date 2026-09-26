@@ -1367,9 +1367,54 @@ npm run tauri dev
    - パストラバーサル防止、保護対象パス、危険コマンド検知パターン、Webview CSP、ネットワーク境界ポリシーの更新。
 5. **包括的検証テスト計画書**:
    - [`docs/TEST_PLAN.md`](file:///home/susie/GitHUB/wammed/Waddle/docs/TEST_PLAN.md) & [`docs/TEST_PLAN.ja.md`](file:///home/susie/GitHUB/wammed/Waddle/docs/TEST_PLAN.ja.md)
-   - 全108テストケース（Suite 1〜11）の追跡、合否判定基準、自動テストコマンド群の整合性維持。
+   - 全109テストケース（Suite 1〜11）の追跡、合否判定基準、自動テストコマンド群の整合性維持。
    - アプリ内フォーム（`testPlanData.ts`）およびスタンドアロン検証フォーム（`tools/test_form.html`）との項目同期。
 6. **開発履歴・引き継ぎ**:
    - [`docs/SESSION_HANDOVER.md`](file:///home/susie/GitHUB/wammed/Waddle/docs/SESSION_HANDOVER.md)
    - ユーザー要望、時系列開発履歴、変更重要ファイル、ビルド検証結果の追記。
+
+---
+
+## 14. 開発履歴（セッション 14: Wayland 多重 MIME クリップボード統合 & 全ドキュメント同期）
+
+### 14.1 ユーザー要望と背景
+- **要望**:
+  1. エディタ内での copy/paste（`Ctrl+A` 全選択、`Ctrl+C` コピー、`Ctrl+X` 切り取り、`Ctrl+V` 貼り付け）。
+  2. ターミナル ⇔ エディタ間での copy/paste。
+  3. Waddle ⇔ 外部アプリ（特に Linux Wayland 環境における Firefox や VS Code）間での copy/paste。
+  4. 今回の copy/paste 実装詳細を各ドキュメント（日英セット）に追記。
+- **課題と根本原因**:
+  - `tauri-plugin-clipboard-manager`（内部 `arboard`）は単一の `text/plain` MIME タイプのみを広告していた。
+  - Wayland ネイティブの Firefox は `text/plain;charset=utf-8` を厳格に要求し、VS Code (Electron) は `UTF8_STRING` や `text/plain;charset=utf-8` を要求するため、Waddle から外部アプリへテキストが貼り付けられない不具合が発生していた。
+  - WebKitGTK Webview 内の `EditorPane.tsx` において、`handleTextareaKeyDown` が `Ctrl + V` を `preventDefault()` で握りつぶしていたため、外部アプリからコピーしたテキストがネイティブブラウザイベント経由で `<textarea>` に到達していなかった。
+
+### 14.2 実装内容とアーキテクチャ
+1. **Rust バックエンド (`src-tauri/src/clipboard_ops.rs`)**:
+   - `wl-clipboard-rs` の `MimeType::Specific` API を活用し、Wayland 環境において以下の **5 種の MIME タイプを 1 回のコピー操作で同時に提供（Multi-MIME Offering）**：
+     - `text/plain;charset=utf-8`（Firefox, Chromium 等）
+     - `UTF8_STRING`（VS Code, Electron 等）
+     - `text/plain`（標準 Wayland / Linux ユーティリティ）
+     - `TEXT`（X11 レガシー互換）
+     - `STRING`（X11 レガシー互換）
+   - GTK3 の `gtk::Clipboard::get(&gdk::SELECTION_CLIPBOARD)` および `gdk::SELECTION_PRIMARY`（Linux マウス中クリック用）の双方へ同一テキストを同期書き込み。
+2. **フロントエンド (`src/components/EditorPane.tsx` & `src/services/clipboardService.ts`)**:
+   - `handleTextareaKeyDown` において `Ctrl + V`、`Ctrl + C`、`Ctrl + X` の `preventDefault()` を解除し、ネイティブイベントへ委譲。
+   - `<textarea>` の `onPaste` ハンドラにて `e.clipboardData.getData('text/plain')` を直接取得し、WebKitGTK のネイティブバッファから欠落なくテキストを抽出して Undo 履歴スタックへ即時登録。
+   - `Ctrl + A`（全選択）、`Ctrl + C`（コピー）、`Ctrl + X`（切り取り）、`Ctrl + V`（貼り付け）のフォーカス限定排他キーバインドおよび右クリックコンテキストメニューを完備。
+3. **テストスイート (`src/services/__tests__/clipboardService.test.ts`)**:
+   - `writeClipboardText` および `readClipboardText` の 3 重フォールバック機構（Rust IPC → `navigator.clipboard` → `execCommand`）を網羅する 7 件のユニットテストを新規実装。
+
+### 14.3 更新ドキュメント一覧（日英同期）
+- **ルート & docs README** ([`README.md`](file:///home/susie/GitHUB/wammed/Waddle/README.md), [`README.ja.md`](file:///home/susie/GitHUB/wammed/Waddle/README.ja.md), [`docs/README.md`](file:///home/susie/GitHUB/wammed/Waddle/docs/README.md), [`docs/README.ja.md`](file:///home/susie/GitHUB/wammed/Waddle/docs/README.ja.md)):
+  - 内蔵エディタ機能リストおよびショートカットテーブルに、Wayland 5-MIME クリップボード連携、`Ctrl+A`, `Ctrl+C`, `Ctrl+V`, `Ctrl+X` を追記。
+- **機能詳細** ([`docs/FEATURES.md`](file:///home/susie/GitHUB/wammed/Waddle/docs/FEATURES.md), [`docs/FEATURES.ja.md`](file:///home/susie/GitHUB/wammed/Waddle/docs/FEATURES.ja.md)):
+  - セクション 4 に Wayland 多重 MIME 広告、GTK3 selection 同期、WebKitGTK イベント委譲、キーバインド排他制御の詳細を追加。
+- **アーキテクチャ設計** ([`docs/ARCHITECTURE.md`](file:///home/susie/GitHUB/wammed/Waddle/docs/ARCHITECTURE.md), [`docs/ARCHITECTURE.ja.md`](file:///home/susie/GitHUB/wammed/Waddle/docs/ARCHITECTURE.ja.md)):
+  - 全体構成図（Mermaid）に `ClipCore` と IPC 接続を追加。
+  - セクション 7 に「クリップボード サブシステム & Wayland 多重 MIME / GTK3 統合アーキテクチャ」を新設し、データフロー図（Mermaid）を掲載。以降のセクション番号を整合。技術スタック一覧に `wl-clipboard-rs`, `gtk`, `gdk` を追加。
+- **セキュリティ仕様** ([`docs/SECURITY.md`](file:///home/susie/GitHUB/wammed/Waddle/docs/SECURITY.md), [`docs/SECURITY.ja.md`](file:///home/susie/GitHUB/wammed/Waddle/docs/SECURITY.ja.md)):
+  - 「クリップボード セキュリティ境界 & 外部アプリ隔離仕様」を新設。Pastejacking 攻撃防御（`CommandPolicy` 連携）、メモリ安全性・16MB 上限 DoS 防御、非破壊シークレット保護（Zero-Mutation）を網羅。
+- **包括的検証テスト計画書** ([`docs/TEST_PLAN.md`](file:///home/susie/GitHUB/wammed/Waddle/docs/TEST_PLAN.md), [`docs/TEST_PLAN.ja.md`](file:///home/susie/GitHUB/wammed/Waddle/docs/TEST_PLAN.ja.md), [`src/data/testPlanData.ts`](file:///home/susie/GitHUB/wammed/Waddle/src/data/testPlanData.ts), [`tools/test_form.html`](file:///home/susie/GitHUB/wammed/Waddle/tools/test_form.html)):
+  - Suite 3 に `TC-FILE-14`（双方向クリップボード統合 & 外部アプリ連携）を追加し、全 109 項目に同期。
+
 

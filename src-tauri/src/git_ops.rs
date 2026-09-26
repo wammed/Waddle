@@ -87,7 +87,10 @@ pub async fn git_generate_commit_message(
     };
 
     if target_diff.trim().is_empty() {
-        return Err("No staged, modified, or untracked changes found to generate commit message.".to_string());
+        return Err(
+            "No staged, modified, or untracked changes found to generate commit message."
+                .to_string(),
+        );
     }
 
     let config = state.config_manager.load();
@@ -110,7 +113,10 @@ mod tests {
         let repo_root = root.unwrap();
         let (is_gh, blocked) = pty::inspect_github_remotes(&repo_root);
         assert!(is_gh, "Waddle remote should be recognized as GitHub");
-        assert!(blocked.is_none(), "No non-GitHub remote should be blocked in Waddle");
+        assert!(
+            blocked.is_none(),
+            "No non-GitHub remote should be blocked in Waddle"
+        );
 
         let status = pty::check_git_status(&curr_dir.to_string_lossy());
         assert!(status.is_repo);
@@ -119,7 +125,8 @@ mod tests {
 
     #[test]
     fn test_git_push_pull_restrictions() {
-        let temp_dir = std::env::temp_dir().join(format!("waddle_git_test_{}", uuid::Uuid::new_v4()));
+        let temp_dir =
+            std::env::temp_dir().join(format!("waddle_git_test_{}", uuid::Uuid::new_v4()));
         let _ = std::fs::create_dir_all(&temp_dir);
         let path_str = temp_dir.to_str().unwrap().to_string();
 
@@ -129,16 +136,27 @@ mod tests {
             .output();
 
         let _ = std::process::Command::new("git")
-            .args(["remote", "add", "origin", "https://gitlab.com/user/fake-repo.git"])
+            .args([
+                "remote",
+                "add",
+                "origin",
+                "https://gitlab.com/user/fake-repo.git",
+            ])
             .current_dir(&temp_dir)
             .output();
 
         let push_res = pty::git_push(&path_str, true);
-        assert!(push_res.is_err(), "Push to GitLab should be blocked when restrict_to_github is true");
+        assert!(
+            push_res.is_err(),
+            "Push to GitLab should be blocked when restrict_to_github is true"
+        );
         assert!(push_res.unwrap_err().contains("GitHub限定ポリシー"));
 
         let pull_res = pty::git_pull(&path_str, true);
-        assert!(pull_res.is_err(), "Pull from GitLab should be blocked when restrict_to_github is true");
+        assert!(
+            pull_res.is_err(),
+            "Pull from GitLab should be blocked when restrict_to_github is true"
+        );
         assert!(pull_res.unwrap_err().contains("GitHub限定ポリシー"));
 
         let _ = std::fs::remove_dir_all(&temp_dir);
@@ -148,23 +166,38 @@ mod tests {
     fn test_is_github_host_strict_domain_validation() {
         assert!(pty::is_github_host("git@github.com:wammed/Waddle.git"));
         assert!(pty::is_github_host("https://github.com/wammed/Waddle.git"));
-        assert!(pty::is_github_host("https://user:ghp_123456789@github.com/wammed/Waddle.git"));
-        assert!(pty::is_github_host("https://gist.github.com/wammed/1234567.git"));
+        assert!(pty::is_github_host(
+            "https://user:ghp_123456789@github.com/wammed/Waddle.git"
+        ));
+        assert!(pty::is_github_host(
+            "https://gist.github.com/wammed/1234567.git"
+        ));
         assert!(pty::is_github_host("https://wammed.github.io/blog.git"));
-        assert!(pty::is_github_host("ssh://git@github.com/wammed/Waddle.git"));
+        assert!(pty::is_github_host(
+            "ssh://git@github.com/wammed/Waddle.git"
+        ));
 
-        assert!(!pty::is_github_host("https://attacker.com/wammed/github.com.git"));
-        assert!(!pty::is_github_host("https://github.com.attacker.com/wammed/Waddle.git"));
-        assert!(!pty::is_github_host("git@attacker.com:github.com/Waddle.git"));
+        assert!(!pty::is_github_host(
+            "https://attacker.com/wammed/github.com.git"
+        ));
+        assert!(!pty::is_github_host(
+            "https://github.com.attacker.com/wammed/Waddle.git"
+        ));
+        assert!(!pty::is_github_host(
+            "git@attacker.com:github.com/Waddle.git"
+        ));
         assert!(!pty::is_github_host("https://gitlab.com/wammed/Waddle.git"));
-        assert!(!pty::is_github_host("https://bitbucket.org/wammed/Waddle.git"));
+        assert!(!pty::is_github_host(
+            "https://bitbucket.org/wammed/Waddle.git"
+        ));
         assert!(!pty::is_github_host(""));
         assert!(!pty::is_github_host("invalid-url"));
     }
 
     #[test]
     fn test_git_diff_clean_repo_empty() {
-        let temp_dir = std::env::temp_dir().join(format!("waddle_git_clean_{}", uuid::Uuid::new_v4()));
+        let temp_dir =
+            std::env::temp_dir().join(format!("waddle_git_clean_{}", uuid::Uuid::new_v4()));
         let _ = std::fs::create_dir_all(&temp_dir);
         let path_str = temp_dir.to_str().unwrap();
 

@@ -71,10 +71,15 @@ impl CommandPolicy {
         // -------------------------------------------------------------
         // Credential & Secret Access Protection (Review)
         // -------------------------------------------------------------
-        if let Some(target) = contains_sensitive_credential_target(&orig_lower).or_else(|| contains_sensitive_credential_target(&norm_lower)) {
+        if let Some(target) = contains_sensitive_credential_target(&orig_lower)
+            .or_else(|| contains_sensitive_credential_target(&norm_lower))
+        {
             return CommandPolicyEvaluation {
                 action: PolicyAction::Review,
-                reason: format!("Sensitive credential/key file access attempt detected: '{}'", target),
+                reason: format!(
+                    "Sensitive credential/key file access attempt detected: '{}'",
+                    target
+                ),
                 matched_pattern: Some(target),
             };
         }
@@ -85,7 +90,8 @@ impl CommandPolicy {
         if is_env_dump_command(&orig_lower) || is_env_dump_command(&norm_lower) {
             return CommandPolicyEvaluation {
                 action: PolicyAction::Review,
-                reason: "Environment variable dump exposes secrets/credentials in plaintext".to_string(),
+                reason: "Environment variable dump exposes secrets/credentials in plaintext"
+                    .to_string(),
                 matched_pattern: Some("env_dump".to_string()),
             };
         }
@@ -108,17 +114,27 @@ impl CommandPolicy {
         // -------------------------------------------------------------
         for target_text in [&orig_lower, &norm_lower] {
             // 1. Fork bomb patterns
-            if target_text.contains(":(){ :|:& };:") || target_text.contains(":(){:|:&};:") || target_text.contains(":(){:|:&}; :") {
+            if target_text.contains(":(){ :|:& };:")
+                || target_text.contains(":(){:|:&};:")
+                || target_text.contains(":(){:|:&}; :")
+            {
                 return CommandPolicyEvaluation {
                     action: PolicyAction::Block,
-                    reason: "Irrevocable destructive operation: Shell fork bomb detected".to_string(),
+                    reason: "Irrevocable destructive operation: Shell fork bomb detected"
+                        .to_string(),
                     matched_pattern: Some("fork_bomb".to_string()),
                 };
             }
 
             // 2. Destructive raw disk / partition operations
             let block_disk_tools = [
-                "wipefs", "fdisk", "gdisk", "parted", "mkfs", "mkswap", "cryptsetup",
+                "wipefs",
+                "fdisk",
+                "gdisk",
+                "parted",
+                "mkfs",
+                "mkswap",
+                "cryptsetup",
             ];
             for tool in &block_disk_tools {
                 if matches_word_boundary(target_text, tool) {
@@ -131,7 +147,13 @@ impl CommandPolicy {
             }
 
             // 3. Raw dd writes to disk/device or device reading
-            if target_text.contains("dd if=") && (target_text.contains("of=/dev/") || target_text.contains("of=/dev/sd") || target_text.contains("of=/dev/nvme") || target_text.contains("of=/dev/null") || !target_text.contains("of=")) {
+            if target_text.contains("dd if=")
+                && (target_text.contains("of=/dev/")
+                    || target_text.contains("of=/dev/sd")
+                    || target_text.contains("of=/dev/nvme")
+                    || target_text.contains("of=/dev/null")
+                    || !target_text.contains("of="))
+            {
                 return CommandPolicyEvaluation {
                     action: PolicyAction::Block,
                     reason: "Irrevocable destructive operation: Direct disk block device overwrite via dd".to_string(),
@@ -141,15 +163,16 @@ impl CommandPolicy {
             if target_text.starts_with("dd ") && target_text.contains("of=/dev/") {
                 return CommandPolicyEvaluation {
                     action: PolicyAction::Block,
-                    reason: "Irrevocable destructive operation: Overwriting block device via dd".to_string(),
+                    reason: "Irrevocable destructive operation: Overwriting block device via dd"
+                        .to_string(),
                     matched_pattern: Some("dd of=/dev/".to_string()),
                 };
             }
 
             // 4. Critical root / partition file removals (rm -rf / or equivalents)
             let destructive_rm_targets = [
-                "/", "/*", "/boot", "/boot/*", "/etc", "/etc/*", "/dev", "/dev/*",
-                "/sys", "/sys/*", "/proc", "/proc/*", "~", "~/*", "$home", "$home/*",
+                "/", "/*", "/boot", "/boot/*", "/etc", "/etc/*", "/dev", "/dev/*", "/sys",
+                "/sys/*", "/proc", "/proc/*", "~", "~/*", "$home", "$home/*",
             ];
             let has_rm_flags = target_text.contains("rm -rf")
                 || target_text.contains("rm -fr")
@@ -171,11 +194,21 @@ impl CommandPolicy {
 
             // 5. Destructive redirection into system devices/directories
             let dangerous_redirections = [
-                "> /dev/", ">> /dev/", ">/dev/",
-                "> /etc/", ">> /etc/", ">/etc/",
-                "> /boot/", ">> /boot/", ">/boot/",
-                "> /sys/", ">> /sys/", ">/sys/",
-                "> /proc/", ">> /proc/", ">/proc/",
+                "> /dev/",
+                ">> /dev/",
+                ">/dev/",
+                "> /etc/",
+                ">> /etc/",
+                ">/etc/",
+                "> /boot/",
+                ">> /boot/",
+                ">/boot/",
+                "> /sys/",
+                ">> /sys/",
+                ">/sys/",
+                "> /proc/",
+                ">> /proc/",
+                ">/proc/",
             ];
             for redir in &dangerous_redirections {
                 if target_text.contains(redir) {
@@ -188,16 +221,22 @@ impl CommandPolicy {
             }
 
             // 6. Python shutil.rmtree targeting root or recursive
-            if target_text.contains("shutil.rmtree") && (target_text.contains("'/'") || target_text.contains("\"/\"")) {
+            if target_text.contains("shutil.rmtree")
+                && (target_text.contains("'/'") || target_text.contains("\"/\""))
+            {
                 return CommandPolicyEvaluation {
                     action: PolicyAction::Block,
-                    reason: "Irrevocable destructive operation: Python shutil.rmtree targeting root".to_string(),
+                    reason:
+                        "Irrevocable destructive operation: Python shutil.rmtree targeting root"
+                            .to_string(),
                     matched_pattern: Some("shutil.rmtree('/')".to_string()),
                 };
             }
 
             // 7. Catastrophic Git repository destruction
-            if target_text.contains("git clean") && (target_text.contains("-fdx") || target_text.contains("-xdf")) {
+            if target_text.contains("git clean")
+                && (target_text.contains("-fdx") || target_text.contains("-xdf"))
+            {
                 return CommandPolicyEvaluation {
                     action: PolicyAction::Block,
                     reason: "Irrevocable destructive operation: Irreversible git repository clean (untracked & ignored files)".to_string(),
@@ -212,7 +251,8 @@ impl CommandPolicy {
         if has_ifs {
             return CommandPolicyEvaluation {
                 action: PolicyAction::Review,
-                reason: "Shell internal field separator ($IFS) obfuscation pattern detected".to_string(),
+                reason: "Shell internal field separator ($IFS) obfuscation pattern detected"
+                    .to_string(),
                 matched_pattern: Some("$IFS".to_string()),
             };
         }
@@ -244,8 +284,15 @@ impl CommandPolicy {
 
             // 3. Dynamic interpreter evaluation (python -c, node -e, ruby -e, perl -e, php -r, lua -e)
             let interpreter_eval_patterns = [
-                "python -c", "python3 -c", "node -e", "nodejs -e", "node --eval",
-                "ruby -e", "perl -e", "php -r", "lua -e",
+                "python -c",
+                "python3 -c",
+                "node -e",
+                "nodejs -e",
+                "node --eval",
+                "ruby -e",
+                "perl -e",
+                "php -r",
+                "lua -e",
             ];
             for ip in &interpreter_eval_patterns {
                 if target_text.starts_with(ip)
@@ -278,7 +325,11 @@ impl CommandPolicy {
                 };
             }
 
-            if target_text.contains("find ") && (target_text.contains("-exec") || target_text.contains("-execdir") || target_text.contains("-delete")) {
+            if target_text.contains("find ")
+                && (target_text.contains("-exec")
+                    || target_text.contains("-execdir")
+                    || target_text.contains("-delete"))
+            {
                 return CommandPolicyEvaluation {
                     action: PolicyAction::Review,
                     reason: "Recursive filesystem item processing/execution via find".to_string(),
@@ -311,7 +362,9 @@ impl CommandPolicy {
                 };
             }
 
-            if (target_text.contains("base64 -d") || target_text.contains("base64 --decode") || target_text.contains("openssl base64 -d"))
+            if (target_text.contains("base64 -d")
+                || target_text.contains("base64 --decode")
+                || target_text.contains("openssl base64 -d"))
                 && target_text.contains('|')
             {
                 return CommandPolicyEvaluation {
@@ -323,16 +376,29 @@ impl CommandPolicy {
 
             // 6. Package management and global installs
             let package_managers = [
-                "npm install", "npm i ", "yarn add", "pnpm add", "pip install",
-                "cargo install", "apt install", "apt-get install", "pacman -s",
-                "dnf install", "yum install", "brew install", "flatpak install",
+                "npm install",
+                "npm i ",
+                "yarn add",
+                "pnpm add",
+                "pip install",
+                "cargo install",
+                "apt install",
+                "apt-get install",
+                "pacman -s",
+                "dnf install",
+                "yum install",
+                "brew install",
+                "flatpak install",
                 "snap install",
             ];
             for pm in &package_managers {
                 if target_text.contains(pm) {
                     return CommandPolicyEvaluation {
                         action: PolicyAction::Review,
-                        reason: format!("Environment package installation or modification via '{}'", pm),
+                        reason: format!(
+                            "Environment package installation or modification via '{}'",
+                            pm
+                        ),
                         matched_pattern: Some(pm.to_string()),
                     };
                 }
@@ -340,36 +406,66 @@ impl CommandPolicy {
 
             // 7. Piped remote execution & process substitutions
             let piped_executions = [
-                "| sh", "| bash", "| zsh", "| dash", "| ksh", "| python", "| python3", "| perl", "| ruby", "| node",
-                "bash <(", "sh <(", "zsh <(", "python <(", "python3 <(", "eval \"$(",
+                "| sh",
+                "| bash",
+                "| zsh",
+                "| dash",
+                "| ksh",
+                "| python",
+                "| python3",
+                "| perl",
+                "| ruby",
+                "| node",
+                "bash <(",
+                "sh <(",
+                "zsh <(",
+                "python <(",
+                "python3 <(",
+                "eval \"$(",
             ];
             for pipe in &piped_executions {
                 if target_text.contains(pipe) {
                     return CommandPolicyEvaluation {
                         action: PolicyAction::Review,
-                        reason: format!("Unverified remote code execution or process substitution via '{}'", pipe),
+                        reason: format!(
+                            "Unverified remote code execution or process substitution via '{}'",
+                            pipe
+                        ),
                         matched_pattern: Some(pipe.to_string()),
                     };
                 }
             }
-            if (target_text.contains("curl ") || target_text.contains("wget ")) && (target_text.contains('|') || target_text.contains("eval")) {
+            if (target_text.contains("curl ") || target_text.contains("wget "))
+                && (target_text.contains('|') || target_text.contains("eval"))
+            {
                 return CommandPolicyEvaluation {
                     action: PolicyAction::Review,
-                    reason: "Remote script download and execution pattern (curl/wget | ...)".to_string(),
+                    reason: "Remote script download and execution pattern (curl/wget | ...)"
+                        .to_string(),
                     matched_pattern: Some("curl/wget pipe".to_string()),
                 };
             }
 
             // 8. Permission & firewall mutations
             let permission_patterns = [
-                "chmod -r", "chmod 777", "chmod 755", "chmod +x", "chown -r", "chown ",
-                "iptables", "ufw disable", "firewalld",
+                "chmod -r",
+                "chmod 777",
+                "chmod 755",
+                "chmod +x",
+                "chown -r",
+                "chown ",
+                "iptables",
+                "ufw disable",
+                "firewalld",
             ];
             for perm in &permission_patterns {
                 if target_text.contains(perm) {
                     return CommandPolicyEvaluation {
                         action: PolicyAction::Review,
-                        reason: format!("System permission, ownership, or firewall rule alteration via '{}'", perm),
+                        reason: format!(
+                            "System permission, ownership, or firewall rule alteration via '{}'",
+                            perm
+                        ),
                         matched_pattern: Some(perm.to_string()),
                     };
                 }
@@ -377,7 +473,12 @@ impl CommandPolicy {
 
             // 9. General file deletions, resets, and force pushes
             let general_delete_patterns = [
-                "rm -", "rm ", "rm\t", "rmdir", "shred", "truncate",
+                "rm -",
+                "rm ",
+                "rm\t",
+                "rmdir",
+                "shred",
+                "truncate",
                 "git reset --hard",
             ];
             for del in &general_delete_patterns {
@@ -404,7 +505,9 @@ impl CommandPolicy {
             }
 
             if target_text.contains("git branch")
-                && (target_text.contains("-d") || target_text.contains("-d") || target_text.contains("--delete"))
+                && (target_text.contains("-d")
+                    || target_text.contains("-d")
+                    || target_text.contains("--delete"))
             {
                 return CommandPolicyEvaluation {
                     action: PolicyAction::Review,
@@ -592,7 +695,9 @@ fn is_env_dump_command(lower: &str) -> bool {
 fn is_pure_safe_display_or_search(cmd: &str) -> bool {
     let trimmed = cmd.trim();
     let lower = trimmed.to_lowercase();
-    let safe_prefixes = ["echo ", "echo\t", "printf ", "grep ", "egrep ", "fgrep ", "cat "];
+    let safe_prefixes = [
+        "echo ", "echo\t", "printf ", "grep ", "egrep ", "fgrep ", "cat ",
+    ];
     let has_safe_prefix = safe_prefixes.iter().any(|&p| lower.starts_with(p));
     if !has_safe_prefix {
         return false;

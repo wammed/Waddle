@@ -123,7 +123,9 @@ pub fn save_wallpaper_file(
     file_name: String,
     file_data: Vec<u8>,
 ) -> Result<String, String> {
-    state.config_manager.save_wallpaper_data(&file_name, &file_data)
+    state
+        .config_manager
+        .save_wallpaper_data(&file_name, &file_data)
 }
 
 #[tauri::command]
@@ -150,10 +152,18 @@ pub fn log_kitty_debug(msg: String) {
     }
 
     let end_idx = if msg.len() > MAX_MSG_LEN {
-        match msg.char_indices().take_while(|(idx, _)| *idx <= MAX_MSG_LEN).last() {
+        match msg
+            .char_indices()
+            .take_while(|(idx, _)| *idx <= MAX_MSG_LEN)
+            .last()
+        {
             Some((idx, ch)) => {
                 let next = idx + ch.len_utf8();
-                if next <= MAX_MSG_LEN { next } else { idx }
+                if next <= MAX_MSG_LEN {
+                    next
+                } else {
+                    idx
+                }
             }
             None => 0,
         }
@@ -176,7 +186,11 @@ pub fn log_kitty_debug(msg: String) {
     }
     #[cfg(not(unix))]
     {
-        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(log_path) {
+        if let Ok(mut f) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(log_path)
+        {
             let _ = writeln!(f, "{}", trimmed);
         }
     }

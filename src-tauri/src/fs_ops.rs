@@ -98,8 +98,13 @@ pub fn validate_safe_write(path: &Path) -> Result<(), String> {
         }
 
         let sensitive_shell_files = [
-            ".bashrc", ".bash_profile", ".bash_login",
-            ".zshrc", ".zprofile", ".zshenv", ".profile"
+            ".bashrc",
+            ".bash_profile",
+            ".bash_login",
+            ".zshrc",
+            ".zprofile",
+            ".zshenv",
+            ".profile",
         ];
         for file in &sensitive_shell_files {
             let target = home_canon.join(file);
@@ -111,8 +116,8 @@ pub fn validate_safe_write(path: &Path) -> Result<(), String> {
 
     // 3. Protect critical system directories
     let forbidden_system_dirs = [
-        "/etc", "/usr", "/bin", "/sbin", "/boot", "/lib", "/lib64",
-        "/sys", "/proc", "/dev", "/var", "/opt", "/root", "/run"
+        "/etc", "/usr", "/bin", "/sbin", "/boot", "/lib", "/lib64", "/sys", "/proc", "/dev",
+        "/var", "/opt", "/root", "/run",
     ];
     for &sys_dir in &forbidden_system_dirs {
         let sys_path = Path::new(sys_dir);
@@ -151,8 +156,13 @@ pub fn validate_safe_deletion(path: &Path) -> Result<(), String> {
         }
 
         let sensitive_shell_files = [
-            ".bashrc", ".bash_profile", ".bash_login",
-            ".zshrc", ".zprofile", ".zshenv", ".profile"
+            ".bashrc",
+            ".bash_profile",
+            ".bash_login",
+            ".zshrc",
+            ".zprofile",
+            ".zshenv",
+            ".profile",
         ];
         for file in &sensitive_shell_files {
             let target = home_canon.join(file);
@@ -169,8 +179,8 @@ pub fn validate_safe_deletion(path: &Path) -> Result<(), String> {
 
     // 3. Never allow critical system directories or subdirectories (prefix match)
     let forbidden_system_dirs = [
-        "/etc", "/usr", "/bin", "/sbin", "/boot", "/lib", "/lib64",
-        "/sys", "/proc", "/dev", "/var", "/opt", "/root", "/run"
+        "/etc", "/usr", "/bin", "/sbin", "/boot", "/lib", "/lib64", "/sys", "/proc", "/dev",
+        "/var", "/opt", "/root", "/run",
     ];
     for &sys_dir in &forbidden_system_dirs {
         let sys_path = Path::new(sys_dir);
@@ -254,7 +264,8 @@ pub fn read_directory(
     let canonical = resolve_canonical_path(p);
 
     let path_str = canonical.to_string_lossy();
-    if path_str.starts_with("/proc") || path_str.starts_with("/sys") || path_str.starts_with("/dev") {
+    if path_str.starts_with("/proc") || path_str.starts_with("/sys") || path_str.starts_with("/dev")
+    {
         return Err("EACCES: 安全上の理由により仮想/システムディレクトリ (/proc, /sys, /dev) の参照は禁止されています。 (Access denied: browsing /proc, /sys, /dev is restricted)".to_string());
     }
 
@@ -300,7 +311,10 @@ pub fn read_directory(
                 let is_symlink = file_type.as_ref().map(|t| t.is_symlink()).unwrap_or(false);
                 let metadata = entry.metadata().ok();
                 let size = metadata.as_ref().map(|m| m.len()).unwrap_or(0);
-                let readonly = metadata.as_ref().map(|m| m.permissions().readonly()).unwrap_or(false);
+                let readonly = metadata
+                    .as_ref()
+                    .map(|m| m.permissions().readonly())
+                    .unwrap_or(false);
                 let modified = metadata
                     .and_then(|m| m.modified().ok())
                     .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
@@ -473,7 +487,8 @@ mod tests {
 
     #[test]
     fn test_file_tree_operations() {
-        let temp_dir = std::env::temp_dir().join(format!("waddle_tree_test_{}", uuid::Uuid::new_v4()));
+        let temp_dir =
+            std::env::temp_dir().join(format!("waddle_tree_test_{}", uuid::Uuid::new_v4()));
         let _ = fs::create_dir_all(&temp_dir);
         let dir_path = temp_dir.to_str().unwrap().to_string();
 
@@ -497,8 +512,13 @@ mod tests {
         assert!(listing.entries[0].is_dir);
         assert_eq!(listing.entries[0].name, "test_folder");
 
-        let listing_with_hidden = read_directory(dir_path.clone(), true, None).expect("read_directory failed");
-        let all_names: Vec<String> = listing_with_hidden.entries.iter().map(|e| e.name.clone()).collect();
+        let listing_with_hidden =
+            read_directory(dir_path.clone(), true, None).expect("read_directory failed");
+        let all_names: Vec<String> = listing_with_hidden
+            .entries
+            .iter()
+            .map(|e| e.name.clone())
+            .collect();
         assert!(all_names.contains(&".hidden".to_string()));
 
         let file_renamed = format!("{}/gamma.txt", dir_path);
@@ -532,7 +552,11 @@ mod tests {
             let ssh_path = home.join(".ssh").to_string_lossy().to_string();
             assert!(delete_entry(ssh_path).is_err());
 
-            let ssh_key_path = home.join(".ssh").join("id_rsa").to_string_lossy().to_string();
+            let ssh_key_path = home
+                .join(".ssh")
+                .join("id_rsa")
+                .to_string_lossy()
+                .to_string();
             assert!(delete_entry(ssh_key_path).is_err());
 
             let gpg_path = home.join(".gnupg").to_string_lossy().to_string();
@@ -558,11 +582,20 @@ mod tests {
         assert!(create_file("/usr/bin/malicious_binary".to_string()).is_err());
 
         if let Some(home) = dirs::home_dir() {
-            let ssh_auth_keys = home.join(".ssh").join("authorized_keys").to_string_lossy().to_string();
+            let ssh_auth_keys = home
+                .join(".ssh")
+                .join("authorized_keys")
+                .to_string_lossy()
+                .to_string();
             assert!(write_file(ssh_auth_keys.clone(), "ssh-rsa ...".to_string()).is_err());
             assert!(create_file(ssh_auth_keys).is_err());
 
-            let gpg_key = home.join(".gnupg").join("private-keys-v1.d").join("key.sec").to_string_lossy().to_string();
+            let gpg_key = home
+                .join(".gnupg")
+                .join("private-keys-v1.d")
+                .join("key.sec")
+                .to_string_lossy()
+                .to_string();
             assert!(write_file(gpg_key.clone(), "secret".to_string()).is_err());
 
             let bashrc = home.join(".bashrc").to_string_lossy().to_string();
@@ -599,7 +632,11 @@ mod tests {
             assert!(validate_safe_read(&custom_key).is_err());
             assert!(validate_safe_read(&work_key).is_err());
 
-            let keyring = home.join(".local").join("share").join("keyrings").join("login.keyring");
+            let keyring = home
+                .join(".local")
+                .join("share")
+                .join("keyrings")
+                .join("login.keyring");
             assert!(validate_safe_read(&keyring).is_err());
         }
     }
@@ -618,18 +655,26 @@ mod tests {
 
             let keyrings_dir = home.join(".local").join("share").join("keyrings");
             let _ = fs::create_dir_all(&keyrings_dir);
-            assert!(read_directory(keyrings_dir.to_string_lossy().to_string(), true, None).is_err());
+            assert!(
+                read_directory(keyrings_dir.to_string_lossy().to_string(), true, None).is_err()
+            );
 
             let ssh_dir = home.join(".ssh");
             if ssh_dir.is_dir() {
-                if let Ok(listing) = read_directory(ssh_dir.to_string_lossy().to_string(), true, None) {
+                if let Ok(listing) =
+                    read_directory(ssh_dir.to_string_lossy().to_string(), true, None)
+                {
                     for entry in listing.entries {
                         let name = &entry.name;
                         let is_safe = name == "config"
                             || name.starts_with("known_hosts")
                             || name.starts_with("authorized_keys")
                             || name.ends_with(".pub");
-                        assert!(is_safe, "Private key file {} should have been stripped from read_directory", name);
+                        assert!(
+                            is_safe,
+                            "Private key file {} should have been stripped from read_directory",
+                            name
+                        );
                     }
                 }
             }
@@ -638,7 +683,8 @@ mod tests {
 
     #[test]
     fn test_read_directory_pagination_limit() {
-        let temp_dir = std::env::temp_dir().join(format!("waddle_test_page_{}", uuid::Uuid::new_v4()));
+        let temp_dir =
+            std::env::temp_dir().join(format!("waddle_test_page_{}", uuid::Uuid::new_v4()));
         let _ = fs::create_dir_all(&temp_dir);
         for i in 0..12 {
             let _ = fs::File::create(temp_dir.join(format!("file_{:02}.txt", i)));
@@ -649,7 +695,8 @@ mod tests {
         assert_eq!(res5.entries.len(), 5);
         assert!(res5.has_more);
 
-        let res15 = read_directory(temp_dir.to_string_lossy().to_string(), false, Some(15)).unwrap();
+        let res15 =
+            read_directory(temp_dir.to_string_lossy().to_string(), false, Some(15)).unwrap();
         assert_eq!(res15.total_count, 12);
         assert_eq!(res15.entries.len(), 12);
         assert!(!res15.has_more);

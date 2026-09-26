@@ -194,7 +194,23 @@ Waddle の内蔵エディタは、「何でもできる巨大なエディタ」�
     - `Ctrl + V`: クリップボードからの貼り付け（Paste / 選択置換・Undo履歴即時反映）
     - `Esc`: 検索バー表示中はバーのみ閉鎖、通常時はエディタ全体を閉鎖
 - **エディタ内外・ターミナル・外部アプリ間での双方向クリップボード連携**:
-  - **OS クリップボード統合 (`clipboardService`)**: `navigator.clipboard` とセーフフォールバック（`execCommand`）を融合した堅牢なクリップボード機構。外部アプリ（VS Code、ブラウザ等）と Waddle の間でテキストを自在にやり取り可能。
+  - **OS クリップボード統合 & Wayland 多重 MIME アーキテクチャ (`clipboard_ops.rs` & `clipboardService.ts`)**:
+    - **Wayland 多重 MIME 形式の同時広告**: Linux Wayland 環境（COSMIC, GNOME, Sway, Hyprland 等）において、`wl-clipboard-rs` を用いてテキスト書き込み時に以下の **5 種の MIME タイプを同時広告（Multi-MIME Offering）** します：
+      1. `text/plain;charset=utf-8`（Firefox, Chromium 等の厳格な Wayland ネイティブブラウザが要求）
+      2. `UTF8_STRING`（VS Code, Electron, XWayland アプリが要求）
+      3. `text/plain`（標準 Wayland / Linux ユーティリティが要求）
+      4. `TEXT`（X11 レガシー互換）
+      5. `STRING`（X11 レガシー互換）
+    - **Firefox / VS Code 貼り付け不具合の完全解消**: 単一の `text/plain` のみを提供していた従来の制限を打破し、Waddle からコピーしたコードや出力が、Firefox や VS Code 等の外部アプリケーションへ 100% 確実に貼り付け可能。
+    - **GTK3 ネイティブセレクション同期**: Tauri が稼働する GTK3 レイヤーの `gtk::Clipboard::get(&gdk::SELECTION_CLIPBOARD)` および `SELECTION_PRIMARY`（Linux 中クリック貼り付け）へも同期書き込みを行い、WebKitGTK およびホスト OS と完全同期。
+  - **エディタ側イベント委譲 & `ClipboardEvent` 直接活用 (`EditorPane.tsx`)**:
+    - **ネイティブ `paste` イベントの解放**: `handleTextareaKeyDown` において `Ctrl + V` を `preventDefault()` で遮断せずブラウザイベントへ委譲。WebKitGTK が OS / GTK レベルで解決した生のクリップボードデータ（`e.clipboardData.getData('text/plain')`）を即座に取得し、外部アプリからコピーしたテキストを欠落なく高精度にエディタへ挿入。
+    - **ネイティブ `copy` / `cut` 委譲 & 二重書き込み防止**: `Ctrl + C` および `Ctrl + X` もネイティブイベントへ委譲し、`onCopy` / `onCut` 内で `e.clipboardData.setData('text/plain', text)` による内部セレクション設定と `writeClipboardText` を 1 回のみ同期実行（スレッド競合を根絶）。
+    - **フォーカス限定キーバインド**:
+      - `Ctrl + A`: 全テキスト選択（Select All）
+      - `Ctrl + C`: 選択範囲のコピー（Read-Only 時も許可）
+      - `Ctrl + X`: 選択範囲の切り取り（Cut / Undo履歴即時反映）
+      - `Ctrl + V`: クリップボードからの貼り付け（Paste / 選択置換・Undo履歴即時反映）
   - **ターミナル ⇔ エディタ間のシームレスな移行**:
     - ターミナルでテキストを選択して `Ctrl + C`（または `Ctrl + Shift + C`）→ エディタで `Ctrl + V` で即座に挿入。
     - エディタでコードを選択して `Ctrl + C` → ターミナルで `Ctrl + V`（または `Ctrl + Shift + V`）で即座にペースト実行/入力。
@@ -203,6 +219,7 @@ Waddle の内蔵エディタは、「何でもできる巨大なエディタ」�
     - エディタ内を右クリックすると、**「切り取り (Ctrl+X)」「コピー (Ctrl+C)」「貼り付け (Ctrl+V)」「すべて選択 (Ctrl+A)」「ターミナルで実行」** を備えた洗練されたダークグラスモーフィズム・メニューを展開。
   - **ターミナル右クリックコンテキストメニュー**:
     - ターミナル上での右クリック時にも、「Copy (Ctrl+Shift+C)」「Paste (Ctrl+V)」「Select All (Ctrl+Shift+A)」「Clear Terminal」を即座に呼び出し可能。
+
 - **非破壊・視覚的シークレット保護 (Zero-Mutation Guarantee)**:
   - `findSecretRanges()` によるファイル内シークレットのリアルタイム自動検知。
   - ヘッダーツールバーに `[🛡️ N 件のシークレットを検知]` バッジと👁️トグルボタンを常時表示。

@@ -115,7 +115,11 @@ async fn test_pty_1000_cycles_stress_and_resource_safety() {
     }
 
     let duration = start_time.elapsed();
-    println!("1,000 PTY cycles finished in {:.2?} ({:.2} ms/cycle)", duration, duration.as_millis() as f64 / total_cycles as f64);
+    println!(
+        "1,000 PTY cycles finished in {:.2?} ({:.2} ms/cycle)",
+        duration,
+        duration.as_millis() as f64 / total_cycles as f64
+    );
 
     // Final checks
     tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
@@ -125,8 +129,16 @@ async fn test_pty_1000_cycles_stress_and_resource_safety() {
     let final_zombies = get_zombie_child_count();
 
     println!("=== Final Audit Results ===");
-    println!("Final FDs: {} (Delta: {})", final_fds, (final_fds as i64) - (initial_fds as i64));
-    println!("Final RSS: {} KB (Delta: {} KB)", final_rss, (final_rss as i64) - (initial_rss as i64));
+    println!(
+        "Final FDs: {} (Delta: {})",
+        final_fds,
+        (final_fds as i64) - (initial_fds as i64)
+    );
+    println!(
+        "Final RSS: {} KB (Delta: {} KB)",
+        final_rss,
+        (final_rss as i64) - (initial_rss as i64)
+    );
     println!("Final Zombies: {}", final_zombies);
 
     // 1. Zero Zombie Processes

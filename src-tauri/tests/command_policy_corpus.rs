@@ -73,7 +73,6 @@ fn test_command_policy_exhaustive_corpus() {
             expected_action: PolicyAction::Review,
             description: "Full path /bin/bash -c indirect call",
         },
-
         // ====================================================================
         // Category 2: Interpreter Dynamic Inline Evaluation (Review or Block)
         // ====================================================================
@@ -131,7 +130,6 @@ fn test_command_policy_exhaustive_corpus() {
             expected_action: PolicyAction::Review,
             description: "lua -e inline execution",
         },
-
         // ====================================================================
         // Category 3: Pipe & Argument Passing Execution (Review or Block)
         // ====================================================================
@@ -219,7 +217,6 @@ fn test_command_policy_exhaustive_corpus() {
             expected_action: PolicyAction::Review,
             description: "env sanitized subshell execution",
         },
-
         // ====================================================================
         // Category 4: Privilege Escalation & Impersonation (Review)
         // ====================================================================
@@ -271,7 +268,6 @@ fn test_command_policy_exhaustive_corpus() {
             expected_action: PolicyAction::Review,
             description: "su target root explicitly",
         },
-
         // ====================================================================
         // Category 5: Command Substitution & Obfuscation (Review)
         // ====================================================================
@@ -335,7 +331,6 @@ fn test_command_policy_exhaustive_corpus() {
             expected_action: PolicyAction::Review,
             description: "Base64 decode pipeline to python3",
         },
-
         // ====================================================================
         // Category 6: Irrevocable Destructive Attacks (Tier 3: Block)
         // ====================================================================
@@ -477,7 +472,6 @@ fn test_command_policy_exhaustive_corpus() {
             expected_action: PolicyAction::Block,
             description: "Python shutil.rmtree targeting root",
         },
-
         // ====================================================================
         // Category 7: False Positive Prevention (Tier 1: Safe)
         // ====================================================================
@@ -637,7 +631,6 @@ fn test_command_policy_exhaustive_corpus() {
             expected_action: PolicyAction::Safe,
             description: "Harmless shell variable assignment",
         },
-
         // ====================================================================
         // Category 12: Sensitive Credential & Secret Access Protection (Review)
         // ====================================================================
@@ -701,7 +694,6 @@ fn test_command_policy_exhaustive_corpus() {
             expected_action: PolicyAction::Review,
             description: "Print environment variables read-only exposes secrets",
         },
-
         // ====================================================================
         // Category 13: Shell Obfuscation & Multiline Evasion (Block / Review)
         // ====================================================================
@@ -756,7 +748,8 @@ fn test_command_policy_exhaustive_corpus() {
     }
 
     assert_eq!(
-        failed, 0,
+        failed,
+        0,
         "Total {} corpus test cases failed out of {}",
         failed,
         corpus.len()

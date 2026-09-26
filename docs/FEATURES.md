@@ -196,7 +196,23 @@ Rather than building an all-encompassing heavyweight editor, Waddle intentionall
     - `Ctrl + V`: Pastes text from clipboard, replacing selection and recording to Undo stack.
     - `Esc`: Closes Find/Replace mini-bar if open; otherwise closes editor (with unsaved confirmation).
 - **Bidirectional Clipboard Integration (Editor ⇔ Terminal ⇔ External Apps)**:
-  - **OS Clipboard Service (`clipboardService`)**: Seamlessly bridges text transfer between external applications (browsers, IDEs) and Waddle with safe fallback.
+  - **OS Clipboard Integration & Wayland Multi-MIME Architecture (`clipboard_ops.rs` & `clipboardService.ts`)**:
+    - **Wayland Multi-MIME Offering**: Under Linux Wayland environments (COSMIC, GNOME, Sway, Hyprland, etc.), `wl-clipboard-rs` advertises **5 MIME types simultaneously** upon writing:
+      1. `text/plain;charset=utf-8` (required by strict Wayland native browsers like Firefox and Chromium)
+      2. `UTF8_STRING` (required by VS Code, Electron, and XWayland applications)
+      3. `text/plain` (standard Wayland and Linux utilities)
+      4. `TEXT` (X11 legacy compatibility)
+      5. `STRING` (X11 legacy compatibility)
+    - **Complete Resolution of Firefox / VS Code Paste Issues**: Overcomes the previous limitation of advertising only a single `text/plain` format. Code snippets, terminal logs, and text copied from Waddle paste 100% reliably into Firefox, VS Code, and other external applications.
+    - **GTK3 Native Selection Sync**: Synchronously writes to GTK3's `gtk::Clipboard::get(&gdk::SELECTION_CLIPBOARD)` and `SELECTION_PRIMARY` (Linux middle-click paste), guaranteeing full synchronization with WebKitGTK and the host OS.
+  - **Editor Event Delegation & Direct `ClipboardEvent` Utilization (`EditorPane.tsx`)**:
+    - **Native `paste` Event Passthrough**: In `handleTextareaKeyDown`, `Ctrl + V` is no longer blocked with `preventDefault()`, allowing standard browser paste events to fire. WebKitGTK retrieves raw OS/GTK clipboard data (`e.clipboardData.getData('text/plain')`) without truncation or dropouts.
+    - **Native `copy` / `cut` Delegation & Double-Write Prevention**: `Ctrl + C` and `Ctrl + X` delegate to native events, where `onCopy` / `onCut` set selection data via `e.clipboardData.setData('text/plain', text)` and invoke `writeClipboardText` once synchronously without thread contention.
+    - **Focus-Exclusive Shortcut Handling**:
+      - `Ctrl + A`: Select all text in editor (Select All).
+      - `Ctrl + C`: Copy selected text (allowed in Read-Only mode).
+      - `Ctrl + X`: Cut selected text to clipboard with immediate undo stack update.
+      - `Ctrl + V`: Paste text from clipboard, replacing active selection with immediate undo stack update.
   - **Terminal ⇔ Editor Workflow**:
     - Select text in terminal + `Ctrl + C` (or `Ctrl + Shift + C`) → Paste into editor via `Ctrl + V`.
     - Select code in editor + `Ctrl + C` → Paste into terminal via `Ctrl + V` (or `Ctrl + Shift + V`).

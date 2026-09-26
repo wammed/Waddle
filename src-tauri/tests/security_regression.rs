@@ -162,25 +162,41 @@ fn test_security_pillar2_ssrf_and_dns_pinning() {
     }
 
     // 3. Forbidden IP range checks
-    assert!(is_forbidden_metadata_ip(&"169.254.169.254".parse::<IpAddr>().unwrap()));
-    assert!(is_forbidden_metadata_ip(&"169.254.0.1".parse::<IpAddr>().unwrap()));
-    assert!(is_forbidden_metadata_ip(&"fd00:ec2::254".parse::<IpAddr>().unwrap()));
-    assert!(is_forbidden_metadata_ip(&"fe80::1".parse::<IpAddr>().unwrap()));
+    assert!(is_forbidden_metadata_ip(
+        &"169.254.169.254".parse::<IpAddr>().unwrap()
+    ));
+    assert!(is_forbidden_metadata_ip(
+        &"169.254.0.1".parse::<IpAddr>().unwrap()
+    ));
+    assert!(is_forbidden_metadata_ip(
+        &"fd00:ec2::254".parse::<IpAddr>().unwrap()
+    ));
+    assert!(is_forbidden_metadata_ip(
+        &"fe80::1".parse::<IpAddr>().unwrap()
+    ));
 
     // Safe IPs
-    assert!(!is_forbidden_metadata_ip(&"127.0.0.1".parse::<IpAddr>().unwrap()));
+    assert!(!is_forbidden_metadata_ip(
+        &"127.0.0.1".parse::<IpAddr>().unwrap()
+    ));
     assert!(!is_forbidden_metadata_ip(&"::1".parse::<IpAddr>().unwrap()));
 
     // 4. DNS Pinning verification: verified socket address matches connection host
     let res = create_pinned_client("http://127.0.0.1:11434");
-    assert!(res.is_ok(), "Pillar 2: create_pinned_client failed on 127.0.0.1");
+    assert!(
+        res.is_ok(),
+        "Pillar 2: create_pinned_client failed on 127.0.0.1"
+    );
     let (_, endpoint, addr) = res.unwrap();
     assert_eq!(endpoint, "http://127.0.0.1:11434");
     assert_eq!(addr.ip(), "127.0.0.1".parse::<IpAddr>().unwrap());
     assert_eq!(addr.port(), 11434);
 
     let res_lh = create_pinned_client("http://localhost:11434");
-    assert!(res_lh.is_ok(), "Pillar 2: create_pinned_client failed on localhost");
+    assert!(
+        res_lh.is_ok(),
+        "Pillar 2: create_pinned_client failed on localhost"
+    );
     let (_, _, addr_lh) = res_lh.unwrap();
     assert_eq!(addr_lh.port(), 11434);
 }
@@ -302,12 +318,19 @@ fn test_security_pillar6_credential_protection_and_read_denial() {
         assert!(validate_safe_read(&ssh_pub).is_ok());
 
         // 2. GPG Private Keys
-        let gpg_priv = home.join(".gnupg").join("private-keys-v1.d").join("key.sec");
+        let gpg_priv = home
+            .join(".gnupg")
+            .join("private-keys-v1.d")
+            .join("key.sec");
         assert!(validate_safe_read(&gpg_priv).is_err());
         assert!(validate_safe_write(&gpg_priv).is_err());
 
         // 3. System Keyrings
-        let keyring = home.join(".local").join("share").join("keyrings").join("default.keyring");
+        let keyring = home
+            .join(".local")
+            .join("share")
+            .join("keyrings")
+            .join("default.keyring");
         assert!(validate_safe_read(&keyring).is_err());
         assert!(validate_safe_write(&keyring).is_err());
 

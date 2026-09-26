@@ -16,7 +16,7 @@ graph TD
         Copilot["AI Copilot サイドバー: コンテキスト認識チャット + エクスポート"]
         GitUI["Git Quick Popover & Diff Viewer: Push / Pull / ステージング / コミット"]
         NextGenModals["拡張モーダル: SessionHistory + PipelineBuilder + RichPreview + TestPlan"]
-        Services["フロントエンドサービス: secretMasker + sessionHistory + kittyGraphics"]
+        Services["フロントエンドサービス: secretMasker + sessionHistory + kittyGraphics + clipboardService"]
         Settings["設定モーダル: Ollama モデル自動検出 & 壁紙 & Git 設定"]
         Hooks["カスタムフック: useTerminalTabs + useGlobalShortcuts"]
     end
@@ -26,6 +26,7 @@ graph TD
         GitCore["Git エンジン: Status / Stage / Commit / Push / Pull / Diff / Ref検証"]
         AiCore["Ollama クライアント: 行バッファリングストリーミング / タグ取得 / SSRF防御 / プロジェクトルール読込"]
         FileIO["ファイルシステム: 読込 / 保存 / 一覧 (仮想FS遮断・秘密鍵保護ガードレール付き)"]
+        ClipCore["クリップボード管理: clipboard_ops (Wayland Multi-MIME wl-clipboard-rs + GTK3 selection)"]
         ConfigMgr["設定管理: ~/.config/waddle/config.json"]
     end
 
@@ -40,6 +41,7 @@ graph TD
     GitUI <-->|Git 操作 IPC| GitCore
     GitCore <--> GitRepo
     Editor <-->|ファイル操作 IPC| FileIO
+    Editor & TermView <-->|クリップボード IPC| ClipCore
     AIOverlay & Copilot & Editor & GitUI <-->|AI リクエスト IPC| AiCore
     AiCore <-->|REST / SSE ストリーミング| Ollama
     Hooks --> TermView
@@ -67,6 +69,7 @@ Waddle は、高速・堅牢な **Rust バックエンド** と、最新の **Re
   - `src/services/secretMasker.ts`: ターミナル出力中の API キーやアクセストークンを正規表現でリアルタイム検知・マスク。
   - `src/services/sessionHistory.ts`: コマンド履歴、終了ステータス、CWD、ターミナル出力スナップショットの追跡と `localStorage` 永続化。
   - `src/services/kittyGraphics/`: Kitty Graphics Protocol（APC パース、テクスチャ管理、256MB LRU キャッシュ、アニメーションループ、Unicode プレースホルダー豆腐抑止）。
+  - `src/services/clipboardService.ts`: 双方向クリップボード抽象化レイヤー。Rust IPC (`clipboard_write_text`, `clipboard_read_text`)、`navigator.clipboard`、および DOM `execCommand` による 3 重フォールバック機構。
 - **モーダル & ビジュアルツール**:
   - `SessionHistoryModal.tsx`: セッションタイムトラベル & 履歴復元 (`Ctrl+Shift+H`)。
   - `PipelineBuilderModal.tsx`: ビジュアルパイプラインビルダー (`Ctrl+Shift+P`)。
@@ -89,6 +92,7 @@ Waddle は、高速・堅牢な **Rust バックエンド** と、最新の **Re
   - `ai.rs`: Ollama HTTP 通信、行バッファリング SSE デコード、プロンプト生成、事前 DNS 名前解決による SSRF/DNS リバインディング防御、リダイレクト無効化、不信プロジェクト規約タグ隔離、2段階階層 AI ルール解決。
   - `config.rs`: `~/.config/waddle/config.json` のアトミック保存、壁紙管理。
   - `kitty.rs`: パス正規化・サンドボックス脱出遮断・展開爆弾対策・Base64 エンコード・一時ファイル自動削除。
+  - `clipboard_ops.rs`: Wayland 5 種多重 MIME 同時広告 (`wl-clipboard-rs`)、GTK3 selection 同期 (`SELECTION_CLIPBOARD` & `SELECTION_PRIMARY`)、双方向 IPC。
   - `lib.rs`: コマンドルーティング、仮想ファイルシステム走査遮断 (`/proc`, `/sys`, `/dev`)、SSH/GPG/Keyring 秘密鍵アクセス拒否、Git 操作。
 
 ---
@@ -290,7 +294,70 @@ Waddle は、高速・堅牢な **Rust バックエンド** と、最新の **Re
 
 ---
 
-### 7. 統合テスト & 品質/セキュリティ監査パイプライン アーキテクチャ
+### 7. クリップボード サブシステム & Wayland 多重 MIME / GTK3 統合アーキテクチャ (`src-tauri/src/clipboard_ops.rs` & `src/services/clipboardService.ts`)
+
+Linux デスクトップ環境（特に Wayland セッション）におけるテキストのコピー＆ペーストは、X11 と異なる厳格なプロトコル制約（MIME タイプ交渉、セレクション所有権、イベント伝搬制限）が存在します。Waddle はエディタ内外、ターミナル、および外部アプリケーション（Firefox, VS Code 等）との間で 100% 確実な双方向同期を実現するため、多重 MIME 広告と多層フォールバックを備えた専用クリップボードサブシステムを搭載しています。
+
+#### 1. Wayland 多重 MIME 同時広告アーキテクチャ (Multi-MIME Offering)
+- **問題の背景**:
+  - 一般的なクリップボードライブラリ（`arboard` 等）は単一の `text/plain` MIME タイプのみを広告することが多く、これに対して Wayland ネイティブの Firefox は `text/plain;charset=utf-8` を厳格に要求し、VS Code (Electron) は `UTF8_STRING` や `text/plain;charset=utf-8` を要求するため、クリップボードデータが認識されず貼り付け不能となる問題が発生していました。
+- **アーキテクチャ解決策 (`clipboard_ops.rs`)**:
+  - `wl-clipboard-rs` の `MimeType::Specific` API を活用し、Linux Wayland 環境において以下の **5 種類の MIME タイプを 1 回のコピー操作で同時に提供 (Simultaneous Multi-MIME Offering)**：
+    1. `text/plain;charset=utf-8` (Wayland ネイティブブラウザ: Firefox, Chromium)
+    2. `UTF8_STRING` (Electron, VS Code, XWayland 互換レイヤー)
+    3. `text/plain` (標準 Wayland / Linux ユーティリティ)
+    4. `TEXT` (X11 レガシー互換)
+    5. `STRING` (X11 レガシー互換)
+  - デーモンプロセスを fork せず、Tauri バックエンドの非同期タスクプール上でセレクション提供スレッドを安全に制御。
+
+```mermaid
+flowchart TD
+    subgraph Frontend["フロントエンド (EditorPane / TerminalView)"]
+        UserCopy["Ctrl+C / Ctrl+X / ContextMenu"]
+        ClipSvc["clipboardService.ts\n(writeClipboardText)"]
+        UserCopy --> ClipSvc
+    end
+
+    subgraph Backend["Rust バックエンド (src-tauri/src/clipboard_ops.rs)"]
+        IPC["Tauri IPC Command: clipboard_write_text"]
+        WaylandDetect{"WAYLAND_DISPLAY\n検知?"}
+        WLOffer["wl-clipboard-rs\n5種 MIME 同時広告\n- text/plain;charset=utf-8\n- UTF8_STRING\n- text/plain\n- TEXT\n- STRING"]
+        GTKSync["GTK3 Selection 同期\n- gdk::SELECTION_CLIPBOARD\n- gdk::SELECTION_PRIMARY"]
+        
+        ClipSvc -->|invoke| IPC
+        IPC --> WaylandDetect
+        WaylandDetect -->|Yes| WLOffer
+        WaylandDetect --> GTKSync
+    end
+
+    subgraph HostOS["ホスト OS & 外部アプリケーション"]
+        FF["Firefox (Wayland Native)\n[text/plain;charset=utf-8 取得]"]
+        VSC["VS Code / Electron\n[UTF8_STRING 取得]"]
+        Term["外部端末 / XWayland\n[text/plain / TEXT 取得]"]
+        Middle["Linux 中クリック貼り付け\n[SELECTION_PRIMARY 取得]"]
+
+        WLOffer -.-> FF
+        WLOffer -.-> VSC
+        WLOffer -.-> Term
+        GTKSync -.-> Middle
+    end
+```
+
+#### 2. GTK3 ネイティブセレクション同期 & 中クリックペースト保護
+- WebKitGTK Webview が動作する GTK3 メインループと完全同期させるため、Rust 側で `gtk::Clipboard::get(&gdk::SELECTION_CLIPBOARD)` および `gdk::SELECTION_PRIMARY`（Linux マウス中クリック用セレクション）の双方に同一テキストを書き込みます。
+- これにより、エディタ内でコピーしたテキストを外部端末の中クリックで即座に貼り付け可能です。
+
+#### 3. WebKitGTK イベント委譲 & 直接 `ClipboardEvent` 取得
+- **`preventDefault()` の解除**:
+  - `EditorPane.tsx` の `handleTextareaKeyDown` において、`Ctrl + V`、`Ctrl + C`、`Ctrl + X` のキーダウンイベントを `preventDefault()` で握りつぶさずにネイティブブラウザイベントへ委譲。
+- **WebKitGTK ネイティブバッファからの高精度抽出**:
+  - `<textarea>` の `onPaste` ハンドラにて `e.clipboardData.getData('text/plain')` を直接取得。WebKitGTK が OS / GTK レイヤーから解決した信頼性の高いテキストを欠落なくエディタバッファへ挿入し、Undo / Redo 履歴スタックへ即時登録。
+- **多層フォールバック読み込みパイプライン**:
+  - `clipboardService.readClipboardText()` は、1. Rust バックエンド IPC (`clipboard_read_text`)、2. `navigator.clipboard.readText()`、3. 非表示 DOM による `execCommand('paste')` の 3 段階フォールバックを備え、いかなるパーミッション制約下でも確実にテキストを復元。
+
+---
+
+### 8. 統合テスト & 品質/セキュリティ監査パイプライン アーキテクチャ
 
 Waddle は、開発者のローカル環境から Git リモートプッシュに至るまで、製品品質・安全性・視覚整合性・メモリ健全性を機械的に保証する 4 層パイプライン構造を採用しています。
 
@@ -339,7 +406,7 @@ flowchart TD
 
 ---
 
-### 8. Rust セキュリティ Trust Boundary アーキテクチャ (`command_policy.rs`)
+### 9. Rust セキュリティ Trust Boundary アーキテクチャ (`command_policy.rs`)
 
 UI モーダルの迂回、悪意ある IPC 呼び出し、および AI プロンプトインジェクションによる脱出攻撃を完全に防ぐため、Waddle はセキュリティ判定を Webview 内の JavaScript から完全に分離し、Rust バックエンドコアに絶対的な信頼境界（Trust Boundary）を集約しています。
 
@@ -416,6 +483,7 @@ flowchart TD
 | **PTY 管理** | `portable-pty` | クロスプラットフォーム疑似端末（PTY）制御 |
 | **非同期ランタイム** | `tokio` (v1) | マルチスレッド非同期 I/O・タスクスケジューリング |
 | **HTTP クライアント** | `reqwest` (v0.12) | ローカル Ollama API との非同期通信 |
+| **クリップボード統合** | `wl-clipboard-rs`, `gtk`, `gdk` | Linux Wayland 5種多重 MIME 同時広告 & GTK3 Selection 同期 |
 | **POSIX 制御** | `libc` | プロセスグループシグナル送信 (`SIGHUP`, `SIGTERM`, `SIGKILL`) |
 | **シリアライズ** | `serde`, `serde_json` | 設定ファイルおよび JSON ストリームのパース |
 | **フロントエンド言語** | [React 19](https://react.dev/) + [TypeScript](https://www.typescriptlang.org/) | UI コンポーネントおよびステート管理 |

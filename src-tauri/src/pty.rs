@@ -161,7 +161,10 @@ pub fn process_kitty_output<W: Write + ?Sized>(
                         } else if let Err(e) = writer.flush() {
                             eprintln!("[Kitty Graphics] Error flushing query response: {}", e);
                         } else {
-                            println!("[Kitty Graphics] Responded to query: \\x1b_Gi={};OK\\x1b\\", id);
+                            println!(
+                                "[Kitty Graphics] Responded to query: \\x1b_Gi={};OK\\x1b\\",
+                                id
+                            );
                         }
                     } else {
                         let response = format!("\x1b_Gi={};ENOTSUP\x1b\\", id);
@@ -199,7 +202,10 @@ pub fn process_kitty_output<W: Write + ?Sized>(
                     if let (Some(s_pos), Some(t_pos)) = (semi_pos, term_pos) {
                         if s_pos < t_pos {
                             let payload = &rest[s_pos + 1..t_pos];
-                            match crate::kitty::read_and_unlink_temp_file_base64(payload, 16 * 1024 * 1024) {
+                            match crate::kitty::read_and_unlink_temp_file_base64(
+                                payload,
+                                16 * 1024 * 1024,
+                            ) {
                                 Ok(inlined_data) => {
                                     // Replace t=t with t=d in header
                                     let mut new_parts = Vec::new();
@@ -215,7 +221,8 @@ pub fn process_kitty_output<W: Write + ?Sized>(
                                         new_parts.push(trimmed.to_string());
                                     }
                                     let new_header = new_parts.join(",");
-                                    let new_command = format!("\x1b_G{};{}\x1b\\", new_header, inlined_data);
+                                    let new_command =
+                                        format!("\x1b_G{};{}\x1b\\", new_header, inlined_data);
                                     let seq_end = header_start + t_pos + term_len;
                                     decoded.replace_range(start..seq_end, &new_command);
                                     search_idx = start + new_command.len();
@@ -223,7 +230,10 @@ pub fn process_kitty_output<W: Write + ?Sized>(
                                     continue;
                                 }
                                 Err(e) => {
-                                    eprintln!("[Kitty Graphics] Failed to inline temporary file: {}", e);
+                                    eprintln!(
+                                        "[Kitty Graphics] Failed to inline temporary file: {}",
+                                        e
+                                    );
                                 }
                             }
                         }
@@ -250,20 +260,34 @@ pub fn process_kitty_output<W: Write + ?Sized>(
     while let Some(xt_pos) = decoded.find("\x1b[>0q") {
         let response = b"\x1bP>|kitty(0.35.0)\x1b\\";
         if let Err(e) = writer.write_all(response) {
-            eprintln!("[Kitty Graphics] Error writing XTVERSION (0q) response: {}", e);
+            eprintln!(
+                "[Kitty Graphics] Error writing XTVERSION (0q) response: {}",
+                e
+            );
         } else if let Err(e) = writer.flush() {
-            eprintln!("[Kitty Graphics] Error flushing XTVERSION (0q) response: {}", e);
+            eprintln!(
+                "[Kitty Graphics] Error flushing XTVERSION (0q) response: {}",
+                e
+            );
         } else {
-            println!("[Kitty Graphics] Responded to XTVERSION (0q) query: \\x1bP>|kitty(0.35.0)\\x1b\\");
+            println!(
+                "[Kitty Graphics] Responded to XTVERSION (0q) query: \\x1bP>|kitty(0.35.0)\\x1b\\"
+            );
         }
         decoded.drain(xt_pos..xt_pos + 5);
     }
     while let Some(xt_pos) = decoded.find("\x1b[>q") {
         let response = b"\x1bP>|kitty(0.35.0)\x1b\\";
         if let Err(e) = writer.write_all(response) {
-            eprintln!("[Kitty Graphics] Error writing XTVERSION query response: {}", e);
+            eprintln!(
+                "[Kitty Graphics] Error writing XTVERSION query response: {}",
+                e
+            );
         } else if let Err(e) = writer.flush() {
-            eprintln!("[Kitty Graphics] Error flushing XTVERSION query response: {}", e);
+            eprintln!(
+                "[Kitty Graphics] Error flushing XTVERSION query response: {}",
+                e
+            );
         } else {
             println!("[Kitty Graphics] Responded to XTVERSION query: \\x1bP>|kitty(0.35.0)\\x1b\\");
         }
@@ -329,11 +353,19 @@ pub fn process_kitty_output<W: Write + ?Sized>(
         // Response format: \x1b[?996;1n (1 = supported)
         let response = b"\x1b[?996;1n";
         if let Err(e) = writer.write_all(response) {
-            eprintln!("[Kitty Graphics] Error writing unicode placeholder probe response: {}", e);
+            eprintln!(
+                "[Kitty Graphics] Error writing unicode placeholder probe response: {}",
+                e
+            );
         } else if let Err(e) = writer.flush() {
-            eprintln!("[Kitty Graphics] Error flushing unicode placeholder probe response: {}", e);
+            eprintln!(
+                "[Kitty Graphics] Error flushing unicode placeholder probe response: {}",
+                e
+            );
         } else {
-            println!("[Kitty Graphics] Responded to unicode placeholder (?996n) query: \\x1b[?996;1n");
+            println!(
+                "[Kitty Graphics] Responded to unicode placeholder (?996n) query: \\x1b[?996;1n"
+            );
         }
         decoded.drain(u_probe_pos..u_probe_pos + 7);
     }
@@ -341,7 +373,11 @@ pub fn process_kitty_output<W: Write + ?Sized>(
     // If an unclosed \x1b_G header remains at the end of decoded (< 256 bytes), hold it
     if let Some(start) = decoded.rfind("\x1b_G") {
         let rest = &decoded[start + 3..];
-        if !rest.contains(';') && !rest.contains("\x1b\\") && !rest.contains('\x07') && rest.len() < 256 {
+        if !rest.contains(';')
+            && !rest.contains("\x1b\\")
+            && !rest.contains('\x07')
+            && rest.len() < 256
+        {
             *pending_prefix = decoded.split_off(start);
         }
     } else if decoded.ends_with("\x1b_") {
@@ -376,7 +412,8 @@ impl PtyManager {
         cwd: Option<String>,
         shell: Option<String>,
     ) -> Result<PtySessionInfo, String> {
-        self.create_pty_internal(Some(app), rows, cols, cwd, shell).await
+        self.create_pty_internal(Some(app), rows, cols, cwd, shell)
+            .await
     }
 
     pub async fn create_pty_headless(
@@ -411,9 +448,8 @@ impl PtyManager {
             .openpty(pty_size)
             .map_err(|e| format!("Failed to open PTY: {}", e))?;
 
-        let shell_cmd = shell.unwrap_or_else(|| {
-            std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".to_string())
-        });
+        let shell_cmd = shell
+            .unwrap_or_else(|| std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".to_string()));
 
         let target_cwd = match cwd {
             Some(c) if !c.is_empty() => PathBuf::from(c),
@@ -558,7 +594,11 @@ impl PtyManager {
                         if !decoded.is_empty() || !pending_kitty_prefix.is_empty() {
                             {
                                 let mut w = writer_clone.lock();
-                                process_kitty_output(&mut decoded, &mut *w, &mut pending_kitty_prefix);
+                                process_kitty_output(
+                                    &mut decoded,
+                                    &mut *w,
+                                    &mut pending_kitty_prefix,
+                                );
                             }
 
                             if !decoded.is_empty() {
@@ -911,9 +951,11 @@ pub fn check_git_status(path: &str) -> GitStatus {
             for (i, line) in text.lines().enumerate() {
                 if i == 0 && line.starts_with("## ") {
                     let branch_part = &line[3..];
-                    let (name_part, sync_part) = if let Some(bracket_start) = branch_part.find('[') {
+                    let (name_part, sync_part) = if let Some(bracket_start) = branch_part.find('[')
+                    {
                         let name = &branch_part[..bracket_start];
-                        let sync = branch_part[bracket_start..].trim_matches(|c| c == '[' || c == ']');
+                        let sync =
+                            branch_part[bracket_start..].trim_matches(|c| c == '[' || c == ']');
                         (name.trim(), Some(sync))
                     } else {
                         (branch_part.trim(), None)
@@ -959,7 +1001,8 @@ pub fn check_git_status(path: &str) -> GitStatus {
                         || (status_x == 'D' && status_y == 'D');
 
                     let is_untracked = status_x == '?' && status_y == '?';
-                    let staged = !is_untracked && !is_conflicted && status_x != ' ' && status_x != '?';
+                    let staged =
+                        !is_untracked && !is_conflicted && status_x != ' ' && status_x != '?';
                     let unstaged = is_untracked || (!is_conflicted && status_y != ' ');
 
                     if is_conflicted {
@@ -1098,7 +1141,10 @@ pub fn git_discard_file(path_str: &str, file_path: &str) -> Result<(), String> {
     let repo_dir = get_effective_repo_dir(path_str);
     // Security check: ensure file_path does not contain path traversal outside repo_dir
     let clean_path = std::path::Path::new(file_path);
-    if clean_path.components().any(|c| c == std::path::Component::ParentDir) {
+    if clean_path
+        .components()
+        .any(|c| c == std::path::Component::ParentDir)
+    {
         return Err("EACCES: Path traversal detected in file_path".to_string());
     }
     let p = repo_dir.join(clean_path);
@@ -1189,7 +1235,9 @@ pub fn git_checkout_branch(path_str: &str, branch: &str) -> Result<String, Strin
         || branch.contains('\r')
         || branch.contains("..")
         || branch.contains("@{")
-        || branch.chars().any(|c| c.is_ascii_control() || matches!(c, ' ' | '~' | '^' | ':' | '?' | '*' | '[' | '\\'))
+        || branch.chars().any(|c| {
+            c.is_ascii_control() || matches!(c, ' ' | '~' | '^' | ':' | '?' | '*' | '[' | '\\')
+        })
     {
         return Err("Invalid git branch ref format".to_string());
     }
@@ -1208,7 +1256,11 @@ pub fn git_checkout_branch(path_str: &str, branch: &str) -> Result<String, Strin
     }
 }
 
-pub fn git_get_diff(path_str: &str, file_path: Option<&str>, staged: bool) -> Result<String, String> {
+pub fn git_get_diff(
+    path_str: &str,
+    file_path: Option<&str>,
+    staged: bool,
+) -> Result<String, String> {
     let repo_dir = get_effective_repo_dir(path_str);
     let mut args = vec!["diff", "--no-color"];
     if staged {
@@ -1297,9 +1349,14 @@ pub fn git_get_diff(path_str: &str, file_path: Option<&str>, staged: bool) -> Re
 pub fn validate_safe_git_repo(path_str: &str) -> Result<std::path::PathBuf, String> {
     let p = std::path::Path::new(path_str);
     if !p.exists() {
-        return Err(format!("無効なリポジトリパスです: 指定されたパス '{}' が存在しません。", path_str));
+        return Err(format!(
+            "無効なリポジトリパスです: 指定されたパス '{}' が存在しません。",
+            path_str
+        ));
     }
-    let canon = p.canonicalize().map_err(|e| format!("パスの正規化に失敗しました: {}", e))?;
+    let canon = p
+        .canonicalize()
+        .map_err(|e| format!("パスの正規化に失敗しました: {}", e))?;
 
     #[cfg(unix)]
     {
@@ -1317,7 +1374,10 @@ pub fn validate_safe_git_repo(path_str: &str) -> Result<std::path::PathBuf, Stri
     }
 
     let repo_dir = resolve_repo_root(&canon.to_string_lossy()).ok_or_else(|| {
-        format!("指定されたディレクトリ '{}' は有効な Git リポジトリではありません。", canon.display())
+        format!(
+            "指定されたディレクトリ '{}' は有効な Git リポジトリではありません。",
+            canon.display()
+        )
     })?;
 
     Ok(repo_dir)
@@ -1415,7 +1475,8 @@ mod tests {
 
     #[test]
     fn test_git_get_diff_untracked_synthetic() {
-        let temp_dir = std::env::temp_dir().join(format!("waddle_git_diff_{}", uuid::Uuid::new_v4()));
+        let temp_dir =
+            std::env::temp_dir().join(format!("waddle_git_diff_{}", uuid::Uuid::new_v4()));
         let _ = std::fs::create_dir_all(&temp_dir);
         let path_str = temp_dir.to_str().unwrap();
 
@@ -1443,14 +1504,19 @@ mod tests {
 
     #[test]
     fn test_git_discard_file_path_traversal() {
-        let temp_dir = std::env::temp_dir().join(format!("waddle_discard_test_{}", uuid::Uuid::new_v4()));
+        let temp_dir =
+            std::env::temp_dir().join(format!("waddle_discard_test_{}", uuid::Uuid::new_v4()));
         let _ = std::fs::create_dir_all(&temp_dir);
 
         // 1. Path containing .. must be rejected with EACCES
         let res = git_discard_file(temp_dir.to_str().unwrap(), "../secret.txt");
         assert!(res.is_err());
         let err = res.unwrap_err();
-        assert!(err.starts_with("EACCES"), "Error must start with EACCES: got {}", err);
+        assert!(
+            err.starts_with("EACCES"),
+            "Error must start with EACCES: got {}",
+            err
+        );
 
         // 2. Nested traversal
         let res2 = git_discard_file(temp_dir.to_str().unwrap(), "foo/../../secret.txt");
@@ -1490,7 +1556,11 @@ mod tests {
 
         for invalid in invalid_cases {
             let res = git_checkout_branch(path, invalid);
-            assert!(res.is_err(), "Branch '{}' should have been rejected", invalid);
+            assert!(
+                res.is_err(),
+                "Branch '{}' should have been rejected",
+                invalid
+            );
             assert_eq!(res.unwrap_err(), "Invalid git branch ref format");
         }
     }
@@ -1557,7 +1627,10 @@ mod tests {
         process_kitty_output(&mut decoded, &mut writer, &mut pending);
 
         // Expect OK for i=1, OK for i=2, refusal (ENOTSUP) for i=3 (shm), and DA1 response (without Sixel 4)
-        assert_eq!(writer, b"\x1b_Gi=1;OK\x1b\\\x1b_Gi=2;OK\x1b\\\x1b_Gi=3;ENOTSUP\x1b\\\x1b[?62c");
+        assert_eq!(
+            writer,
+            b"\x1b_Gi=1;OK\x1b\\\x1b_Gi=2;OK\x1b\\\x1b_Gi=3;ENOTSUP\x1b\\\x1b[?62c"
+        );
         assert_eq!(decoded, "");
         assert_eq!(pending, "");
     }
@@ -1571,7 +1644,10 @@ mod tests {
 
         process_kitty_output(&mut decoded, &mut writer, &mut pending);
 
-        assert_eq!(writer, b"\x1b_Gi=99;ENOTSUP\x1b\\", "Shared memory query (t=s) must be rejected with ENOTSUP");
+        assert_eq!(
+            writer, b"\x1b_Gi=99;ENOTSUP\x1b\\",
+            "Shared memory query (t=s) must be rejected with ENOTSUP"
+        );
         assert_eq!(decoded, "");
         assert_eq!(pending, "");
     }
@@ -1585,8 +1661,14 @@ mod tests {
 
         process_kitty_output(&mut decoded, &mut writer, &mut pending);
 
-        assert!(writer.is_empty(), "No response should be written for image data");
-        assert_eq!(decoded, original, "Image sequence must be preserved for frontend");
+        assert!(
+            writer.is_empty(),
+            "No response should be written for image data"
+        );
+        assert_eq!(
+            decoded, original,
+            "Image sequence must be preserved for frontend"
+        );
         assert_eq!(pending, "");
     }
 
@@ -1694,7 +1776,8 @@ mod tests {
         std::fs::write(&file_path, dummy_data).unwrap();
         assert!(file_path.exists());
 
-        let path_b64 = base64::engine::general_purpose::STANDARD.encode(file_path.to_str().unwrap().as_bytes());
+        let path_b64 = base64::engine::general_purpose::STANDARD
+            .encode(file_path.to_str().unwrap().as_bytes());
         let mut data = format!("\x1b_Gf=32,s=10,v=10,a=T,t=t;{}\x1b\\\x1b[5n", path_b64);
         let mut writer = Vec::new();
         let mut pending = String::new();
@@ -1706,12 +1789,20 @@ mod tests {
 
         // 2. data should now contain t=d with base64 encoded dummy_data
         let expected_payload = base64::engine::general_purpose::STANDARD.encode(dummy_data);
-        assert!(data.contains("t=d"), "Command must be transformed from t=t to t=d: {}", data);
-        assert!(data.contains(&expected_payload), "Payload must contain inlined base64 data");
+        assert!(
+            data.contains("t=d"),
+            "Command must be transformed from t=t to t=d: {}",
+            data
+        );
+        assert!(
+            data.contains(&expected_payload),
+            "Payload must contain inlined base64 data"
+        );
 
         // 3. File must be deleted
-        assert!(!file_path.exists(), "Temporary file must be deleted upon inlining!");
+        assert!(
+            !file_path.exists(),
+            "Temporary file must be deleted upon inlining!"
+        );
     }
 }
-
-

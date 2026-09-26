@@ -18,7 +18,9 @@ pub async fn native_clipboard_write(text: String) -> Result<(), String> {
             let sources = vec![
                 wl_clipboard_rs::copy::MimeSource {
                     source: wl_clipboard_rs::copy::Source::Bytes(bytes.clone()),
-                    mime_type: wl_clipboard_rs::copy::MimeType::Specific("text/plain;charset=utf-8".into()),
+                    mime_type: wl_clipboard_rs::copy::MimeType::Specific(
+                        "text/plain;charset=utf-8".into(),
+                    ),
                 },
                 wl_clipboard_rs::copy::MimeSource {
                     source: wl_clipboard_rs::copy::Source::Bytes(bytes.clone()),
@@ -43,7 +45,6 @@ pub async fn native_clipboard_write(text: String) -> Result<(), String> {
             if let Err(e) = opts.copy_multi(sources) {
                 eprintln!("[Waddle Clipboard] wl-clipboard copy_multi failed: {:?}", e);
             }
-
         }
 
         // 2. GTK clipboard sync (Linux): also sets GTK/WebKit selection clipboard
@@ -59,7 +60,6 @@ pub async fn native_clipboard_write(text: String) -> Result<(), String> {
         });
         any_success = true;
     }
-
 
     // 3. Arboard fallback (cross-platform / X11)
     if let Ok(mut cb) = arboard::Clipboard::new() {
@@ -122,7 +122,9 @@ pub async fn native_clipboard_read() -> Result<String, String> {
             let _ = tx.send(text);
         });
 
-        if let Ok(Ok(Some(text))) = tokio::time::timeout(std::time::Duration::from_millis(500), rx).await {
+        if let Ok(Ok(Some(text))) =
+            tokio::time::timeout(std::time::Duration::from_millis(500), rx).await
+        {
             if !text.is_empty() {
                 return Ok(text);
             }

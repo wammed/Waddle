@@ -286,6 +286,33 @@ The Kitty Graphics Protocol subsystem is hardened with multiple layers of sandbo
 
 ---
 
+## 📋 Clipboard Security Boundaries & External App Isolation
+
+Clipboard interactions in Wayland / X11 desktop environments interface directly with arbitrary external processes. Waddle enforces multi-layer defense-in-depth to protect against sensitive credential leaks and malicious clipboard hijacking (pastejacking):
+
+### 1. Pastejacking & Malicious Command Injection Defense (`CommandPolicy`)
+- **Zero-Trust External Clipboard Data**:
+  - Text copied from web browsers (Firefox, Chrome) or external applications may contain hidden line breaks (`\n`), dangerous shell one-liners (`curl ... | bash`), privilege escalation commands (`sudo`), or destructive scripts (`rm -rf /`) injected via malicious CSS/JavaScript.
+- **Deterministic Rust Trust Boundary Interception**:
+  - Before pasted text is written into the terminal (PTY), Waddle's native `CommandPolicy::evaluate` engine inspects every line.
+  - Commands evaluated as `Block` are immediately dropped with a hard error before reaching the PTY master.
+  - Commands evaluated as `Review` intercept execution and trigger `DangerousCommandModal`, requiring explicit human visual verification and confirmation (Enter). This completely neutralizes blind command execution attacks from the clipboard.
+
+### 2. Memory Safety & Clipboard DoS (OOM) Protection (`clipboard_ops.rs`)
+- **Non-Blocking Asynchronous Task Pool**:
+  - Wayland clipboard data offering operates on a lazy evaluation model: target applications negotiate MIME types and request content only upon triggering paste.
+  - Waddle isolates selection offering within dedicated asynchronous Tokio tasks, preventing slow or hanging external applications from stalling Waddle's main UI or rendering threads.
+- **Safe Payload Memory Ceiling (16MB Guard)**:
+  - Clipboard read and write pipelines enforce a strict 16MB ceiling, preventing memory exhaustion (OOM DoS) attacks via massive text or binary blobs.
+- **Plain-Text Only Enforcement**:
+  - Clipboard transfers are strictly constrained to plain text MIME types (`text/plain;charset=utf-8`, `UTF8_STRING`, `text/plain`, `TEXT`, `STRING`). File descriptors, D-Bus object paths, or executable binaries are strictly rejected.
+
+### 3. Sensitive Data Protection (Zero-Mutation & Secret Masking)
+- The embedded editor maintains a Zero-Mutation Guarantee: raw credentials are kept intact in memory and disk for valid development work, while visually masked via non-destructive CSS overlays.
+- During screen sharing or projector presentations, secret overlays prevent accidental visual disclosure (shoulder surfing) of API tokens and passwords.
+
+---
+
 ## 🔧 Subprocess Hardening
 
 - **Git Lock Safety**: Background polling runs with `GIT_OPTIONAL_LOCKS=0` and `--no-optional-locks` to prevent index file conflicts.
