@@ -6,7 +6,7 @@
 ![Banner](images/waddle-banner1.svg)
 
 [![Built with Tauri](https://img.shields.io/badge/Tauri-2.0-24C8D8?style=for-the-badge&logo=tauri&logoColor=white)](https://tauri.app/)
-[![Rust](https://img.shields.io/badge/Rust-1.98+-orange?style=for-the-badge&logo=rust&logoColor=white)](https://www.rust-lang.org/)
+[![Rust](https://img.shields.io/badge/Rust-1.80+-orange?style=for-the-badge&logo=rust&logoColor=white)](https://www.rust-lang.org/)
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
 [![Ollama](https://img.shields.io/badge/Ollama-Local_AI-white?style=for-the-badge&logo=ollama&logoColor=black)](https://ollama.com/)
 [![Platform](https://img.shields.io/badge/Platform-Linux_(Wayland_/_X11)-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://www.kernel.org/)
@@ -55,8 +55,18 @@
 
 - **検証済み動作環境**: **CachyOS + COSMIC Desktop Environment**
   - *※ KDE Plasma, GNOME, XFCE 等の他環境や他ディストリビューションでは動作未検証です。*
-- [Rust (Cargo)](https://rustup.rs/) (1.70 以上)
-- [Node.js & npm](https://nodejs.org/) (Node 18 以上)
+- [Rust (Cargo)](https://rustup.rs/) (1.80 以上、最新 Stable 推奨 / 実機検証: 1.98.1)
+- [Node.js & npm](https://nodejs.org/) (Node 18 以上、推奨: Node 20 LTS)
+- **Tauri 2.0 / WebKitGTK システムビルド依存パッケージ**:
+  - **Arch Linux / CachyOS**:
+    ```bash
+    sudo pacman -S base-devel webkit2gtk-4.1 openssl
+    ```
+  - **Debian / Ubuntu / Pop!_OS**:
+    ```bash
+    sudo apt install build-essential libwebkit2gtk-4.1-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+    ```
+  - *※ 詳細は [Tauri 2.0 Linux 前提パッケージガイド](https://v2.tauri.app/start/prerequisites/#linux) を参照*
 - [Ollama](https://ollama.com/) (完全ローカル AI エンジン)
 - **Nerd Fonts (推奨)**: Waddle はフォントを同梱しません。グリフやアイコンを最適に描画するため、ホスト OS に JetBrainsMono NF、FiraCode NF 等のインストールを推奨します（詳細は[ライセンス条項](#フォントおよびライセンスについて-fonts--licensing)参照）。
 

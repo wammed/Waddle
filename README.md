@@ -6,7 +6,7 @@
 ![Banner](images/waddle-banner1.svg)
 
 [![Built with Tauri](https://img.shields.io/badge/Tauri-2.0-24C8D8?style=for-the-badge&logo=tauri&logoColor=white)](https://tauri.app/)
-[![Rust](https://img.shields.io/badge/Rust-1.98+-orange?style=for-the-badge&logo=rust&logoColor=white)](https://www.rust-lang.org/)
+[![Rust](https://img.shields.io/badge/Rust-1.80+-orange?style=for-the-badge&logo=rust&logoColor=white)](https://www.rust-lang.org/)
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
 [![Ollama](https://img.shields.io/badge/Ollama-Local_AI-white?style=for-the-badge&logo=ollama&logoColor=black)](https://ollama.com/)
 [![Platform](https://img.shields.io/badge/Platform-Linux_(Wayland_/_X11)-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://www.kernel.org/)
@@ -55,8 +55,18 @@
 
 - **Validated OS**: **CachyOS + COSMIC Desktop Environment**
   - *Note: Other desktop environments or distributions are untested.*
-- [Rust (Cargo)](https://rustup.rs/) (1.70+)
-- [Node.js & npm](https://nodejs.org/) (Node 18+)
+- [Rust (Cargo)](https://rustup.rs/) (1.80+, latest Stable recommended / Tested: 1.98.1)
+- [Node.js & npm](https://nodejs.org/) (Node 18+, recommended: Node 20 LTS)
+- **Tauri 2.0 / WebKitGTK System Build Dependencies**:
+  - **Arch Linux / CachyOS**:
+    ```bash
+    sudo pacman -S base-devel webkit2gtk-4.1 openssl
+    ```
+  - **Debian / Ubuntu / Pop!_OS**:
+    ```bash
+    sudo apt install build-essential libwebkit2gtk-4.1-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+    ```
+  - *See also: [Tauri 2.0 Linux Prerequisites](https://v2.tauri.app/start/prerequisites/#linux)*
 - [Ollama](https://ollama.com/) (Local AI Engine)
 - **Nerd Fonts (Recommended)**: Waddle does not bundle fonts. For optimal icon and powerline glyph rendering, installing JetBrainsMono NF or FiraCode NF on your host system is recommended (see [Fonts & Licensing](#fonts--licensing)).
 
