@@ -1,18 +1,14 @@
 ### テスト実行記録 (Test Execution Evidence)
-- **実行日**: 2026-09-19
-- **テスター**: Susie (User) & Antigravity (DeepMind Pair Programming Assistant)
-- **Commit SHA**: 74c90eb9a7fb608502e3c5c92af1e2320cbc0946
-- **OS/Kernel**: Linux 7.2.6-1-cachyos x86_64
-- **Rust version**: rustc 1.98.1 (48a229cea 2026-09-01)
-- **Node version**: v26.8.2
-- **WebKitGTK version**: 2.52.6
+- **実行日**: 2026-09-26
+- **テスター**: Waddle Quality Assurance Team
+- **環境**: Linux (Linux x86_64, WebKitGTK, Node.js >= 20, Rust >= 1.75)
 - **総合判定**: **[PASS]** (合格: 110 / 不合格: 0 / 保留・スキップ: 0 / 未検証: 0)
 
 | スイート | 項目数 | 合格数 | 不合格数 | 備考 |
 | :--- | :--- | :--- | :--- | :--- |
 | PTY & コアターミナル基盤 | 10 | 10 | 0 | 全項目合格確認済 |
 | タブ・10種分割ペイン・セッション永続化 | 8 | 8 | 0 | 全項目合格確認済 |
-| ファイルツリー & 簡易エディタ | 13 | 13 | 0 | 全項目合格確認済 |
+| ファイルツリー & 簡易エディタ | 14 | 14 | 0 | 全項目合格確認済 |
 | AI アシスタント & プロンプト連携 | 6 | 6 | 0 | 全項目合格確認済 |
 | Git 連携 & リモート接続制限 | 8 | 8 | 0 | 全項目合格確認済 |
 | テーマ・UI・壁紙・アイコン | 6 | 6 | 0 | 全項目合格確認済 |
@@ -20,7 +16,7 @@
 | セキュリティポリシー & 多層防御ガードレール | 21 | 21 | 0 | 全項目合格確認済 |
 | パフォーマンス & リソースリーク耐性 | 5 | 5 | 0 | 全項目合格確認済 |
 | 次世代ワークフロー & 生産性拡張機能 | 6 | 6 | 0 | 全項目合格確認済 |
-| 統合自動テストスイート & セキュリティ/回帰検証 | 7 | 7 | 0 | Gitleaks/Secretlint/cargo-audit/cargo-deny, Vitest V8, Playwright, CDP, PTY 1000, CommandPolicy コーパス, セキュリティ回帰 6 大柱全合格確認済 |
+| 統合自動テストスイート & セキュリティ/回帰検証 | 6 | 6 | 0 | 全項目合格確認済 |
 
 ### 詳細エビデンス & 特記事項
 
@@ -57,6 +53,7 @@
 | **TC-FILE-11** | AI コード編集・リファクタ (Ctrl+Shift+K) | 🟢 PASS | Manual | - |
 | **TC-FILE-12** | ヘッダー常設「復元 (N)」UI & ポップオーバーモーダル | 🟢 PASS | Manual | - |
 | **TC-FILE-13** | スナップショット復元 & 非破壊 Undo (Ctrl+Z) | 🟢 PASS | Manual | - |
+| **TC-FILE-14** | 双方向クリップボード統合 & 外部アプリ連携 (Wayland 5-MIME / Firefox / VS Code) | 🟢 PASS | Automated / Manual |   ╰─ 󱉸  npx vitest run src/services/__tests__/clipboardService.test.ts npm notice run tauri-app@0.1.0 npx npm notice run 'vitest' run src/services/__tests__/clipboardService.test.ts   RUN  v5.0.0 /home/susie/GitHUB/wammed/Waddle  stderr \| src/services/__tests__/clipboardService.test.ts > clipboardService > readClipboardText > returns empty string if navigator.clipboard.readText rejects navigator.clipboard.readText fallback failed: Error: Not allowed     at /home/susie/GitHUB/wammed/Waddle/src/services/__tests__/clipboardService.test.ts:126:54     at file:///home/susie/GitHUB/wammed/Waddle/node_modules/vitest/dist/chunks/run.CQOUYP-x.js:1628:35     at file:///home/susie/GitHUB/wammed/Waddle/node_modules/vitest/dist/chunks/run.CQOUYP-x.js:2783:26     at file:///home/susie/GitHUB/wammed/Waddle/node_modules/vitest/dist/chunks/run.CQOUYP-x.js:3319:20     at new Promise (<anonymous>)     at runWithCancel (file:///home/susie/GitHUB/wammed/Waddle/node_modules/vitest/dist/chunks/run.CQOUYP-x.js:3314:10)     at file:///home/susie/GitHUB/wammed/Waddle/node_modules/vitest/dist/chunks/run.CQOUYP-x.js:3299:20     at new Promise (<anonymous>)     at runWithTimeout (file:///home/susie/GitHUB/wammed/Waddle/node_modules/vitest/dist/chunks/run.CQOUYP-x.js:3257:10)     at file:///home/susie/GitHUB/wammed/Waddle/node_modules/vitest/dist/chunks/run.CQOUYP-x.js:3876:64   ✓ src/services/__tests__/clipboardService.test.ts (7 tests) 7ms    ✓ clipboardService (7)      ✓ writeClipboardText (4)        ✓ returns true on empty string without doing anything 1ms        ✓ calls native_clipboard_write when running in Tauri 1ms        ✓ uses navigator.clipboard.writeText when available 0ms        ✓ falls back to execCommand if navigator.clipboard.writeText rejects 1ms      ✓ readClipboardText (3)        ✓ reads text from native_clipboard_read when running in Tauri 0ms        ✓ reads text from navigator.clipboard.readText when available 0ms        ✓ returns empty string if navigator.clipboard.readText rejects 3ms   Test Files  1 passed (1)       Tests  7 passed (7)    Start at  22:30:20    Duration  143ms (transform 65%, import 18%, tests 10%, worker 6%) |
 | **TC-AI-01** | 自然言語からのコマンド自動生成 (Ctrl+K) | 🟢 PASS | Manual | - |
 | **TC-AI-02** | コンテキスト認識 (CWD, コマンド履歴, Git) | 🟢 PASS | Manual | - |
 | **TC-AI-03** | 会話履歴エクスポート (Markdown / JSON) | 🟢 PASS | Manual | - |
@@ -134,6 +131,4 @@
 | **TC-INT-03** | Playwright 視覚的描画回帰テスト (npm run test:visual) | 🟢 PASS | Automated |  npm run test:visual npm notice run tauri-app@0.1.0 test:visual npm notice run playwright test tests/visual [WebServer] npm notice run tauri-app@0.1.0 dev [WebServer] npm notice run vite --host 127.0.0.1 --port 5173  Running 4 tests using 1 worker    ✓  1 tests/visual/visual.spec.ts:15:3 › Waddle Visual Regression Testing › TC-VISUAL-01: Kitty Unicode Placeholder (U+10EEEE) suppresses tofu and renders image (1.1s) PAGE LOG: [vite] connecting... PAGE LOG: [vite] connected. PAGE LOG: Visual harness ready! PAGE LOG: Failed to load resource: the server responded with a status of 404 (Not Found)   ✓  2 tests/visual/visual.spec.ts:23:3 › Waddle Visual Regression Testing › TC-VISUAL-02: TUI preview box borders and image alignment (Yazi / Ranger) (968ms) PAGE LOG: [vite] connecting... PAGE LOG: [vite] connected. PAGE LOG: Visual harness ready!   ✓  3 tests/visual/visual.spec.ts:31:3 › Waddle Visual Regression Testing › TC-VISUAL-03: High-Voltage Neon theme rendering and color fidelity (957ms) PAGE LOG: [vite] connecting... PAGE LOG: [vite] connected. PAGE LOG: Visual harness ready!   ✓  4 tests/visual/visual.spec.ts:39:3 › Waddle Visual Regression Testing › TC-VISUAL-04: Main Waddle Application UI Layout & Shell (1.9s) PAGE LOG: [vite] connecting... PAGE LOG: [vite] connected. PAGE LOG: Visual harness ready! PAGE LOG: [vite] connecting... PAGE LOG: [vite] connected. PAGE LOG: %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold    4 passed (5.8s) |
 | **TC-INT-04** | CDP メモリ & リソースリーク計測 (npm run test:memory) | 🟢 PASS | Automated | 󱉸  npm run test:memory npm notice run tauri-app@0.1.0 test:memory npm notice run playwright test tests/memory [WebServer] npm notice run tauri-app@0.1.0 dev [WebServer] npm notice run vite --host 127.0.0.1 --port 5173  Running 2 tests using 1 worker    ✓  1 tests/memory/memory_audit.spec.ts:4:3 › Waddle Memory & Resource Leak Audit (CDP) › TC-MEM-01: Massive streaming stress retains memory under 300MB cap (2.2s) [CDP Memory Audit] Baseline Heap: 12.56 MB [CDP Memory Audit] Post-Stream Heap: 12.89 MB (Strict 300MB Cap) [CDP Memory Audit] DOM Node Count: 425   ✓  2 tests/memory/memory_audit.spec.ts:45:3 › Waddle Memory & Resource Leak Audit (CDP) › TC-MEM-02: Tab lifecycle and destruction retains zero lingering DOM leaks (2.8s) [CDP Memory Audit] Documents: Before=2, After=2 [CDP Memory Audit] DOM Nodes: Before=425, After=487 (Diff: 62)    2 passed (5.8s) |
 | **TC-INT-05** | 単一コマンド統合パイプライン & Lefthook Git 連動 (npm run test:all) | 🟢 PASS | Automated | 🎉 ALL AUDIT & TEST SUITES PASSED SUCCESSFULLY (ALL PASS)! ⏱️  Total Duration: 20s |
-| **TC-INT-06** | CommandPolicy 攻撃・誤検知検証コーパス (command_policy_corpus) | 🟢 PASS | Automated | cargo test --manifest-path src-tauri/Cargo.toml --test command_policy_corpus<br>running 8 tests: test_indirect_shell_execution_bypass ... ok, test_dynamic_interpreter_evaluation ... ok, test_pipe_and_argument_passing ... ok, test_privilege_escalation ... ok, test_dangerous_obfuscations ... ok, test_catastrophic_variants ... ok, test_false_positive_prevention ... ok, test_corpus_summary ... ok<br>test result: ok. 8 passed (101 individual vectors evaluated); 0 failed; finished in 0.00s |
-| **TC-INT-07** | 統合セキュリティ回帰テストスイート (security_regression) | 🟢 PASS | Automated | cargo test --manifest-path src-tauri/Cargo.toml --test security_regression<br>running 6 tests: test_pillar_1_command_policy_boundaries ... ok, test_pillar_2_ssrf_and_dns_pinning ... ok, test_pillar_3_filesystem_traversal_guards ... ok, test_pillar_4_symlink_escape_defense ... ok, test_pillar_5_untrusted_rules_and_git_boundaries ... ok, test_pillar_6_secret_masking_integration ... ok<br>test result: ok. 6 passed; 0 failed; finished in 0.01s |
-
+| **TC-INT-06** | CommandPolicy 攻撃・誤検知検証コーパス (command_policy_corpus) | 🟢 PASS | Automated | 󱉸  cargo test --test command_policy_corpus     Finished `test` profile [unoptimized + debuginfo] target(s) in 0.19s      Running tests/command_policy_corpus.rs (target/debug/deps/command_policy_corpus-fd22b2ba1c79320b)  running 1 test test test_command_policy_exhaustive_corpus ... ok  test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s |
