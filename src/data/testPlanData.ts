@@ -41,7 +41,7 @@ export interface TestExecutionRecord {
 export const TEST_SUITES: TestSuite[] = [
   { id: 1, name: 'PTY & Terminal Core', nameJa: 'PTY & コアターミナル基盤', icon: 'Terminal', descriptionJa: '0ms起動、32KBストリーミング、UTF-8、Canvas描画、プロセス管理' },
   { id: 2, name: 'Tabs, Panes & Session', nameJa: 'タブ・10種分割ペイン・セッション永続化', icon: 'LayoutGrid', descriptionJa: '10種分割レイアウト、16px当たり判定、セッション自動保存・復元' },
-  { id: 3, name: 'File Tree & Editor', nameJa: 'ファイルツリー & 簡易エディタ', icon: 'FolderTree', descriptionJa: '500件制限、言語バッジ、パンくず、インライン編集、AI差分編集' },
+  { id: 3, name: 'File Tree & Editor', nameJa: 'ファイルツリー & 簡易エディタ', icon: 'FolderTree', descriptionJa: '500件制限、言語バッジ、パンくず、インライン編集、AI差分編集、双方向クリップボード' },
   { id: 4, name: 'AI & Context Integration', nameJa: 'AI アシスタント & プロンプト連携', icon: 'Sparkles', descriptionJa: '自然言語コマンド生成、64KBバッファガード、リモート警告、エクスポート' },
   { id: 5, name: 'Git Integration & Guardrails', nameJa: 'Git 連携 & リモート接続制限', icon: 'GitBranch', descriptionJa: 'GitHub限定ポリシー、Diffビューワー、Conventional Commits、Push/Pull' },
   { id: 6, name: 'Theming, UI & Wallpapers', nameJa: 'テーマ・UI・壁紙・アイコン', icon: 'Palette', descriptionJa: '22種テーマ（11種ネオン）、発光同期、壁紙透過/ブラー、MagicBytes検証' },
@@ -49,7 +49,7 @@ export const TEST_SUITES: TestSuite[] = [
   { id: 8, name: 'Security & Defense-in-Depth', nameJa: 'セキュリティポリシー & 多層防御ガードレール', icon: 'ShieldAlert', descriptionJa: 'パストラバーサル、危険コマンド、プロンプト脱出、GitHubホスト偽装防御' },
   { id: 9, name: 'Performance & Resource Guards', nameJa: 'パフォーマンス & リソースリーク耐性', icon: 'Cpu', descriptionJa: '256MB LRUキャッシュ、0% アイドルCPU、0msレイテンシ、単体テスト30件' },
   { id: 10, name: 'Next-Gen Workflow & Productivity', nameJa: '次世代ワークフロー & 生産性拡張機能', icon: 'Sparkles', descriptionJa: '機密情報マスク、セッションタイムトラベル、リッチデータプレビュー、AI自律監視、パイプライン、プロジェクトAIルール' },
-  { id: 11, name: 'Integrated Automated Test Suite', nameJa: '統合自動テストスイート & セキュリティ/回帰検証', icon: 'CheckCircle2', descriptionJa: 'セキュリティ静的監査、Vitest V8 カバレッジ、Playwright 視覚回帰、CDP メモリ監査、Lefthook Git 連動' },
+  { id: 11, name: 'Integrated Automated Test Suite', nameJa: '統合自動テストスイート & セキュリティ/回帰検証', icon: 'CheckCircle2', descriptionJa: 'セキュリティ静的監査、Vitest V8 カバレッジ、Playwright 視覚回帰、CDP メモリ監査、Lefthook Git 連動、CommandPolicy コーパス' },
 ];
 
 export const TEST_CASES: TestCase[] = [
@@ -480,7 +480,8 @@ export const TEST_CASES: TestCase[] = [
     procedureJa: '1. エディタで全選択（Ctrl+A）→ コピー（Ctrl+C）し、Firefox および VS Code に貼り付け。\n2. Firefox / VS Code からコピーしたテキストをエディタで Ctrl+V 貼り付け。\n3. ターミナルで選択した出力を Ctrl+Shift+C → エディタで Ctrl+V 貼り付け。\n4. エディタでコードを選択して Ctrl+X で切り取り、Undo（Ctrl+Z）で復元。',
     expected: '1. 5 simultaneous Wayland MIME types ensure 100% reliable paste into Firefox and VS Code.\n2. External text pastes into editor via WebKitGTK without drops and registers on Undo stack.\n3. Bidirectional text transfer between terminal and editor functions smoothly.\n4. Cut content updates clipboard and Ctrl+Z restores the buffer instantly.',
     expectedJa: '1. Wayland 5種多重 MIME 同時広告により、Firefox および VS Code へ 100% 確実に貼り付け可能。\n2. 外部アプリからのテキストが WebKitGTK 経由で欠落なくエディタにペーストされ、Undo 履歴に反映される。\n3. ターミナル ⇔ エディタ間でテキストが相互に送受信される。\n4. 切り取り内容がクリップボードへ保存され、Ctrl+Z で元のバッファが復元される。',
-    type: 'Manual',
+    type: 'Automated / Manual',
+    command: 'npx vitest run src/services/__tests__/clipboardService.test.ts',
   },
 
   // Suite 4: AI & Context Integration (6)
@@ -1547,6 +1548,20 @@ export const TEST_CASES: TestCase[] = [
     expectedJa: '全 4 レイヤーが順次完走して ALL PASS で終了。不正コミットやリグレッションのプッシュが機械的に遮断される。',
     type: 'Automated',
     command: 'npm run test:all',
+  },
+  {
+    id: 'TC-INT-06',
+    suiteId: 11,
+    suiteName: 'Integrated Automated Test Suite',
+    suiteNameJa: '統合自動テストスイート & セキュリティ/回帰検証',
+    title: 'CommandPolicy Attack & False-Positive Verification Corpus (command_policy_corpus)',
+    titleJa: 'CommandPolicy 攻撃・誤検知検証コーパス (command_policy_corpus)',
+    procedure: 'Run cargo test --test command_policy_corpus across 100+ attack patterns (shell indirect execution, dynamic evaluation, pipeline bypasses, privilege escalation, obfuscation) and benign dev operations.',
+    procedureJa: 'cargo test --test command_policy_corpus を実行（シェル間接実行、動的評価、パイプ迂回、特権昇格、難読化など 100+ パターンおよび日常の開発コマンド）。',
+    expected: '100% of bypass attempts correctly trigger Review/Block, 100% of benign commands (git, npm, cargo, echo/cat with destructive keywords) evaluate to Safe.',
+    expectedJa: '迂回試行が 100% 確実に Review または Block され、日常的な開発コマンド（git, npm, cargo, 破壊的単語を含む echo/cat）は 100% 確実に Safe と判定される。',
+    type: 'Automated',
+    command: 'cargo test --test command_policy_corpus',
   },
 ];
 

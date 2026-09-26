@@ -30,6 +30,7 @@ import { useI18n, translations } from '../i18n';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import waddleIcon from '../assets/waddle-icon.svg';
+import { TEST_CASES } from '../data/testPlanData';
 
 const ACKNOWLEDGED_PROJECTS = [
   {
@@ -1846,7 +1847,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <div style={{ fontSize: '13px', fontWeight: 600, color: '#f8fafc', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span>{t.settings.testPlanCardTitle}</span>
                     <span style={{ fontSize: '10px', background: 'rgba(0, 240, 255, 0.2)', color: '#00f0ff', padding: '1px 6px', borderRadius: '4px', fontWeight: 700 }}>
-                      81 Tests
+                      {TEST_CASES.length} Tests
                     </span>
                   </div>
                   <div style={{ fontSize: '12px', color: '#94a3b8', lineHeight: 1.5 }}>

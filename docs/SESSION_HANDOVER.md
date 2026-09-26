@@ -1414,7 +1414,9 @@ npm run tauri dev
   - セクション 7 に「クリップボード サブシステム & Wayland 多重 MIME / GTK3 統合アーキテクチャ」を新設し、データフロー図（Mermaid）を掲載。以降のセクション番号を整合。技術スタック一覧に `wl-clipboard-rs`, `gtk`, `gdk` を追加。
 - **セキュリティ仕様** ([`docs/SECURITY.md`](file:///home/susie/GitHUB/wammed/Waddle/docs/SECURITY.md), [`docs/SECURITY.ja.md`](file:///home/susie/GitHUB/wammed/Waddle/docs/SECURITY.ja.md)):
   - 「クリップボード セキュリティ境界 & 外部アプリ隔離仕様」を新設。Pastejacking 攻撃防御（`CommandPolicy` 連携）、メモリ安全性・16MB 上限 DoS 防御、非破壊シークレット保護（Zero-Mutation）を網羅。
-- **包括的検証テスト計画書** ([`docs/TEST_PLAN.md`](file:///home/susie/GitHUB/wammed/Waddle/docs/TEST_PLAN.md), [`docs/TEST_PLAN.ja.md`](file:///home/susie/GitHUB/wammed/Waddle/docs/TEST_PLAN.ja.md), [`src/data/testPlanData.ts`](file:///home/susie/GitHUB/wammed/Waddle/src/data/testPlanData.ts), [`tools/test_form.html`](file:///home/susie/GitHUB/wammed/Waddle/tools/test_form.html)):
-  - Suite 3 に `TC-FILE-14`（双方向クリップボード統合 & 外部アプリ連携）を追加し、全 109 項目に同期。
+- **包括的検証テスト計画書 & アプリ内テスト入力フォーム** ([`docs/TEST_PLAN.md`](file:///home/susie/GitHUB/wammed/Waddle/docs/TEST_PLAN.md), [`docs/TEST_PLAN.ja.md`](file:///home/susie/GitHUB/wammed/Waddle/docs/TEST_PLAN.ja.md), [`src/data/testPlanData.ts`](file:///home/susie/GitHUB/wammed/Waddle/src/data/testPlanData.ts), [`tools/test_form.html`](file:///home/susie/GitHUB/wammed/Waddle/tools/test_form.html), [`src/components/TestPlanModal.tsx`](file:///home/susie/GitHUB/wammed/Waddle/src/components/TestPlanModal.tsx), [`src/components/SettingsModal.tsx`](file:///home/susie/GitHUB/wammed/Waddle/src/components/SettingsModal.tsx)):
+  - Suite 3 に `TC-FILE-14`（双方向クリップボード統合 & 外部アプリ連携: `clipboardService.test.ts` 自動テストコマンド付き）を追加。
+  - Suite 11 に `TC-INT-06`（`CommandPolicy` 攻撃・誤検知検証コーパス）を追加。
+  - 設定モーダル内のテスト数バッジをハードコードから動的 `{TEST_CASES.length} Tests`（全 110 項目・11 スイート）に完全同期。
 
 
