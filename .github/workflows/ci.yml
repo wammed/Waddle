@@ -1,174 +1,140 @@
-name: Waddle Production Release Gate CI
+name: CI
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
   pull_request:
-    branches: [ main ]
-  workflow_dispatch:
+    branches:
+      - main
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  CARGO_TERM_COLOR: always
-
 jobs:
-  # --------------------------------------------------------------------------
-  # 1. Security Audit: Fail-Closed Zero-Trust Verification
-  # --------------------------------------------------------------------------
-  security-audit:
+  security:
     name: Security & Dependency Audit
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+    runs-on: ubuntu-24.04
 
-      - name: Setup Node.js (v22)
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
-          cache: 'npm'
+          node-version: 20
+          cache: npm
 
-      - name: Setup Rust Toolchain (stable)
+      - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy, rustfmt
 
-      - name: Install System Dependencies (WebKitGTK & Tauri core)
+      - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
+          sudo apt-get install -y \
             libwebkit2gtk-4.1-dev \
-            build-essential \
-            curl \
-            wget \
-            file \
-            libxdo-dev \
-            libssl-dev \
-            libayatana-appindicator3-dev \
+            libappindicator3-dev \
             librsvg2-dev
 
-      - name: Install Security Tools (cargo-audit, cargo-deny)
-        uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-audit,cargo-deny
+      - name: Install Node.js dependencies
+        run: npm ci
+
+      - name: Install security tools
+        run: |
+          cargo install cargo-audit --locked
+          cargo install cargo-deny --locked
 
       - name: Install Gitleaks
-        run: |
-          GITLEAKS_VERSION="8.18.4"
-          wget -q https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz
-          tar -xzf gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz
-          sudo mv gitleaks /usr/local/bin/
-          rm -f gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz
+        uses: gitleaks/gitleaks-installer@v3
 
-      - name: Install Frontend Dependencies
-        run: npm ci
-
-      - name: Execute Security Audit Suite (Fail-Closed)
+      - name: Run security audit suite
         run: ./test-security.sh
 
-  # --------------------------------------------------------------------------
-  # 2. Rust Backend: Strict Compilation, Clippy, and Comprehensive Tests
-  # --------------------------------------------------------------------------
-  rust-backend:
+  rust:
     name: Rust Backend Tests & Clippy
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Rust Toolchain (stable)
+      - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy, rustfmt
 
-      - name: Install System Dependencies
+      - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
+          sudo apt-get install -y \
             libwebkit2gtk-4.1-dev \
-            build-essential \
-            curl \
-            wget \
-            file \
-            libxdo-dev \
-            libssl-dev \
-            libayatana-appindicator3-dev \
+            libappindicator3-dev \
             librsvg2-dev
 
-      - name: Run Cargo Test (--all-targets)
-        working-directory: src-tauri
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Run Rust tests
         run: cargo test --all-targets
 
-      - name: Run Cargo Clippy (--all-targets -D warnings)
-        working-directory: src-tauri
+      - name: Run Clippy
         run: cargo clippy --all-targets -- -D warnings
 
-  # --------------------------------------------------------------------------
-  # 3. Frontend Unit & Coverage Gate: Vitest + V8 (80%+ Thresholds)
-  # --------------------------------------------------------------------------
-  frontend-coverage:
-    name: Frontend Unit & Coverage Gate (80%+)
-    runs-on: ubuntu-latest
+  frontend:
+    name: Frontend Unit & Coverage Gate
+    runs-on: ubuntu-24.04
+
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node.js (v22)
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
-          cache: 'npm'
+          node-version: 20
+          cache: npm
 
-      - name: Install Dependencies
+      - name: Install dependencies
         run: npm ci
 
-      - name: Run Frontend Unit Tests with Coverage
+      - name: Run frontend tests with coverage
         run: npm run test:coverage
 
-  # --------------------------------------------------------------------------
-  # 4. Build Verification: Frontend Build & Tauri Release Build Check
-  # --------------------------------------------------------------------------
-  build-verification:
-    name: Build Verification (Vite & Tauri)
-    runs-on: ubuntu-latest
+  build:
+    name: Build Verification
+    runs-on: ubuntu-24.04
+
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node.js (v22)
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
-          cache: 'npm'
+          node-version: 20
+          cache: npm
 
-      - name: Setup Rust Toolchain (stable)
+      - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Install System Dependencies
+      - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
+          sudo apt-get install -y \
             libwebkit2gtk-4.1-dev \
-            build-essential \
-            curl \
-            wget \
-            file \
-            libxdo-dev \
-            libssl-dev \
-            libayatana-appindicator3-dev \
+            libappindicator3-dev \
             librsvg2-dev
 
-      - name: Install Dependencies
+      - name: Install dependencies
         run: npm ci
 
-      - name: Verify Frontend Production Build (tsc & vite build)
+      - name: Build frontend
         run: npm run build
 
-      - name: Verify Tauri Backend Release Build
-        working-directory: src-tauri
+      - name: Verify release build
         run: cargo check --release
