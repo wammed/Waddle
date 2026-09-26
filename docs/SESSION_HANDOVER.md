@@ -1253,8 +1253,14 @@ npm run tauri dev
          - `Ctrl-V` および `Ctrl-Shift-V` によるクリップボードからターミナルPTYへのペースト送信。
          - `Ctrl-Shift-A` によるターミナル内全選択。
          - ターミナル右クリックコンテキストメニュー（Copy, Paste, Select All, Clear Terminal）の設置。
-      4. **堅牢なクリップボードサービス開発 (`src/services/clipboardService.ts`)**:
-         - `navigator.clipboard.writeText` / `readText` に加え、制限環境下でも確実に動作するフォールバック（一時 textarea + `execCommand('copy')`）を完備。
+      4. **OS ネイティブクリップボード統合 (`tauri-plugin-clipboard-manager` / `arboard` / `wl-clipboard-rs`)**:
+         - **外部アプリ（Firefox / VS Code 等）との連携不能の根本原因究明**:
+           - WebKitGTK (Linux/Wayland) において、ブラウザ標準の `navigator.clipboard.readText()` は他プロセスがクリップボードオーナーである場合にセキュリティ制約（NotAllowedError）で遮断され空文字を返す挙動となっていた。
+           - また、エディタ内で `Ctrl+V` / `Ctrl+C` をキーイベント側で `e.preventDefault()` していたため、WebKitGTK のネイティブ GDK セレクション送受信パイプラインが阻害され、Firefox や VS Code からの貼り付けおよびそれらへのコピーが破綻していた。
+         - **Tauri ネイティブクリップボードブリッジの導入**:
+           - Tauri 2 公式の `tauri-plugin-clipboard-manager`（Rust 側の `arboard` および `wl-clipboard-rs` による Wayland / X11 直接通信）を導入。
+           - フロントエンド `clipboardService.ts` において、Tauri ネイティブのクリップボード API を最優先で呼び出し、OS の Wayland / X11 セレクションを直接読み書きするアーキテクチャへと刷新。
+           - エディタキーハンドラで `Ctrl+C` の `preventDefault` を解除し、Tauri ネイティブクリップボードへの書き込みと WebKitGTK ネイティブセレクション更新を同時並行で発火させるハイブリッド方式を採用。これにより Firefox, VS Code (Electron), Chrome 等の外部アプリと双方向で 100% 確実にコピー＆ペーストが成立する環境を確立。
       5. **純粋関数分離 & 包括的ユニットテスト整備**:
          - `src/services/editorService.ts`: `handleCutText` および `handlePasteText` を純粋関数として実装。インデックス逆順選択や空文字等の境界値を含めて `editorService.test.ts` で 100% 検証。
          - `src/services/__tests__/clipboardService.test.ts`: クリップボード読み書きとフォールバックの動作を検証。

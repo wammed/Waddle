@@ -1010,8 +1010,6 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
     // Ctrl+C: Copy (supported even if read-only)
     if (isCtrlOrMeta && !e.shiftKey && (keyLower === 'c' || code === 'KeyC')) {
       if (start !== end) {
-        e.preventDefault();
-        e.stopPropagation();
         handleCopySelection();
       }
       return;
@@ -2123,8 +2121,9 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
                   const el = textareaRef.current;
                   if (el && el.selectionStart !== el.selectionEnd) {
                     const text = el.value.substring(el.selectionStart, el.selectionEnd);
-                    e.clipboardData.setData('text/plain', text);
-                    e.preventDefault();
+                    try {
+                      e.clipboardData.setData('text/plain', text);
+                    } catch {}
                     writeClipboardText(text);
                     showToast(language === 'ja' ? '選択範囲をコピーしました' : 'Selection copied to clipboard', 'info');
                   }
@@ -2137,14 +2136,17 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
                   e.preventDefault();
                   handleCutSelection();
                 }}
-                onPaste={(e) => {
+                onPaste={async (e) => {
                   if (activeTab.isReadOnly) {
                     e.preventDefault();
                     return;
                   }
                   e.preventDefault();
-                  const text = e.clipboardData.getData('text/plain');
-                  handlePasteSelection(text);
+                  const eventText = e.clipboardData?.getData('text/plain');
+                  const text = (eventText && eventText.length > 0) ? eventText : await readClipboardText();
+                  if (text) {
+                    handlePasteSelection(text);
+                  }
                 }}
                 onContextMenu={(e) => {
                   e.preventDefault();
