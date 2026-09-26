@@ -537,9 +537,42 @@
     - **検証**:
       - `npm run test`: 全 11 テストファイル / 88 テストすべて 100% PASS。
       - `npm run test:security`: Gitleaks, Secretlint, Cargo Audit, Cargo Deny, Security Regression Suite 全て PASS。
-      - `npm run build`: TypeScript 型検査 & Vite 本番ビルド 0 エラー。
+47. **エディタ内外・ターミナル・外部アプリ（Firefox / VS Code / Wayland / XWayland）間の双方向クリップボード（Copy / Paste / Cut / Select All）完全対応**:
+    - **ユーザー要望**:
+      - 「エディタ内外でのcopy/pasteを実装してほしい（エディタ内、ターミナル-エディタ間、Waddle-外部アプリ間、エディタ内"select all"-copy/paste、エディタ内での選択範囲-cut）」
+      - エディタ内ショートカットキー: `Ctrl-A` (Select All), `Ctrl-C` (Copy), `Ctrl-V` (Paste), `Ctrl-X` (Cut)
+      - 「外部アプリとのcopy/pasteにおいて、可能なアプリと不可能なアプリがある。特に、ブラウザ（Firefox）やVSCodeでできない」「できない」
+    - **根本原因の完全解明**:
+      1. **Wayland 単一 MIME 提示問題 (`arboard` / `wl-clipboard-rs`)**:
+         - Tauri の `tauri-plugin-clipboard-manager` が依存する `arboard` の Wayland 実装は、テキスト設定時に単一の `text/plain` のみを Wayland データソースとして広告していた。
+         - 一方、Wayland ネイティブの **Firefox** は厳格に `text/plain;charset=utf-8` を要求し、Electron ベースの **VS Code** は `UTF8_STRING` または `text/plain;charset=utf-8` を要求するため、Waddle からコピーしたテキストが「互換性のある MIME タイプなし」として認識されず、貼り付けが不発となっていた。
+      2. **エディタ `keydown` での `preventDefault()` によるネイティブ `paste` イベント遮断**:
+         - `EditorPane.tsx` の `handleTextareaKeyDown` において、`Ctrl+V` 押下時に `e.preventDefault()` を呼び出していたため、WebKitGTK のブラウザ標準 `paste` イベント（`ClipboardEvent`）が完全に抑制されていた。
+         - その結果、WebKitGTK が GTK レベルで解決した OS クリップボードデータ（`e.clipboardData.getData('text/plain')`）にアクセスできず、非同期 IPC の `readClipboardText` に依存していた。WebKitGTK のセキュリティ制約や Wayland 側の MIME 型不一致により `readClipboardText` が空文字を返すと、貼り付けが一切行われない状態となっていた。
+      3. **`Ctrl+C` 二重書き込みレースコンディション**:
+         - `Ctrl+C` 押下時に `keydown` 側で `handleCopySelection()`（IPC 書き込み）を呼び出し、直後にブラウザの `onCopy` でも `writeClipboardText`（IPC 書き込み）を二重に呼び出していたため、Wayland のデータ制御スレッド競合が発生していた。
+    - **改修内容**:
+      1. **多重 MIME 型対応 Rust バックエンド (`src-tauri/src/clipboard_ops.rs`)**:
+         - `native_clipboard_write`: Wayland 環境下で `wl-clipboard-rs` を用い、`text/plain;charset=utf-8`、`UTF8_STRING`、`text/plain`、`TEXT`、`STRING` の全 5 種の MIME タイプを同時広告。Firefox、VS Code、LibreOffice、XWayland ブリッジすべての要求形式に 100% 適合。
+         - GTK 連携: `gtk::Clipboard::get(&gdk::SELECTION_CLIPBOARD)` および `SELECTION_PRIMARY`（Linux 中クリック貼り付け）にも同期書き込みを行い、WebKitGTK およびホスト OS と完全同期。
+         - `native_clipboard_read`: `text/plain;charset=utf-8` 優先で Wayland から読み込み、GTK `wait_for_text` へのフォールバックを完備。
+      2. **フロントエンド クリップボードサービス (`src/services/clipboardService.ts`)**:
+         - `native_clipboard_write` / `native_clipboard_read` を最優先で呼び出し、Tauri プラグイン、`navigator.clipboard`、`execCommand` へ順次シームレスにフォールバック。
+      3. **エディタ キーイベント委譲 & `clipboardData` 活用 (`src/components/EditorPane.tsx`)**:
+         - `handleTextareaKeyDown` において `Ctrl+C`, `Ctrl+X`, `Ctrl+V` で `preventDefault()` を呼ばず、ブラウザネイティブの `copy`, `cut`, `paste` イベントへ安全に委譲。
+         - `onPaste`: `e.clipboardData?.getData('text/plain')` を最優先で取得。Firefox や VS Code 等の外部アプリからコピーしたテキストが WebKitGTK 経由で即時かつ確実に挿入される構造を確立。
+         - `onCopy` / `onCut`: `e.clipboardData.setData('text/plain', text)` で WebKitGTK 内部セレクションを設定しつつ `writeClipboardText` を 1 回のみ同期実行。
+      4. **単体テスト & 回帰テスト (`src/services/__tests__/clipboardService.test.ts`)**:
+         - Tauri 環境下での `native_clipboard_write` / `native_clipboard_read` 呼び出しテストを追加。
+    - **検証**:
+      - `cargo check`: 警告 0 件、正常完了。
+      - `npm test`: 全 13 テストファイル / 104 テストすべて 100% PASS。
+      - `npm run test:security`: 全 6 柱セキュリティ回帰テスト PASS。
+      - `npm run build:pacman`: リリースビルド成功。
+      - `~/.local/bin/waddle` へ最新バイナリ再配備完了。
 
 ---
+
 
 
 

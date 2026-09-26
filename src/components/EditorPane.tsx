@@ -1007,34 +1007,24 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
       return;
     }
 
-    // Ctrl+C: Copy (supported even if read-only)
+    // Ctrl+C: Allow browser native copy event to fire, which triggers onCopy with e.clipboardData
     if (isCtrlOrMeta && !e.shiftKey && (keyLower === 'c' || code === 'KeyC')) {
-      if (start !== end) {
-        handleCopySelection();
-      }
       return;
     }
 
     // If read-only, disallow modifying operations
     if (activeTab.isReadOnly) return;
 
-    // Ctrl+X: Cut
+    // Ctrl+X: Allow browser native cut event to fire, which triggers onCut with e.clipboardData
     if (isCtrlOrMeta && !e.shiftKey && (keyLower === 'x' || code === 'KeyX')) {
-      if (start !== end) {
-        e.preventDefault();
-        e.stopPropagation();
-        handleCutSelection();
-      }
       return;
     }
 
-    // Ctrl+V: Paste
+    // Ctrl+V: Allow browser native paste event to fire, which triggers onPaste with e.clipboardData
     if (isCtrlOrMeta && !e.shiftKey && (keyLower === 'v' || code === 'KeyV')) {
-      e.preventDefault();
-      e.stopPropagation();
-      handlePasteSelection();
       return;
     }
+
 
     // Soft Tab (4 spaces) / Shift+Tab (Unindent)
     if (e.key === 'Tab') {
@@ -2133,9 +2123,17 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
                     e.preventDefault();
                     return;
                   }
+                  const el = textareaRef.current;
+                  if (el && el.selectionStart !== el.selectionEnd) {
+                    const text = el.value.substring(el.selectionStart, el.selectionEnd);
+                    try {
+                      e.clipboardData.setData('text/plain', text);
+                    } catch {}
+                  }
                   e.preventDefault();
                   handleCutSelection();
                 }}
+
                 onPaste={async (e) => {
                   if (activeTab.isReadOnly) {
                     e.preventDefault();

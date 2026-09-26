@@ -1,54 +1,50 @@
 /**
- * Safe clipboard service supporting Tauri native clipboard manager (Wayland / X11 direct)
- * with seamless fallback to navigator.clipboard and execCommand.
+ * Safe clipboard service supporting Tauri native clipboard (Wayland multi-MIME + GTK direct)
+ * with seamless fallback to Tauri clipboard plugin, navigator.clipboard, and execCommand.
  */
+import { invoke } from '@tauri-apps/api/core';
 import { isTauri } from './tauriApi';
-
-let tauriClipboardModule: typeof import('@tauri-apps/plugin-clipboard-manager') | null = null;
-
-async function getTauriClipboard() {
-  if (!isTauri()) return null;
-  if (!tauriClipboardModule) {
-    try {
-      tauriClipboardModule = await import('@tauri-apps/plugin-clipboard-manager');
-    } catch (e) {
-      console.warn('Failed to load @tauri-apps/plugin-clipboard-manager:', e);
-    }
-  }
-  return tauriClipboardModule;
-}
 
 export async function writeClipboardText(text: string): Promise<boolean> {
   if (!text) return true;
 
   let nativeSuccess = false;
 
-  // 1. Priority: Tauri native clipboard manager (Wayland / X11 OS-level clipboard direct)
-  try {
-    const cb = await getTauriClipboard();
-    if (cb && cb.writeText) {
-      await cb.writeText(text);
+  // 1. High Priority: Dedicated Linux Wayland multi-MIME & GTK clipboard
+  if (isTauri()) {
+    try {
+      await invoke('native_clipboard_write', { text });
       nativeSuccess = true;
+    } catch (err) {
+      console.warn('Native clipboard write failed, trying plugin:', err);
     }
-  } catch (err) {
-    console.warn('Tauri native clipboard write failed, continuing to web fallback:', err);
   }
 
-  // 2. Also write to web standard navigator.clipboard to ensure WebKitGTK internal selection is in sync
+  // 2. Tauri official clipboard manager plugin
+  if (isTauri() && !nativeSuccess) {
+    try {
+      await invoke('plugin:clipboard-manager|write_text', { text });
+      nativeSuccess = true;
+    } catch (err) {
+      console.warn('Tauri plugin clipboard write failed:', err);
+    }
+  }
+
+  // 3. Web standard navigator.clipboard (WebKitGTK internal sync)
   try {
     if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
       await navigator.clipboard.writeText(text);
       return true;
     }
   } catch (e) {
-    console.warn('navigator.clipboard.writeText fallback failed:', e);
+    // Non-fatal fallback
   }
 
   if (nativeSuccess) {
     return true;
   }
 
-  // 3. Fallback for restricted WebKit environments
+  // 4. Fallback for restricted WebKit environments
   try {
     if (typeof document !== 'undefined') {
       const textArea = document.createElement('textarea');
@@ -72,20 +68,31 @@ export async function writeClipboardText(text: string): Promise<boolean> {
 }
 
 export async function readClipboardText(): Promise<string> {
-  // 1. Priority: Tauri native clipboard manager (reads directly from Wayland / X11 OS clipboard)
-  try {
-    const cb = await getTauriClipboard();
-    if (cb && cb.readText) {
-      const text = await cb.readText();
+  // 1. High Priority: Dedicated Linux Wayland multi-MIME & GTK clipboard
+  if (isTauri()) {
+    try {
+      const text = await invoke<string>('native_clipboard_read');
       if (typeof text === 'string' && text.length > 0) {
         return text;
       }
+    } catch (err) {
+      console.warn('Native clipboard read failed, trying plugin:', err);
     }
-  } catch (err) {
-    console.warn('Tauri native clipboard read failed, trying web fallback:', err);
   }
 
-  // 2. Web standard navigator.clipboard fallback
+  // 2. Tauri official clipboard manager plugin
+  if (isTauri()) {
+    try {
+      const text = await invoke<string>('plugin:clipboard-manager|read_text');
+      if (typeof text === 'string' && text.length > 0) {
+        return text;
+      }
+    } catch (err) {
+      console.warn('Tauri plugin clipboard read failed:', err);
+    }
+  }
+
+  // 3. Web standard navigator.clipboard fallback
   if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.readText) {
     try {
       const text = await navigator.clipboard.readText();

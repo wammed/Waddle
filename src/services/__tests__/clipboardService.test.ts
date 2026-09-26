@@ -1,4 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
+vi.mock('@tauri-apps/api/core', () => ({
+  invoke: vi.fn(),
+}));
+
+import { invoke } from '@tauri-apps/api/core';
 import { writeClipboardText, readClipboardText } from '../clipboardService';
 
 describe('clipboardService', () => {
@@ -9,6 +15,7 @@ describe('clipboardService', () => {
   });
 
   afterEach(() => {
+    delete (globalThis as any).window;
     if (originalClipboard !== undefined) {
       Object.defineProperty(globalThis.navigator, 'clipboard', {
         value: originalClipboard,
@@ -22,6 +29,15 @@ describe('clipboardService', () => {
     it('returns true on empty string without doing anything', async () => {
       const res = await writeClipboardText('');
       expect(res).toBe(true);
+    });
+
+    it('calls native_clipboard_write when running in Tauri', async () => {
+      (globalThis as any).window = { __TAURI_INTERNALS__: {} };
+      vi.mocked(invoke).mockResolvedValueOnce(undefined as any);
+
+      const res = await writeClipboardText('tauri native text');
+      expect(res).toBe(true);
+      expect(invoke).toHaveBeenCalledWith('native_clipboard_write', { text: 'tauri native text' });
     });
 
     it('uses navigator.clipboard.writeText when available', async () => {
@@ -81,6 +97,15 @@ describe('clipboardService', () => {
   });
 
   describe('readClipboardText', () => {
+    it('reads text from native_clipboard_read when running in Tauri', async () => {
+      (globalThis as any).window = { __TAURI_INTERNALS__: {} };
+      vi.mocked(invoke).mockResolvedValueOnce('tauri native read content' as any);
+
+      const text = await readClipboardText();
+      expect(text).toBe('tauri native read content');
+      expect(invoke).toHaveBeenCalledWith('native_clipboard_read');
+    });
+
     it('reads text from navigator.clipboard.readText when available', async () => {
       const readTextMock = vi.fn().mockResolvedValue('clipboard content');
       if (!globalThis.navigator) {

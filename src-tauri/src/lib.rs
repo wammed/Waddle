@@ -1,4 +1,5 @@
 pub mod ai;
+pub mod clipboard_ops;
 pub mod command_policy;
 pub mod config;
 pub mod editor_ops;
@@ -16,7 +17,9 @@ use config::ConfigManager;
 use pty::{PtyManager, PtySessionInfo};
 use tauri::{AppHandle, State};
 
+pub use clipboard_ops::*;
 pub use editor_ops::*;
+
 pub use fs_ops::{
     create_directory, create_file, delete_entry, delete_file, read_directory, read_file,
     rename_entry, rename_file, reveal_in_file_manager, write_file, DirectoryListing, FileEntry,
@@ -323,7 +326,15 @@ pub fn run() {
             editor_get_autosave_history,
             editor_load_autosave_content,
             editor_remove_autosave,
+            native_clipboard_write,
+            native_clipboard_read,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Waddle terminal application");
 }
+
+
+
+
+
+

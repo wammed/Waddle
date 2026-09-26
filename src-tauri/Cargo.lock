@@ -4896,10 +4896,13 @@ dependencies = [
 name = "waddle"
 version = "0.1.0"
 dependencies = [
+ "arboard",
  "base64 0.22.1",
  "chrono",
  "dirs 5.0.1",
  "futures-util",
+ "gdk",
+ "gtk",
  "libc",
  "parking_lot",
  "portable-pty",
@@ -4913,6 +4916,7 @@ dependencies = [
  "tauri-plugin-opener",
  "tokio",
  "uuid",
+ "wl-clipboard-rs",
 ]
 
 [[package]]
