@@ -1267,6 +1267,33 @@ npm run tauri dev
          - ユニットテスト (`npm run test:unit`): 全 13 テストファイル（102 テスト）および Rust ユニットテスト（69 テスト）すべて PASS
          - セキュリティテスト (`npm run test:security`): Cargo Deny、脆弱性監査、セキュリティ回帰テスト全 6 柱すべて PASS
 
+53. **`LICENSES.md` & `LICENSES.ja.md` ライセンスおよびサードパーティ通知の全面改訂・校正**:
+    - **背景と目的**:
+      - Waddle のライセンスポリシー、ソースコードのみの配布モデル（Source-Code-Only Policy）、サードパーティ製依存関係のコンプライアンス基準、システム共有ライブラリの動的リンク解決、およびフォント・ビジュアルアセット方針を体系的に明文化。
+      - 英語版（[`LICENSES.md`](file:///home/susie/GitHUB/wammed/Waddle/LICENSES.md)）と日本語版（[`LICENSES.ja.md`](file:///home/susie/GitHUB/wammed/Waddle/LICENSES.ja.md)）が 1 対 1 で完全に対をなす二言語ドキュメントとして再構築。
+    - **主要な改訂・反映事項**:
+      1. **10章構成の体系的ライセンス文書化**:
+         - **第1章: プロジェクトライセンス (Waddle)** — Waddle 本体の MIT License の権利、条件、著作権保持義務、アーキテクチャ境界の明確化。
+         - **第2章: 配布およびビルドモデル** — ソースコード形式での配布、コンパイル済みバイナリの非同梱、ローカルビルド、公式レジストリからの直接取得、第三者ライブラリのベンダー同梱なし、下流ディストリビューターの責任範囲を明記。
+         - **第3章: サードパーティ製依存関係とライセンス適合性** — パーミッシブライセンス方針（MIT, Apache-2.0, BSD 等）、強力なコピーレフト（GPL/AGPL）の意図的除外、`src-tauri/deny.toml` による監査、および依存関係にない `libcosmic` の非含有確認。CI/CD パイプライン（`cargo-deny`, `cargo-audit`, `secretlint`, `gitleaks`）による自動監査。
+         - **第4章: システム共有ライブラリ** — GTK 3 や WebKitGTK などのライブラリはホスト OS が共有ライブラリ（`.so`）として提供し、リポジトリへの同梱や静的リンクを行わない方針を明記。
+         - **第5章: フォントおよびビジュアルアセット方針** — Nerd Font プリセットの例示、フォントバイナリ非同梱（フォント一覧は作成せずホスト OS 参照）、独自アセット（MIT）と第三者アイコン（Lucide Icons 等）のライセンス帰属。
+         - **第6章: 謝辞 (Acknowledgements)** — Waddle の実依存基盤（Tauri, React, **Prism.js**, xterm.js, Lucide Icons, Vite, Rust 等）への謝辞を明記。ロックファイル・マニフェストを正式記録と定義。
+         - **第7章: アプリ内About / License情報** — Settings UI 内の表示はユーザー向けの謝辞および便利な導線であり、ソースツリーの正式なコンプライアンス文書に代わるものではないこと、日英同等カバレッジを明文化。
+         - **第8章: パッケージ作成時の依存ライセンス抽出方法** — リポジトリ内に生成済み `THIRD_PARTY_LICENSES/*.txt` を同梱せず、`cargo-about`, `cargo-bundle-licenses`, `license-checker` のコマンドライン生成手順を案内。
+         - **第9章: サマリー** — 全コンポーネントのライセンス／適用方針／補足を網羅したマトリクス表。
+         - **第10章: 適用範囲および免責** — 法的助言ではないこと、下流ディストリビューターの確認責任を明記。
+      2. **個別要件の完全網羅**:
+         - `libcosmic` の非含有（Waddle の依存関係外）。
+         - `Prism.js` の Acknowledgements / サマリーへの明記（フロントエンド実依存関係）。
+         - フォントファイル一覧表の非作成（同梱ゼロ方針）。
+         - `THIRD_PARTY_LICENSES/*.txt` の存在前提の排除（抽出手順の文書化に特化）。
+         - アプリ内 About / Licenses の位置づけの明確化。
+         - 英語版・日本語版の 1 対 1 完全対称性。
+    - **検証エビデンス**:
+      - `npm run test`: 全 13 テストファイル（102 テスト）100% PASS。
+      - `npm run test:security`: `cargo-deny`, `cargo-audit`, `secretlint`, `gitleaks`, セキュリティ回帰テスト全 6 柱 100% PASS。
+
 ---
 
 ## 6. 次回再開時の検討・作業候補（Next Steps）
