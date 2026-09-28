@@ -134,7 +134,7 @@ This document provides a comprehensive, end-to-end test plan for **Waddle**, cov
 | **TC-THM-03** | Custom Wallpaper Drag & Drop | Drop image file into Wallpaper settings drop zone. | File saves to `~/.config/waddle/wallpapers/` and displays beneath transparent terminal panes. | Manual |
 | **TC-THM-04** | Wallpaper Opacity & Blur Sliders | Adjust opacity and blur sliders in Settings. | Wallpaper transparency and backdrop blur effects update in real-time. | Manual |
 | **TC-THM-05** | Wallpaper Magic Byte Validation | Upload text/script file disguised with `.png` extension. | Rust backend magic byte check rejects upload with error banner. | Automated / Manual |
-| **TC-THM-06** | Application Icon Fidelity | Verify app icon in desktop launcher, window dock, and titlebar. | Crisp rendering of `waddle-matte-icon.svg` without pixelation or outdated iconography. | Manual |
+| **TC-THM-06** | Application Icon Fidelity | Verify app icon in desktop launcher, window dock, and titlebar. | Crisp rendering of `waddle-icon.svg` without pixelation or outdated iconography. | Manual |
 
 ---
 

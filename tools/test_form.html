@@ -876,7 +876,7 @@
       { id: 'TC-THM-03', suiteId: 6, titleJa: 'カスタム壁紙のドラッグ＆ドロップ', titleEn: 'Custom Wallpaper Drag & Drop', type: 'Manual', procedureJa: '画像ファイルを壁紙設定エリアへドラッグ。', expectedJa: '~/.config/waddle/wallpapers/ に保存され、ターミナル背面に即時反映される。' },
       { id: 'TC-THM-04', suiteId: 6, titleJa: '壁紙不透明度 & ブラー調整スライダー', titleEn: 'Wallpaper Opacity & Blur Sliders', type: 'Manual', procedureJa: '設定のスライダーを左右に動かす。', expectedJa: 'ターミナル背景画像の透明度およびぼかし（すりガラス効果）がリアルタイムに変化。' },
       { id: 'TC-THM-05', suiteId: 6, titleJa: '壁紙バイナリヘッダー検証 (Magic Bytes)', titleEn: 'Wallpaper Binary Magic Bytes Validation', type: 'Automated / Manual', procedureJa: '.png に偽装したテキストファイルを壁紙に設定。', expectedJa: 'Rust 側のマジックバイト検証により拒否され、エラーが表示される。' },
-      { id: 'TC-THM-06', suiteId: 6, titleJa: 'アプリアイコンの統一性', titleEn: 'Application Icon Uniformity', type: 'Manual', procedureJa: 'デスクトップ環境のランチャー、タイトルバーのアイコンを確認。', expectedJa: 'waddle-matte-icon.svg に基づく高解像度アイコンが正常に表示される。' },
+      { id: 'TC-THM-06', suiteId: 6, titleJa: 'アプリアイコンの統一性', titleEn: 'Application Icon Uniformity', type: 'Manual', procedureJa: 'デスクトップ環境のランチャー、タイトルバーのアイコンを確認。', expectedJa: 'waddle-icon.svg に基づく高解像度アイコンが正常に表示される。' },
 
       // Suite 7: Kitty Graphics Protocol (19)
       { id: 'TC-KITTY-01', suiteId: 7, titleJa: 'APC エスケープシーケンス解析 & 0ms 分離', titleEn: 'APC Escape Parsing & 0ms Stream Separation', type: 'Manual', command: 'fastfetch --logo-type kitty', procedureJa: 'fastfetch --logo-type kitty などの画像出力を実行。', expectedJa: 'Base64 ペイロードが xterm 前に事前分離され、端末がフリーズせずプロンプトが 0ms 表示される。' },

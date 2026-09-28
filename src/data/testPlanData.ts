@@ -745,8 +745,8 @@ export const TEST_CASES: TestCase[] = [
     titleJa: 'アプリアイコンの統一性',
     procedure: 'Verify launcher, desktop environment, and titlebar app icon.',
     procedureJa: 'デスクトップ環境のランチャー、タイトルバーのアイコンを確認。',
-    expected: 'Uniform high-resolution waddle-matte-icon.svg renders across all contexts.',
-    expectedJa: 'waddle-matte-icon.svg に基づく高解像度アイコンが正常に表示される。',
+    expected: 'Uniform high-resolution waddle-icon.svg renders across all contexts.',
+    expectedJa: 'waddle-icon.svg に基づく高解像度アイコンが正常に表示される。',
     type: 'Manual',
   },
 

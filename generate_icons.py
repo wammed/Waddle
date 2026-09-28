@@ -1,64 +1,117 @@
+import base64
 import os
+import re
+import shutil
+import subprocess
 from PIL import Image
 
-def generate_rgba_icons():
-    src_path = "images/waddle-matte-icon.png"
-    if not os.path.exists(src_path):
-        print(f"Error: {src_path} not found")
+def generate_icons():
+    root_dir = os.path.dirname(os.path.abspath(__file__))
+    src_svg = os.path.join(root_dir, "images/waddle-icon.svg")
+
+    if not os.path.exists(src_svg):
+        print(f"Error: {src_svg} not found")
         return
 
-    # Open image and convert strictly to RGBA
-    img = Image.open(src_path).convert("RGBA")
-    w, h = img.size
-    print(f"Source size: {w}x{h}, Mode: {img.mode}")
+    print(f"Reading source icon: {src_svg}")
 
-    center_icon = img
+    # Copy SVG to public and src/assets
+    svg_targets = [
+        os.path.join(root_dir, "public/waddle-icon.svg"),
+        os.path.join(root_dir, "src/assets/waddle-icon.svg"),
+    ]
+    for target in svg_targets:
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        shutil.copyfile(src_svg, target)
+        print(f"Updated SVG: {target}")
 
-    # Output directories
-    out_dirs = ["src/assets", "public", "src-tauri/icons", "images"]
-    for d in out_dirs:
-        os.makedirs(d, exist_ok=True)
+    # Extract or render high-resolution raster image
+    with open(src_svg, "r", encoding="utf-8") as f:
+        svg_content = f.read()
 
-    # 512x512 app icon in RGBA
-    app_icon_512 = center_icon.resize((512, 512), Image.Resampling.LANCZOS).convert("RGBA")
-    app_icon_512.save("src/assets/waddle-icon.png", "PNG")
-    app_icon_512.save("public/waddle-icon.png", "PNG")
-    app_icon_512.save("images/waddle-icon.png", "PNG")
-    app_icon_512.save("src-tauri/icons/icon.png", "PNG")
+    m = re.search(r"base64,([A-Za-z0-9+/=\s]+)", svg_content)
+    if m:
+        clean_b64 = re.sub(r"\s+", "", m.group(1))
+        raw_png = base64.b64decode(clean_b64)
+        from io import BytesIO
+        src_img = Image.open(BytesIO(raw_png)).convert("RGBA")
+    else:
+        # Fallback to rsvg-convert if not an embedded base64 png
+        temp_png = os.path.join(root_dir, "scratch/temp_rendered.png")
+        os.makedirs(os.path.dirname(temp_png), exist_ok=True)
+        subprocess.run(["rsvg-convert", src_svg, "-o", temp_png], check=True)
+        src_img = Image.open(temp_png).convert("RGBA")
 
-    # Standard Tauri icon sizes - ALL STRICTLY RGBA
-    sizes = {
-        "src-tauri/icons/32x32.png": (32, 32),
-        "src-tauri/icons/128x128.png": (128, 128),
-        "src-tauri/icons/128x128@2x.png": (256, 256),
-        "src-tauri/icons/Square30x30Logo.png": (30, 30),
-        "src-tauri/icons/Square44x44Logo.png": (44, 44),
-        "src-tauri/icons/Square71x71Logo.png": (71, 71),
-        "src-tauri/icons/Square89x89Logo.png": (89, 89),
-        "src-tauri/icons/Square107x107Logo.png": (107, 107),
-        "src-tauri/icons/Square142x142Logo.png": (142, 142),
-        "src-tauri/icons/Square150x150Logo.png": (150, 150),
-        "src-tauri/icons/Square284x284Logo.png": (284, 284),
-        "src-tauri/icons/Square310x310Logo.png": (310, 310),
-        "src-tauri/icons/StoreLogo.png": (50, 50),
-    }
+    w, h = src_img.size
+    print(f"Source image dimensions: {w}x{h}, Mode: {src_img.mode}")
 
-    for path, sz in sizes.items():
-        resized = center_icon.resize(sz, Image.Resampling.LANCZOS).convert("RGBA")
-        resized.save(path, "PNG")
+    # Create 512x512 square icon maintaining aspect ratio with transparency
+    canvas_size = 512
+    scale = canvas_size / max(w, h)
+    new_w = int(round(w * scale))
+    new_h = int(round(h * scale))
+    resized = src_img.resize((new_w, new_h), Image.Resampling.LANCZOS)
 
-    # Create ICO file
-    ico_sizes = [(16, 16), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)]
-    app_icon_512.save("src-tauri/icons/icon.ico", sizes=ico_sizes)
+    app_icon_512 = Image.new("RGBA", (canvas_size, canvas_size), (0, 0, 0, 0))
+    paste_x = (canvas_size - new_w) // 2
+    paste_y = (canvas_size - new_h) // 2
+    app_icon_512.paste(resized, (paste_x, paste_y), resized)
 
-    # Local icons for Linux / COSMIC DE
+    # Save primary 512x512 icons
+    out_512_paths = [
+        os.path.join(root_dir, "images/waddle-icon.png"),
+        os.path.join(root_dir, "public/waddle-icon.png"),
+        os.path.join(root_dir, "src/assets/waddle-icon.png"),
+        os.path.join(root_dir, "src-tauri/icons/icon.png"),
+    ]
+    for p in out_512_paths:
+        os.makedirs(os.path.dirname(p), exist_ok=True)
+        app_icon_512.save(p, "PNG")
+        print(f"Saved 512x512 icon: {p}")
+
+    # Use tauri icon command to generate all platform bundle icons
+    icon_source = os.path.join(root_dir, "images/waddle-icon.png")
+    print(f"Running 'npx tauri icon {icon_source}'...")
+    subprocess.run(["npx", "tauri", "icon", icon_source], cwd=root_dir, check=True)
+
+    # Update Linux Desktop / User local icon cache (~/.local/share/icons/hicolor)
     user_home = os.path.expanduser("~")
-    local_icons_dir = os.path.join(user_home, ".local/share/icons/hicolor/512x512/apps")
-    os.makedirs(local_icons_dir, exist_ok=True)
-    app_icon_512.save(os.path.join(local_icons_dir, "waddle.png"), "PNG")
-    app_icon_512.save(os.path.join(local_icons_dir, "com.waddle.terminal.png"), "PNG")
+    local_icons_base = os.path.join(user_home, ".local/share/icons/hicolor")
 
-    print("All icons successfully converted to RGBA!")
+    desktop_icon_mappings = [
+        # Scalable SVGs
+        (src_svg, os.path.join(local_icons_base, "scalable/apps/waddle.svg"), "copy"),
+        (src_svg, os.path.join(local_icons_base, "scalable/apps/com.waddle.terminal.svg"), "copy"),
+        # 512x512 PNGs
+        (512, os.path.join(local_icons_base, "512x512/apps/waddle.png")),
+        (512, os.path.join(local_icons_base, "512x512/apps/com.waddle.terminal.png")),
+        # 256x256 PNGs
+        (256, os.path.join(local_icons_base, "256x256/apps/waddle.png")),
+        (256, os.path.join(local_icons_base, "256x256/apps/waddle-256x256.png")),
+        # 128x128 PNGs
+        (128, os.path.join(local_icons_base, "128x128/apps/waddle.png")),
+        (128, os.path.join(local_icons_base, "128x128/apps/waddle-128x128.png")),
+    ]
+
+    for item in desktop_icon_mappings:
+        if len(item) == 3 and item[2] == "copy":
+            src_f, dest_f, _ = item
+            os.makedirs(os.path.dirname(dest_f), exist_ok=True)
+            shutil.copyfile(src_f, dest_f)
+            print(f"Updated local desktop icon: {dest_f}")
+        else:
+            sz, dest_f = item
+            os.makedirs(os.path.dirname(dest_f), exist_ok=True)
+            resized_icon = app_icon_512.resize((sz, sz), Image.Resampling.LANCZOS)
+            resized_icon.save(dest_f, "PNG")
+            print(f"Updated local desktop icon: {dest_f} ({sz}x{sz})")
+
+    # Update GTK icon cache if command exists
+    if shutil.which("gtk-update-icon-cache"):
+        print("Updating GTK icon cache...")
+        subprocess.run(["gtk-update-icon-cache", "-f", "-t", local_icons_base], check=False)
+
+    print("All application, desktop, and Tauri icons successfully updated!")
 
 if __name__ == "__main__":
-    generate_rgba_icons()
+    generate_icons()

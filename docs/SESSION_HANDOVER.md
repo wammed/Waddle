@@ -1419,4 +1419,30 @@ npm run tauri dev
   - Suite 11 に `TC-INT-06`（`CommandPolicy` 攻撃・誤検知検証コーパス）を追加。
   - 設定モーダル内のテスト数バッジをハードコードから動的 `{TEST_CASES.length} Tests`（全 110 項目・11 スイート）に完全同期。
 
+---
 
+## 15. 開発履歴（セッション 15: 最新アプリアイコン `images/waddle-icon.svg` への全面更新）
+
+### 15.1 ユーザー要望と背景
+- **要望**:
+  - `images/waddle-icon.svg` の変更に伴い、アプリ内、デスクトップ環境、ドキュメント類、各種アイコンアセットをすべて最新に同期更新。
+
+### 15.2 実施内容と更新箇所
+1. **フロントエンドおよび Web 配信用アセット**:
+   - `images/waddle-icon.svg` を `public/waddle-icon.svg` および `src/assets/waddle-icon.svg` に完全同期。
+   - `index.html`（ファビコン）、`TitleBar.tsx`（タイトルバーブランドロゴ）、`SettingsModal.tsx`（設定ヘッダーおよび About カード内ロゴ）の表示を確認。`objectFit: 'contain'` により歪みなくピクセルパーフェクトに描画。
+   - `npm run build` を実行し、`dist/assets/waddle-icon-*.svg`（24.28 kB）のプロダクションバンドルを再生成。
+2. **正方形 512x512 PNG および全プラットフォーム用アイコン自動生成**:
+   - `images/waddle-icon.svg` の埋め込みグラフィックを抽出し、アスペクト比を厳格に保持したまま透過 512x512 RGBA 正方形キャンバスへセンタリング配置した `images/waddle-icon.png`, `public/waddle-icon.png`, `src/assets/waddle-icon.png`, `src-tauri/icons/icon.png` を生成。
+   - `npx tauri icon` を実行し、`src-tauri/icons/` 配下の Windows (`icon.ico`, 各種 Square PNG, StoreLogo), macOS (`icon.icns`), Linux 各解像度 PNG (`32x32.png`, `64x64.png`, `128x128.png`, `128x128@2x.png`), iOS (`AppIcon-*.png`), Android (`mipmap-*/ic_launcher*.png`) を全自動一括更新。
+3. **Linux デスクトップ環境 (`~/.local/share/icons/hicolor/`) 同期**:
+   - `~/.local/share/icons/hicolor/scalable/apps/waddle.svg` および `com.waddle.terminal.svg` を最新 SVG に同期。
+   - `512x512/apps/`, `256x256/apps/`, `128x128/apps/` の `waddle.png` 等をリサイズ生成して配置。
+   - `gtk-update-icon-cache -f -t ~/.local/share/icons/hicolor` を実行してシステムアイコンキャッシュを即時再構築。
+4. **アイコン生成スクリプト刷新 (`generate_icons.py`)**:
+   - 旧 `waddle-matte-icon.png` 前提のコードを、`images/waddle-icon.svg` を単一ソース（Single Source of Truth）としてフロントエンド・Tauri・Linux デスクトップ・GTK キャッシュまで一発で全自動更新するワークフローへ改修。
+5. **ドキュメント・テスト計画書の同期**:
+   - `docs/TEST_PLAN.md`, `docs/TEST_PLAN.ja.md`, `src/data/testPlanData.ts`, `tools/test_form.html` における `TC-THM-06`（アプリアイコンの統一性）の検証対象・期待値を `waddle-matte-icon.svg` から `waddle-icon.svg` へ更新。
+6. **テスト検証**:
+   - `npm run build`: 成功。
+   - `npm run test`: 全 13 テストファイル（104 テスト）100% PASS。
