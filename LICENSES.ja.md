@@ -1,7 +1,7 @@
 # ライセンスおよびサードパーティ通知 (Licensing & Third-Party Notice)
 
 <p align="center">
-  <a href="LICENSES.md">English</a> | <strong>日本語</strong>
+  <a href="docs/PORTAL.ja.md">ドキュメンテーションポータル</a> | <a href="LICENSES.md">English</a> | <strong>日本語</strong>
 </p>
 
 ---
@@ -190,7 +190,7 @@ npx license-checker --production --markdown > THIRD_PARTY_LICENSES_NPM.md
 | **npm 依存パッケージ** | 各パッケージの上流ライセンス (MIT, ISC, Apache-2.0 等) | `package.json` / `package-lock.json` 参照 |
 | **システム共有ライブラリ** | ホストディストリビューションのライセンス (LGPL 等) | ユーザー OS から動的提供（同梱・静的リンクなし） |
 | **Nerd Fonts** | 各上流フォントのライセンス (SIL OFL 等) | 非同梱、ホスト OS にインストールされたものを使用 |
-| **Waddle 独自アセット** | MIT License | 特に別途記載がない場合 |
+| **Waddle 独自アセット** | MIT License | 特に別途記載がない場合（詳細は [IP_COMPLIANCE.ja.md](IP_COMPLIANCE.ja.md) および [ICON_DESIGN_HISTORY.ja.md](ICON_DESIGN_HISTORY.ja.md) を参照） |
 | **Lucide Icons** | 上流オープンソースライセンス (MIT License) | 第三者アイコンライブラリ |
 | **Acknowledgements** | 情報提供 | アプリ内 About / Licenses を参照 |
 

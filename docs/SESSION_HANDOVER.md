@@ -1333,6 +1333,29 @@ npm run tauri dev
       - `npm run test`: 全 13 テストファイル（102 テスト）100% PASS。
       - `npm run test:security`: `cargo-deny`, `cargo-audit`, `secretlint`, `gitleaks`, セキュリティ回帰テスト全 6 柱 100% PASS。
 
+54. **アイコン意匠・知的財産（IP）監査履歴記録（`ICON_DESIGN_HISTORY`）の導入および全ドキュメント総合整理**:
+    - **背景と目的**:
+      - Waddle を含む 4 アプリケーション（Fluffy, Waddle, Rooney, Toodle）のアイコン意匠設計、AI 支援による類似性監査（Gemini）、および改訂プロセスの全容を記録した `ICON_DESIGN_HISTORY.md`（英語）および `ICON_DESIGN_HISTORY.ja.md`（日本語）の追加に伴い、リポジトリ内の全ドキュメント（`IP_COMPLIANCE`, `LICENSES`, `README`, `docs/PORTAL`, `docs/FEATURES`）の相互参照リンク、ナビゲーションヘッダー、ドキュメント構成を整理・統一。
+    - **主要な実施・整理項目**:
+      1. **`ICON_DESIGN_HISTORY.md` & `ICON_DESIGN_HISTORY.ja.md` の配備とナビゲーション整備**:
+         - 上部ナビゲーションバー（`Documentation Portal` / `ドキュメンテーションポータル` リンクおよび日英切り替え）を整備。
+      2. **`IP_COMPLIANCE.md` & `IP_COMPLIANCE.ja.md` の相互参照拡充**:
+         - ヘッダーに `Documentation Portal` へのリンクを追加。
+         - 第6節「Record Keeping」/「記録の保管」に、4アプリ横断の詳細記録である `ICON_DESIGN_HISTORY.md` / `ICON_DESIGN_HISTORY.ja.md` への相互参照リンクを追加。
+      3. **`LICENSES.md` & `LICENSES.ja.md` の整合性確保**:
+         - ヘッダーに `Documentation Portal` へのリンクを追加。
+         - 第9節サマリー表の「Waddle 独自アセット」補足欄に、`IP_COMPLIANCE.md` および `ICON_DESIGN_HISTORY.md` への参照リンクを追加。
+      4. **`README.md` & `README.ja.md` のポータル・ライセンス導線拡充**:
+         - `## 📚 Documentation Portal` セクションに法務・ライセンス・知財記録 3 文書（`LICENSES`, `IP_COMPLIANCE`, `ICON_DESIGN_HISTORY`）を追加。
+         - `## 📄 License` / `## 📄 ライセンス` セクションに、ライセンス・知的財産デューデリジェンス記録書・アイコン設計履歴への導線リストを追加。
+      5. **ドキュメントポータル (`docs/PORTAL.md` & `docs/PORTAL.ja.md`) の更新**:
+         - 総合ドキュメント一覧表（Master Documentation Index）に `LICENSES`, `IP_COMPLIANCE`, `ICON_DESIGN_HISTORY` を追加。
+         - クイックナビゲーションに「For Legal, Compliance & IP Provenance」/「法務・ライセンス・知的財産 (IP) プロヴェナンス」カテゴリを追加。
+      6. **機能仕様書 (`docs/FEATURES.md` & `docs/FEATURES.ja.md`) の整合性向上**:
+         - セクション 26（About / License）のフォント・ビジュアルアセット方針に `IP_COMPLIANCE` / `ICON_DESIGN_HISTORY` への正式言及を追記。
+      7. **全ドキュメントの日英対称性と相対リンク検証**:
+         - 全 18 ドキュメント（9組の日英ペア）の相対リンクの整合性を確認。
+
 ---
 
 ## 6. 次回再開時の検討・作業候補（Next Steps）

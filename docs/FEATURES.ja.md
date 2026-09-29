@@ -824,6 +824,7 @@ flowchart TD
 - **フォントおよびビジュアルアセット方針**:
   - Nerd Fontsの非同梱・非再配布（ホストOSローカル参照）および利用者のライセンス遵守責任を明記。
   - 独自SVGアセット・壁紙のMIT License、およびLucide IconsのMIT License採用を明記。
+  - アプリアイコンおよびビジュアルアイデンティティのプロヴェナンスおよび知的財産デューデリジェンス記録は [IP_COMPLIANCE.ja.md](../IP_COMPLIANCE.ja.md) および [ICON_DESIGN_HISTORY.ja.md](../ICON_DESIGN_HISTORY.ja.md) に体系的に文書化。
 - **完全同期された多言語対応**:
   - 英語（`en-US`, `en-GB`）と日本語（`ja`）で情報量・構成・項目数が100%完全に一致。
 

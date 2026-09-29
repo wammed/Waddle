@@ -1,7 +1,7 @@
 # Licensing & Third-Party Notice
 
 <p align="center">
-  <strong>English</strong> | <a href="LICENSES.ja.md">日本語</a>
+  <a href="docs/PORTAL.md">Documentation Portal</a> | <strong>English</strong> | <a href="LICENSES.ja.md">日本語</a>
 </p>
 
 ---
@@ -190,7 +190,7 @@ These generated reports are intended to assist with packaging and do not replace
 | **npm Dependencies** | Upstream Package Licenses (MIT, ISC, Apache-2.0, etc.) | See `package.json` / `package-lock.json` |
 | **System Shared Libraries** | Host Distribution Licenses (LGPL, etc.) | Dynamically provided by user OS (not bundled/statically linked) |
 | **Nerd Fonts** | Respective Upstream Licenses (SIL OFL, etc.) | Not bundled; uses fonts installed on host OS |
-| **Waddle Original Assets** | MIT License | Unless otherwise noted |
+| **Waddle Original Assets** | MIT License | Unless otherwise noted (see [IP_COMPLIANCE.md](IP_COMPLIANCE.md) & [ICON_DESIGN_HISTORY.md](ICON_DESIGN_HISTORY.md)) |
 | **Lucide Icons** | Upstream Open-Source License (MIT License) | Third-party icon library |
 | **Acknowledgements** | Informational | See in-app About / Licenses |
 

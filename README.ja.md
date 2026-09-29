@@ -142,7 +142,7 @@ sudo pacman -U src-tauri/target/release/bundle/pacman/waddle-0.1.0-1-x86_64.pkg.
 
 ## 📚 ドキュメントポータル (Documentation)
 
-Waddle の詳しいアーキテクチャや技術ドキュメントは `docs/` ディレクトリに集約されています：
+Waddle の詳しいアーキテクチャや技術ドキュメントは `docs/` およびリポジトリ直下に整理されています：
 
 - **[📚 ドキュメンテーションポータル (docs/PORTAL.ja.md)](docs/PORTAL.ja.md)**: 全技術ドキュメントの総合目次・ハブ
 - **[💡 機能仕様書 (docs/FEATURES.ja.md)](docs/FEATURES.ja.md)**: 全24機能の網羅的な技術仕様 & 設計思想
@@ -150,6 +150,9 @@ Waddle の詳しいアーキテクチャや技術ドキュメントは `docs/` �
 - **[📐 アーキテクチャ解説 (docs/ARCHITECTURE.ja.md)](docs/ARCHITECTURE.ja.md)**: PTYコア、IPC境界、プロセス管理の内部機構
 - **[🛡️ セキュリティポリシー (docs/SECURITY.ja.md)](docs/SECURITY.ja.md)**: 脅威モデル、多層防御、SSRF/DNS Pinning仕様
 - **[🧪 テスト計画書 (docs/TEST_PLAN.ja.md)](docs/TEST_PLAN.ja.md)**: 統合テストパイプライン、カバレッジ、品質保証
+- **[📄 ライセンスおよびサードパーティ通知 (LICENSES.ja.md)](LICENSES.ja.md)**: ソース配布方針、依存クレート管理（`cargo-deny`）、フォント規約
+- **[🛡️ IP デューデリジェンス記録書 (IP_COMPLIANCE.ja.md)](IP_COMPLIANCE.ja.md)**: アイコン意匠プロヴェナンス、類似性検証、IPデューデリジェンス記録
+- **[🎨 アイコンデザイン・IPレビュー履歴 (ICON_DESIGN_HISTORY.ja.md)](ICON_DESIGN_HISTORY.ja.md)**: 4アプリ横断AI生成対話ログ・類似性監査履歴
 
 ---
 
@@ -184,7 +187,13 @@ npm run test:security  # Gitleaks + Secretlint + cargo-audit + cargo-deny
 
 本プロジェクトは [MIT License](LICENSE) のもとで公開されています。
 
-ソースコードのみの配布方針、サードパーティ製クレート・パッケージのライセンス適合性（`cargo-deny` によるパーミッシブポリシー準拠）、GTK3 / WebKitGTK などシステム共有ライブラリの動的リンク解決、および再配布向けパッケージング時のライセンス抽出手順についての詳細は、[LICENSES.ja.md](LICENSES.ja.md) を参照してください（アプリ内の設定画面「About / ライセンス」からも主要OSSへの謝辞や正式ライセンス文書への導線を確認できます）。
+詳細なライセンス方針、サードパーティ製依存関係の管理、およびアセットのプロヴェナンス記録については以下を参照してください：
+
+* **[ライセンスおよびサードパーティ通知 (LICENSES.ja.md)](LICENSES.ja.md)**: ソースコードのみの配布方針、サードパーティ製クレート・パッケージのライセンス適合性（`cargo-deny` によるパーミッシブポリシー準拠）、GTK3 / WebKitGTK などシステム共有ライブラリの動的リンク解決、および再配布向けパッケージング時のライセンス抽出手順。
+* **[アイコンデザイン・IPデューデリジェンス記録 (IP_COMPLIANCE.ja.md)](IP_COMPLIANCE.ja.md)**: Waddle アイコンの由来、類似性監査結果、および知的財産デューデリジェンス記録。
+* **[アイコンデザイン・IPレビュー履歴 (ICON_DESIGN_HISTORY.ja.md)](ICON_DESIGN_HISTORY.ja.md)**: 4アプリケーションを網羅したAIアイコン生成対話ログおよび類似性レビュー履歴の統合記録。
+
+アプリ内の設定画面「About / ライセンス」（`Ctrl + ,`）からも主要OSSへの謝辞や正式ライセンス文書への導線を確認できます。
 
 ### フォントおよびライセンスについて (Fonts & Licensing)
 

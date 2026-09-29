@@ -142,7 +142,7 @@ sudo pacman -U src-tauri/target/release/bundle/pacman/waddle-0.1.0-1-x86_64.pkg.
 
 ## 📚 Documentation Portal
 
-Detailed technical documentation and guides are organized under `docs/`:
+Detailed technical documentation and guides are organized under `docs/` and root:
 
 - **[📚 Documentation Portal (docs/PORTAL.md)](docs/PORTAL.md)**: Central hub and index of all project documentation
 - **[💡 Feature Specifications (docs/FEATURES.md)](docs/FEATURES.md)**: Comprehensive deep dive into all 24 features & architecture decisions
@@ -150,6 +150,9 @@ Detailed technical documentation and guides are organized under `docs/`:
 - **[📐 Architecture Guide (docs/ARCHITECTURE.md)](docs/ARCHITECTURE.md)**: PTY engine, IPC boundaries, WebKitGTK optimization
 - **[🛡️ Security Policy (docs/SECURITY.md)](docs/SECURITY.md)**: Threat modeling, defense-in-depth, SSRF/DNS Pinning specs
 - **[🧪 Test Plan & QA (docs/TEST_PLAN.md)](docs/TEST_PLAN.md)**: Multi-layer testing suite, coverage dashboards, memory audit
+- **[📄 Licensing & Third-Party Notice (LICENSES.md)](LICENSES.md)**: Source distribution model, crate compliance (`cargo-deny`), font governance
+- **[🛡️ IP Compliance Due Diligence (IP_COMPLIANCE.md)](IP_COMPLIANCE.md)**: Icon provenance, similarity audit, and IP due-diligence record
+- **[🎨 Icon Design & IP Review History (ICON_DESIGN_HISTORY.md)](ICON_DESIGN_HISTORY.md)**: Cross-application AI generation logs and design iterations
 
 ---
 
@@ -184,7 +187,13 @@ npm run test:security  # Gitleaks + Secretlint + cargo-audit + cargo-deny
 
 This project is licensed under the [MIT License](LICENSE).
 
-For detailed information regarding our source-code-only distribution policy, third-party dependency compliance (`cargo-deny` permissive policy), dynamic linking of system libraries (GTK3, WebKitGTK), and guidance on extracting dependency notices for redistributable packaging, please see [LICENSES.md](LICENSES.md). An in-app **About / Licenses** section is also available directly in the application Settings (`Ctrl + ,`).
+For detailed licensing policies, third-party dependency compliance, and asset provenance records, please see:
+
+* **[Licensing & Third-Party Notice (LICENSES.md)](LICENSES.md)**: Source-code-only distribution policy, third-party dependency compliance (`cargo-deny` permissive policy), dynamic linking of system libraries (GTK3, WebKitGTK), and guidance on extracting dependency notices for redistributable packaging.
+* **[Icon Design & IP Compliance Due Diligence Record (IP_COMPLIANCE.md)](IP_COMPLIANCE.md)**: Waddle icon provenance, similarity audit findings, and due diligence.
+* **[Icon Design & IP Review History (ICON_DESIGN_HISTORY.md)](ICON_DESIGN_HISTORY.md)**: Integrated chronological archive of AI icon generation and similarity reviews across the 4 applications.
+
+An in-app **About / Licenses** section is also available directly in the application Settings (`Ctrl + ,`).
 
 ### Fonts & Licensing
 

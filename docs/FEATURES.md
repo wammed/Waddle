@@ -823,6 +823,7 @@ flowchart TD
 - **Fonts & Visual Assets Clearance**:
   - Reaffirms Waddle's policy: Nerd Fonts are not bundled or redistributed; users leverage locally installed fonts on their host operating system and maintain responsibility for licensing.
   - Affirms original SVG assets and wallpapers are provided under the MIT License, and UI icons via Lucide Icons under MIT.
+  - Formal provenance and IP due-diligence records for application icons and visual identity are documented in [IP_COMPLIANCE.md](../IP_COMPLIANCE.md) and [ICON_DESIGN_HISTORY.md](../ICON_DESIGN_HISTORY.md).
 - **100% Synchronized Multilingual Support**:
   - Fully translated with identical depth, structure, and parity across English (`en-US`, `en-GB`) and Japanese (`ja`).
 

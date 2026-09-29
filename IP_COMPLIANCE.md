@@ -1,7 +1,7 @@
 # Icon Design & IP Compliance Due Diligence Record
 
 <p align="center">
-  <strong>English</strong> | <a href="IP_COMPLIANCE.ja.md">日本語</a>
+  <a href="docs/PORTAL.md">Documentation Portal</a> | <strong>English</strong> | <a href="IP_COMPLIANCE.ja.md">日本語</a>
 </p>
 
 This document records the provenance, design-review history, and IP due-diligence process for the **Waddle** application icon.
@@ -65,7 +65,7 @@ No claim is made that no third-party mark anywhere in the world is similar to th
 
 ## 6. Record Keeping
 
-The detailed Gemini conversation is retained separately as the underlying development/provenance record.
+The detailed Gemini conversation is retained separately as the underlying development/provenance record. For the comprehensive cross-application historical archive covering initial generation, similarity reviews, and design transitions across Fluffy, Waddle, Rooney, and Toodle, see [ICON_DESIGN_HISTORY.md](ICON_DESIGN_HISTORY.md).
 
 This document is the concise public-facing record and should be updated if the icon changes materially.
 

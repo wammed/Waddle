@@ -17,6 +17,9 @@ Waddle の設計思想、内部アーキテクチャ、機能仕様、セキュ�
 | **[🔍 セキュリティステータス (SECURITY STATUS)](SECURITY_STATUS_ja.md)** | [JA](SECURITY_STATUS_ja.md) / [EN](SECURITY_STATUS.md) | Gitleaks、Secretlint、cargo-audit、cargo-deny、侵入・ファジングテスト結果レポート | セキュリティ担当 / 開発者 |
 | **[🧪 テスト計画・品質保証 (TEST PLAN)](TEST_PLAN.ja.md)** | [JA](TEST_PLAN.ja.md) / [EN](TEST_PLAN.md) | 統合テストパイプライン、メモリリーク検証、Playwright 描画テスト、カバレッジ | コントリビューター / QA |
 | **[📊 テスト実行証跡 (Test Execution Evidence)](Waddle_Test_Execution_Evidence_ja.md)** | [JA](Waddle_Test_Execution_Evidence_ja.md) | 実際の自動テスト実行結果、カバレッジダッシュボード証跡 | 開発チーム |
+| **[📄 ライセンスおよびサードパーティ通知 (LICENSES)](../LICENSES.ja.md)** | [JA](../LICENSES.ja.md) / [EN](../LICENSES.md) | ソースコード配布モデル、`cargo-deny` による依存関係監査、フォント管理基準 | 全ユーザー / パッケージング |
+| **[🛡️ IP デューデリジェンス記録書 (IP COMPLIANCE)](../IP_COMPLIANCE.ja.md)** | [JA](../IP_COMPLIANCE.ja.md) / [EN](../IP_COMPLIANCE.md) | アイコン意匠プロヴェナンス、類似性レビュー結果、IPデューデリジェンス記録 | 全ユーザー / 法務 |
+| **[🎨 アイコンデザイン・IPレビュー履歴 (ICON DESIGN HISTORY)](../ICON_DESIGN_HISTORY.ja.md)** | [JA](../ICON_DESIGN_HISTORY.ja.md) / [EN](../ICON_DESIGN_HISTORY.md) | 4アプリ横断AI生成対話ログ、類似性監査履歴、デザイン変更の全記録 | 全ユーザー / 法務 |
 | **[🤝 セッション引継ぎ書 (SESSION HANDOVER)](SESSION_HANDOVER.md)** | [EN](SESSION_HANDOVER.md) | 開発背景、過去の実装経緯、既知の課題、今後のロードマップ | 開発チーム |
 
 ---
@@ -32,6 +35,11 @@ Waddle の設計思想、内部アーキテクチャ、機能仕様、セキュ�
 1. [アーキテクチャ解説](ARCHITECTURE.ja.md) で Rust バックエンドと React フロントエンドの責務分担を理解。
 2. [セキュリティポリシー](SECURITY.ja.md) で IPC 境界とコマンド安全検証ルールを確認。
 3. 変更を加えたら [テスト計画書](TEST_PLAN.ja.md) に従って `npm run test:all` を実行。
+
+### 法務・ライセンス・知的財産 (IP) プロヴェナンス
+1. [ライセンスおよびサードパーティ通知](../LICENSES.ja.md) でソース配布方針、依存クレート管理、フォント規約を確認。
+2. [IP デューデリジェンス記録書](../IP_COMPLIANCE.ja.md) で Waddle アイコンの由来と類似性検証結果を確認。
+3. [アイコンデザイン・IPレビュー履歴](../ICON_DESIGN_HISTORY.ja.md) で4アプリを横断したAI対話・変更履歴の全容を確認。
 
 ---
 

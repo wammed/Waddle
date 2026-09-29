@@ -1,7 +1,7 @@
 # アイコンデザインおよび知的財産コンプライアンス・デューデリジェンス記録
 
 <p align="center">
-  <a href="IP_COMPLIANCE.md">English</a> | <strong>日本語</strong>
+  <a href="docs/PORTAL.ja.md">ドキュメンテーションポータル</a> | <a href="IP_COMPLIANCE.md">English</a> | <strong>日本語</strong>
 </p>
 
 本書は、**Waddle** アプリケーションアイコンの由来（プロベナンス）、デザインレビューの履歴、および知的財産（IP）デューデリジェンスのプロセスを記録するものです。
@@ -65,7 +65,7 @@ Gemini との対話記録には「リスクゼロ (zero risk)」「完全な適�
 
 ## 6. 記録の保管 (Record Keeping)
 
-詳細な Gemini との対話内容は、基礎となる開発および由来の記録として別途保管されています。
+詳細な Gemini との対話内容は、基礎となる開発および由来の記録として別途保管されています。初期の生成経緯、4アプリケーション（Fluffy, Waddle, Rooney, Toodle）を横断した類似性レビュー、デザインの変遷等の包括的な詳細履歴については、[ICON_DESIGN_HISTORY.ja.md](ICON_DESIGN_HISTORY.ja.md) を参照してください。
 
 本書は公開向けの簡潔な記録であり、アイコンに重大な変更が生じた場合は更新される必要があります。
 
