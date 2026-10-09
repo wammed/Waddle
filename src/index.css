@@ -782,6 +782,30 @@ body, html {
   width: 100%;
 }
 
+.chat-markdown p {
+  margin-bottom: 8px;
+  line-height: 1.5;
+}
+
+.chat-markdown p:last-child {
+  margin-bottom: 0;
+}
+
+.chat-markdown ul,
+.chat-markdown ol {
+  padding-left: 20px;
+  margin: 6px 0;
+}
+
+.chat-markdown li {
+  margin-bottom: 4px;
+  line-height: 1.5;
+}
+
+.chat-markdown li:last-child {
+  margin-bottom: 0;
+}
+
 .chat-markdown pre {
   background: rgba(0, 0, 0, 0.5);
   border: 1px solid var(--border);
