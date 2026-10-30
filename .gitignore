@@ -8,3 +8,7 @@ src-tauri/target/
 coverage/
 test-results/
 playwright-report/
+
+# Documentation
+docs/TEST*
+docs/Waddle*
