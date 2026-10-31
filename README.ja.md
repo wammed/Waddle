@@ -95,7 +95,30 @@ npm install
 npm run tauri dev
 ```
 
-### 4. プロダクションビルド & パッケージング
+### 4. ローカルインストール（$HOME/.local/bin & COSMIC ランチャー登録）
+
+リリースバイナリを `$HOME/.local/bin/waddle` に配置し、COSMIC ランチャー（およびドック・アプリライブラリ）にアプリアイコンと `.desktop` エントリを登録するインストールスクリプトが用意されています。
+
+```bash
+# ワンライナーでバイナリ配置・アイコン登録・キャッシュ更新を実行
+./install.sh
+
+# または npm スクリプト経由で実行
+npm run install:local
+
+# ソースコードから最新リリースバイナリを強制再ビルドしてインストールする場合:
+./install.sh --build
+```
+
+**スクリプトが自動で行う処理:**
+- 📦 **バイナリ配置**: `src-tauri/target/release/waddle` を `$HOME/.local/bin/waddle` へインストール（実行権限 `755`）。
+- 🎨 **アイコン配置**: 最新の高解像度アイコン（`images/waddle-icon.svg`）に基づき、`$HOME/.local/share/icons/hicolor/` 配下に scalable SVG および各解像度（16px 〜 512px）の PNG アイコンを配置。
+- 🚀 **デスクトップエントリ作成**: `$HOME/.local/share/applications/waddle.desktop` および `com.waddle.terminal.desktop` を生成。
+- 🔄 **システムキャッシュ更新**: `update-desktop-database`、`gtk-update-icon-cache`、`gtk4-update-icon-cache` を実行し、COSMIC デスクトップ環境のランチャーやドックへ即座に反映。
+
+> 💡 **起動方法**: インストール完了後、COSMIC ランチャー（`Super` キー）またはアプリケーションライブラリから **"Waddle"** を検索して起動できます。また、ターミナルから `waddle` コマンドでも起動可能です（`$HOME/.local/bin` が `$PATH` に含まれている必要があります）。
+
+### 5. プロダクションビルド & Pacman パッケージング
 
 ```bash
 # Arch Linux 向けネイティブ Pacman パッケージ (.pkg.tar.zst) をビルド

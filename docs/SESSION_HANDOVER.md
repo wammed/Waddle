@@ -1491,6 +1491,12 @@ npm run tauri dev
 4. **ネイティブリリースバイナリの再コンパイルと配備**:
    - `cargo build --release` を実行し、最新アイコンリソースをコンパイルしたリリースバイナリを生成。
    - `/home/susie/.local/bin/waddle` へ再配置（実行権限 755）。
-5. **テスト検証**:
+5. **ワンクリック/ローカルインストールスクリプトの新設 (`scripts/install.sh`, `./install.sh`)**:
+   - バイナリを `$HOME/.local/bin/waddle` へ配置（755）し、`$HOME/.local/share/icons/hicolor/` への各解像度 PNG / scalable SVG 配置、COSMIC ランチャー用デスクトップエントリ（`waddle.desktop`, `com.waddle.terminal.desktop`）作成、および `update-desktop-database`, `gtk-update-icon-cache`, `gtk4-update-icon-cache` を一括自動実行するスクリプトを新設。
+   - ルート直下に `install.sh` のシンボリックリンクを配備し、`package.json` に `"install:local": "bash scripts/install.sh"` を追加。
+   - オプション `--build` / `-b` による強制再ビルドモードに対応。
+6. **テスト検証**:
    - `npm test`: 全 13 テストファイル（104 テスト項目）100% PASS。
+   - `bash scripts/install.sh`: 正常完了確認。
+
 

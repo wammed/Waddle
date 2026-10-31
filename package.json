@@ -18,7 +18,8 @@
     "prepare": "lefthook install",
     "tauri": "tauri",
     "build:pacman": "bash scripts/build-pacman.sh",
-    "package": "npm run build:pacman"
+    "package": "npm run build:pacman",
+    "install:local": "bash scripts/install.sh"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",

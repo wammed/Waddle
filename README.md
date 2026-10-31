@@ -95,7 +95,30 @@ npm install
 npm run tauri dev
 ```
 
-### 4. Production Build & Packaging
+### 4. Local Installation ($HOME/.local/bin & COSMIC Launcher Registration)
+
+An automated installation script is provided to install the release binary to `$HOME/.local/bin/waddle` and register application icon assets and desktop entries for the COSMIC Launcher (and application library / dock).
+
+```bash
+# One-liner to install binary, icon assets, and refresh desktop caches
+./install.sh
+
+# Or run via npm script
+npm run install:local
+
+# Force re-compiling the latest release binary from source before installing:
+./install.sh --build
+```
+
+**Automated Steps Performed by the Installer:**
+- 📦 **Binary Installation**: Installs `src-tauri/target/release/waddle` to `$HOME/.local/bin/waddle` with executable permissions (`755`).
+- 🎨 **Icon Deployment**: Deploys scalable SVG and raster PNG icons across all standard launcher resolutions (16px to 512px) into `$HOME/.local/share/icons/hicolor/`.
+- 🚀 **Desktop Entry Creation**: Generates `$HOME/.local/share/applications/waddle.desktop` and `com.waddle.terminal.desktop`.
+- 🔄 **Cache Refresh**: Executes `update-desktop-database`, `gtk-update-icon-cache`, and `gtk4-update-icon-cache` for instant recognition by the COSMIC Launcher and dock.
+
+> 💡 **Launching**: After installation, press the `Super` key to open the COSMIC Launcher and search for **"Waddle"**, or run `waddle` directly from any terminal (ensure `$HOME/.local/bin` is in your `$PATH`).
+
+### 5. Production Build & Packaging
 
 ```bash
 # Build native Pacman package (.pkg.tar.zst) for Arch Linux / CachyOS
