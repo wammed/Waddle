@@ -6,7 +6,14 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Resolve symlinks so this script works correctly when invoked via a symlink (e.g., ./install.sh)
+PRG="${BASH_SOURCE[0]}"
+while [ -h "$PRG" ]; do
+    DIR="$(cd -P "$(dirname "$PRG")" && pwd)"
+    PRG="$(readlink "$PRG")"
+    [[ $PRG != /* ]] && PRG="$DIR/$PRG"
+done
+SCRIPT_DIR="$(cd -P "$(dirname "$PRG")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # Color definitions
@@ -52,13 +59,19 @@ RELEASE_BIN="$ROOT_DIR/src-tauri/target/release/waddle"
 # ------------------------------------------------------------------------------
 # 1. Build or Locate Release Binary
 # ------------------------------------------------------------------------------
+# Check if existing binary was incorrectly compiled with devUrl (localhost:1420)
+NEEDS_REBUILD=false
 if [[ "$FORCE_BUILD" == true ]] || [[ ! -f "$RELEASE_BIN" ]]; then
-    echo -e "${BLUE}🔨 Building release binary (frontend & Rust)...${NC}"
+    NEEDS_REBUILD=true
+elif strings "$RELEASE_BIN" 2>/dev/null | grep -q "localhost:1420"; then
+    echo -e "${YELLOW}⚠️  Existing binary was compiled in dev mode (targets localhost:1420). Rebuilding for production...${NC}"
+    NEEDS_REBUILD=true
+fi
+
+if [[ "$NEEDS_REBUILD" == true ]]; then
+    echo -e "${BLUE}🔨 Compiling frontend & standalone release binary via Tauri...${NC}"
     cd "$ROOT_DIR"
-    if [[ ! -d "$ROOT_DIR/dist" ]]; then
-        npm run build
-    fi
-    cargo build --release --manifest-path "$ROOT_DIR/src-tauri/Cargo.toml"
+    npx tauri build --no-bundle --ignore-version-mismatches
 fi
 
 if [[ ! -f "$RELEASE_BIN" ]]; then
