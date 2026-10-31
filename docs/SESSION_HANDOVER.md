@@ -1469,3 +1469,28 @@ npm run tauri dev
 6. **テスト検証**:
    - `npm run build`: 成功。
    - `npm run test`: 全 13 テストファイル（104 テスト）100% PASS。
+
+---
+
+## 16. 開発履歴（セッション 16: 新規アイコン `images/waddle-icon.svg` に伴うドックランチャー等全環境のアイコン完全更新）
+
+### 16.1 ユーザー要望
+- **要望**: 「アイコンを images/waddle-icon.svg に変更したので、ドックランチャー等すべてのアイコンを更新してください」
+
+### 16.2 実施内容と更新箇所
+1. **ソースアイコンおよびフロントエンド・アセットの完全同期**:
+   - 新規 `images/waddle-icon.svg`（暗赤褐色CRT筐体 × 水平走査線 × `>_` プロンプト発光パルス）から、512x512 正方形 PNG（透過キャンバスセンタリング）を生成。
+   - `public/waddle-icon.svg`, `public/waddle-icon.png`, `src/assets/waddle-icon.svg`, `src/assets/waddle-icon.png` を完全同期。
+   - `npm run build` を実行し、Vite バンドル（`dist/assets/waddle-icon-CH1d3HuF.svg`）を再生成。
+2. **全プラットフォーム用 Tauri バンドルアイコン一括更新**:
+   - `npx tauri icon images/waddle-icon.png` を実行し、`src-tauri/icons/` 配下の全フォーマット（ICO, ICNS, 各解像度 PNG, iOS, Android）を最新化。
+3. **Linux / COSMIC デスクトップ環境・ドックランチャーの完全刷新**:
+   - `generate_icons.py` を機能拡張し、16x16, 32x32, 48x48, 64x64, 128x128, 256x256, 512x512 の全解像度 PNG および scalable SVG を `~/.local/share/icons/hicolor/` 配下に `waddle` と `com.waddle.terminal` の双方の名前で配置。
+   - `~/.local/share/applications/waddle.desktop` および `~/.local/share/applications/com.waddle.terminal.desktop` を最新仕様（`Icon=waddle`）で同期・更新。
+   - `update-desktop-database`、`gtk-update-icon-cache`、`gtk4-update-icon-cache` を実行し、システムおよび COSMIC ドック（`cosmic-app-list`, `cosmic-panel`, `cosmic-launcher`）のアイコンキャッシュを即時再構築。
+4. **ネイティブリリースバイナリの再コンパイルと配備**:
+   - `cargo build --release` を実行し、最新アイコンリソースをコンパイルしたリリースバイナリを生成。
+   - `/home/susie/.local/bin/waddle` へ再配置（実行権限 755）。
+5. **テスト検証**:
+   - `npm test`: 全 13 テストファイル（104 テスト項目）100% PASS。
+

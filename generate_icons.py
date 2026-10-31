@@ -88,9 +88,23 @@ def generate_icons():
         # 256x256 PNGs
         (256, os.path.join(local_icons_base, "256x256/apps/waddle.png")),
         (256, os.path.join(local_icons_base, "256x256/apps/waddle-256x256.png")),
+        (256, os.path.join(local_icons_base, "256x256/apps/com.waddle.terminal.png")),
         # 128x128 PNGs
         (128, os.path.join(local_icons_base, "128x128/apps/waddle.png")),
         (128, os.path.join(local_icons_base, "128x128/apps/waddle-128x128.png")),
+        (128, os.path.join(local_icons_base, "128x128/apps/com.waddle.terminal.png")),
+        # 64x64 PNGs
+        (64, os.path.join(local_icons_base, "64x64/apps/waddle.png")),
+        (64, os.path.join(local_icons_base, "64x64/apps/com.waddle.terminal.png")),
+        # 48x48 PNGs
+        (48, os.path.join(local_icons_base, "48x48/apps/waddle.png")),
+        (48, os.path.join(local_icons_base, "48x48/apps/com.waddle.terminal.png")),
+        # 32x32 PNGs
+        (32, os.path.join(local_icons_base, "32x32/apps/waddle.png")),
+        (32, os.path.join(local_icons_base, "32x32/apps/com.waddle.terminal.png")),
+        # 16x16 PNGs
+        (16, os.path.join(local_icons_base, "16x16/apps/waddle.png")),
+        (16, os.path.join(local_icons_base, "16x16/apps/com.waddle.terminal.png")),
     ]
 
     for item in desktop_icon_mappings:
@@ -106,10 +120,44 @@ def generate_icons():
             resized_icon.save(dest_f, "PNG")
             print(f"Updated local desktop icon: {dest_f} ({sz}x{sz})")
 
-    # Update GTK icon cache if command exists
+    # Update Desktop Entries (~/.local/share/applications)
+    local_apps_dir = os.path.join(user_home, ".local/share/applications")
+    os.makedirs(local_apps_dir, exist_ok=True)
+    desktop_content = """[Desktop Entry]
+Name=Waddle
+GenericName=AI Terminal Emulator
+Comment=AI-Integrated Next-Generation Linux Terminal Emulator
+Exec=/home/susie/.local/bin/waddle %U
+Icon=waddle
+Terminal=false
+Type=Application
+Categories=System;TerminalEmulator;Development;Utility;
+Keywords=terminal;shell;prompt;command;ai;ollama;xterm;
+StartupWMClass=waddle
+"""
+    desktop_files = [
+        os.path.join(local_apps_dir, "waddle.desktop"),
+        os.path.join(local_apps_dir, "com.waddle.terminal.desktop"),
+    ]
+    for df in desktop_files:
+        with open(df, "w", encoding="utf-8") as f:
+            f.write(desktop_content)
+        # Touch to ensure mtime changes
+        os.utime(df, None)
+        print(f"Updated desktop entry: {df}")
+
+    # Update desktop database if available
+    if shutil.which("update-desktop-database"):
+        print("Updating desktop database...")
+        subprocess.run(["update-desktop-database", local_apps_dir], check=False)
+
+    # Update GTK icon cache if commands exist
     if shutil.which("gtk-update-icon-cache"):
         print("Updating GTK icon cache...")
         subprocess.run(["gtk-update-icon-cache", "-f", "-t", local_icons_base], check=False)
+    if shutil.which("gtk4-update-icon-cache"):
+        print("Updating GTK4 icon cache...")
+        subprocess.run(["gtk4-update-icon-cache", "-f", "-t", local_icons_base], check=False)
 
     print("All application, desktop, and Tauri icons successfully updated!")
 
